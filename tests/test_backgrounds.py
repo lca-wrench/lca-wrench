@@ -125,6 +125,27 @@ def test_single_scenario_takes_the_counterparts(world):
         backgrounds.set_choice("auto", [], roles)
 
 
+def test_working_copy_keeps_the_background_choice(world):
+    """Regression: the copy reverted to "auto" and calculated on today's data instead of the chosen scenario."""
+    roles = models.roles()
+    backgrounds.set_choice("single", [SC], roles)
+    name = None
+    try:
+        name = s.make_working_copy()
+        assert bd.projects.current == name
+        assert backgrounds.choice(models.roles()) == {"mode": "single", "databases": [SC]}
+        assert models.system().score({world: 1}, GWP) == pytest.approx(Y2040, rel=1e-6)
+    finally:
+        bd.projects.set_current(TEST_PROJECT)
+        if name:
+            bd.projects.delete_project(name, delete_dir=True)
+            reg = models.registry.load()
+            for key in ("copies", "backgrounds", "models"):
+                reg.get(key, {}).pop(name, None)
+            models.registry.save(reg)
+        backgrounds.set_choice("auto", [], roles)
+
+
 def test_combined_and_compare_per_item(world):
     roles = models.roles()
     st = backgrounds.set_choice("combined", [EI, SC], roles)

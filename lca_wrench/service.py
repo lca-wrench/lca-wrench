@@ -809,6 +809,12 @@ def make_working_copy() -> str:
     models_of = reg.get("models", {}).get(cur)
     if models_of:
         reg.setdefault("models", {})[name] = list(models_of)
+    # the copy calculates on the same background as its original (a reused name must not keep a deleted copy's)
+    bg_of = reg.get("backgrounds", {}).get(cur)
+    if bg_of:
+        reg.setdefault("backgrounds", {})[name] = dict(bg_of)
+    else:
+        reg.get("backgrounds", {}).pop(name, None)
     registry.save(reg)
     return name
 
