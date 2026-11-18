@@ -802,6 +802,9 @@ def make_working_copy() -> str:
         n += 1
         name = _("{base} – Arbeitskopie {n}", base=base, n=n)
     bd.projects.copy_project(name, switch=True)
+    # a reused name must not get the cached results of a deleted copy (the cache is keyed by name and versions)
+    engine.bump_background(name)
+    engine.bump_foreground(name)
     reg = registry.load()
     reg["copies"][name] = {"original": cur, "created": time.strftime("%Y-%m-%dT%H:%M:%S"), "changes": []}
     reg.get("journal", {}).pop(name, None)  # a reused name must not inherit the undo steps of a deleted copy
@@ -809,6 +812,12 @@ def make_working_copy() -> str:
     models_of = reg.get("models", {}).get(cur)
     if models_of:
         reg.setdefault("models", {})[name] = list(models_of)
+    # the copy calculates on the same background as its original (a reused name must not keep a deleted copy's)
+    bg_of = reg.get("backgrounds", {}).get(cur)
+    if bg_of:
+        reg.setdefault("backgrounds", {})[name] = dict(bg_of)
+    else:
+        reg.get("backgrounds", {}).pop(name, None)
     registry.save(reg)
     return name
 
@@ -831,11 +840,16 @@ def edit_exchange(exchange_id: int, amount: float) -> dict:
     if old == amount:
         return {"changed": False}
     output, inp = exc.output, exc.input
-    models.rescale_uncertainty(exc, old, float(amount))
-    exc["amount"] = float(amount)
-    exc.save()
     changes = reg["copies"][cur]["changes"]
     prior = next((c for c in changes if c["exchange"] == exchange_id), None)
+    unc = ({k: models._plain(exc.get(k)) for k in models.UNC_FIELDS}
+           if int(exc.get("uncertainty type") or 0) > 1 else None)
+    if prior and prior.get("unc") and float(amount) == prior["old"]:
+        models._apply_fields(exc, prior["unc"])  # back to the original amount: the distribution exactly as before
+    else:
+        models.rescale_uncertainty(exc, old, float(amount))
+    exc["amount"] = float(amount)
+    exc.save()
     if prior:
         prior["new"] = float(amount)
         if prior["new"] == prior["old"]:
@@ -843,7 +857,8 @@ def edit_exchange(exchange_id: int, amount: float) -> dict:
     else:
         changes.append({"exchange": exchange_id, "activity_id": str(output.id), "activity": output["name"],
                         "location": output.get("location"), "input": inp["name"], "unit": short_unit(inp.get("unit")),
-                        "old": old, "new": float(amount), "time": time.strftime("%Y-%m-%dT%H:%M:%S")})
+                        "old": old, "new": float(amount), "time": time.strftime("%Y-%m-%dT%H:%M:%S"),
+                        **({"unc": unc} if unc else {})})
     registry.save(reg)
     engine.bump_background(cur)
     return {"changed": True}

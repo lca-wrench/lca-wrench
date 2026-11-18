@@ -125,6 +125,66 @@ def test_single_scenario_takes_the_counterparts(world):
         backgrounds.set_choice("auto", [], roles)
 
 
+def test_working_copy_keeps_the_background_choice(world):
+    """Regression: the copy reverted to "auto" and calculated on today's data instead of the chosen scenario."""
+    roles = models.roles()
+    backgrounds.set_choice("single", [SC], roles)
+    name = None
+    try:
+        name = s.make_working_copy()
+        assert bd.projects.current == name
+        assert backgrounds.choice(models.roles()) == {"mode": "single", "databases": [SC]}
+        assert models.system().score({world: 1}, GWP) == pytest.approx(Y2040, rel=1e-6)
+        # a lognormal background amount set to 0: no distribution left (it sampled around the old amount);
+        # undo brings the distribution back exactly
+        exc = next(iter(bd.get_node(database=EI, code="elec").technosphere()))
+        exc.update({"uncertainty type": 2, "loc": float(np.log(0.001)), "scale": 0.3})
+        exc.save()
+        eid = exc._document.id
+        s.edit_exchange(eid, 0.0)
+        e = next(iter(bd.get_node(database=EI, code="elec").technosphere()))
+        assert e["amount"] == 0 and int(e.get("uncertainty type") or 0) == 0 and e.get("loc") is None
+        s.undo_change(eid)
+        e = next(iter(bd.get_node(database=EI, code="elec").technosphere()))
+        assert e["amount"] == pytest.approx(0.001) and e["uncertainty type"] == 2 and e["scale"] == 0.3
+        assert e["loc"] == pytest.approx(np.log(0.001)) and s.state()["changes"] == []
+    finally:
+        bd.projects.set_current(TEST_PROJECT)
+        if name:
+            bd.projects.delete_project(name, delete_dir=True)
+            reg = models.registry.load()
+            for key in ("copies", "backgrounds", "models"):
+                reg.get(key, {}).pop(name, None)
+            models.registry.save(reg)
+        backgrounds.set_choice("auto", [], roles)
+
+
+def test_reused_working_copy_name_is_not_served_from_the_cache(world):
+    """Regression: a new copy with the name of a deleted, edited one returned the deleted copy's cached score."""
+    names = []
+
+    def drop(name):
+        bd.projects.set_current(TEST_PROJECT)
+        bd.projects.delete_project(name, delete_dir=True)
+        reg = models.registry.load()
+        for key in ("copies", "backgrounds", "models"):
+            reg.get(key, {}).pop(name, None)
+        models.registry.save(reg)
+
+    try:
+        names.append(s.make_working_copy())
+        co2 = next(iter(bd.get_node(database=EI, code="elec").biosphere()))
+        s.edit_exchange(co2._document.id, 10.0)
+        assert models.system().score({world: 1}, GWP) > 50
+        drop(names.pop())
+        names.append(s.make_working_copy())
+        assert models.system().score({world: 1}, GWP) == pytest.approx(TODAY, rel=1e-6)
+    finally:
+        for name in names:
+            drop(name)
+        bd.projects.set_current(TEST_PROJECT)
+
+
 def test_combined_and_compare_per_item(world):
     roles = models.roles()
     st = backgrounds.set_choice("combined", [EI, SC], roles)

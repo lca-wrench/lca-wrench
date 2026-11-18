@@ -116,6 +116,21 @@ def test_set_move_and_undo(proc):
         models.set_uncertainty(next(iter(bg.technosphere()))._document.id, {"type": "lognormal", "gsd2": 2})
 
 
+def test_amount_zero_drops_the_lognormal_and_undo_restores_it(proc):
+    """Regression: set to 0, a lognormal kept loc = ln(old amount), so Monte Carlo sampled around the old value."""
+    p, ex = proc
+    models.set_uncertainty(ex, {"type": "lognormal", "gsd2": 2})
+    before = {k: models._plain(models.Exchange(models.ExchangeDataset.get_by_id(ex)).get(k)) for k in models.UNC_FIELDS}
+    models.update_exchange(ex, amount=0.0)
+    exc = models.Exchange(models.ExchangeDataset.get_by_id(ex))
+    assert exc["amount"] == 0 and int(exc.get("uncertainty type") or 0) == 0 and exc.get("loc") is None
+    assert _row(p, ex)[1]["uncertainty"] is None
+    models.undo()
+    exc = models.Exchange(models.ExchangeDataset.get_by_id(ex))
+    assert exc["amount"] == 10 and {k: models._plain(exc.get(k)) for k in models.UNC_FIELDS} == before
+    models.undo()
+
+
 def test_api_and_description_in_search(proc):
     p, ex = proc
     with TestClient(app, base_url="http://127.0.0.1", headers={"X-LCA-Wrench": "1"}) as c:

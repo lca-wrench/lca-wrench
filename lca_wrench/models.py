@@ -493,6 +493,11 @@ def _apply_fields(exc, fields: dict) -> None:
 def rescale_uncertainty(exc, old: float, new: float) -> None:
     """After a new amount: the distribution moves along, with the same relative spread."""
     kind = int(exc.get("uncertainty type") or 0)
+    if kind > 1 and not new:
+        # no relative spread around 0 (a lognormal kept sampling around the old amount): no distribution.
+        # The callers keep the old fields for undo.
+        _apply_fields(exc, uncertainty_fields(0.0, None))
+        return
     if kind == 2 and new:
         import math
 
