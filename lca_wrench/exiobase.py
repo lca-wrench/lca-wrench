@@ -54,6 +54,8 @@ def write(path, name: str, biosphere: str) -> dict:
     say("phase", "read")
     ex = Exiobase3MonetaryImporter(path, name)
     ex.apply_strategies()
+    # re-read the metadata before writing: the app may have added databases while this process read the table
+    bd.databases.load()
     new_bio = _new_biosphere(ex, name)
     add_biosphere_ids(ex.biosphere_correspondence, [new_bio, biosphere])
     ex.write_activities_as_database()
@@ -80,11 +82,13 @@ def write(path, name: str, biosphere: str) -> dict:
         ({"row": i, "col": i, "amount": 1, "flip": False, "uncertainty_type": 0} for i in products.values()))
     say("phase", "write")
     IOTableBackend(name).write_exchanges(technosphere, biosphere_rows(), [new_bio, biosphere])
+    bd.databases.load()
     meta = dict(bd.databases[name])
     meta["lca_wrench"] = {"kind": "mrio", "source": str(path)}
     bd.databases[name] = meta
     bd.databases.flush()
     say("phase", "methods")
+    bd.methods.load()
     patched = _patch_methods(new_bio)
     return {"database": name, "biosphere": new_bio, "sectors": len(products), "flows": len(flows),
             "left_out": sorted(left_out), "patched_methods": patched}
@@ -168,9 +172,12 @@ def main() -> int:
     except BaseException as e:  # noqa: BLE001 - reported to the app, then cleaned up
         traceback.print_exc(file=sys.stdout)
         try:
+            bd.methods.load()
             _undo_methods()
-            for name in set(bd.databases) - before:
-                del bd.databases[name]
+            bd.databases.load()  # the app may have added databases meanwhile: keep them
+            for name in {cfg["name"], cfg["name"] + " biosphere"} - before:
+                if name in bd.databases:
+                    del bd.databases[name]
         except Exception:
             traceback.print_exc(file=sys.stdout)
         say("error", f"{type(e).__name__}: {e}".replace("\n", " ")[:2000])
