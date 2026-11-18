@@ -37,3 +37,12 @@ def test_installers_require_the_checksums():
     for script in ("mac/Install LCA Wrench.command", "windows/install.ps1"):
         text = (ROOT / script).read_text(encoding="utf-8")
         assert "--require-hashes" in text and "hash mismatch" in text, script
+
+
+def test_installers_refuse_the_source_tree():
+    # run from a clone or "Source code (zip)" they must point to the release package (issue #1)
+    # script and its first write to the folder: the check must come before it
+    for script, first_write in (("mac/Install LCA Wrench.command", "mkdir -p"), ("windows/install.ps1", "New-Item")):
+        text = (ROOT / script).read_text(encoding="utf-8")
+        assert "releases/latest" in text and "Source code (zip)" in text, script
+        assert text.index("releases/latest") < text.index(first_write), script
