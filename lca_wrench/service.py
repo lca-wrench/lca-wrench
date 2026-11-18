@@ -802,6 +802,9 @@ def make_working_copy() -> str:
         n += 1
         name = _("{base} – Arbeitskopie {n}", base=base, n=n)
     bd.projects.copy_project(name, switch=True)
+    # a reused name must not get the cached results of a deleted copy (the cache is keyed by name and versions)
+    engine.bump_background(name)
+    engine.bump_foreground(name)
     reg = registry.load()
     reg["copies"][name] = {"original": cur, "created": time.strftime("%Y-%m-%dT%H:%M:%S"), "changes": []}
     reg.get("journal", {}).pop(name, None)  # a reused name must not inherit the undo steps of a deleted copy

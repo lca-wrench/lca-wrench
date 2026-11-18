@@ -159,6 +159,32 @@ def test_working_copy_keeps_the_background_choice(world):
         backgrounds.set_choice("auto", [], roles)
 
 
+def test_reused_working_copy_name_is_not_served_from_the_cache(world):
+    """Regression: a new copy with the name of a deleted, edited one returned the deleted copy's cached score."""
+    names = []
+
+    def drop(name):
+        bd.projects.set_current(TEST_PROJECT)
+        bd.projects.delete_project(name, delete_dir=True)
+        reg = models.registry.load()
+        for key in ("copies", "backgrounds", "models"):
+            reg.get(key, {}).pop(name, None)
+        models.registry.save(reg)
+
+    try:
+        names.append(s.make_working_copy())
+        co2 = next(iter(bd.get_node(database=EI, code="elec").biosphere()))
+        s.edit_exchange(co2._document.id, 10.0)
+        assert models.system().score({world: 1}, GWP) > 50
+        drop(names.pop())
+        names.append(s.make_working_copy())
+        assert models.system().score({world: 1}, GWP) == pytest.approx(TODAY, rel=1e-6)
+    finally:
+        for name in names:
+            drop(name)
+        bd.projects.set_current(TEST_PROJECT)
+
+
 def test_combined_and_compare_per_item(world):
     roles = models.roles()
     st = backgrounds.set_choice("combined", [EI, SC], roles)
