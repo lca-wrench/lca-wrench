@@ -282,7 +282,7 @@ def test_premise_job_keeps_databases_made_meanwhile(world, monkeypatch, tmp_path
     names = [scenarios.scenario_name(EI, "remind", "TEST-50", y) for y in (2030, 2050)]
     mine = {"TEST-50": "Mein Modell waehrend premise", "TEST-FAIL": "Mein Modell waehrend premise (Fehler)"}
     try:
-        with TestClient(app, base_url="http://127.0.0.1") as c:
+        with TestClient(app, base_url="http://127.0.0.1", headers={"X-LCA-Wrench": "1"}) as c:
             body = {"name": TEST_PROJECT, "source": "premise", "source_db": EI, "model": "remind",
                     "years": [2050, 2030], "key": "x" * 44}
             for pathway, state in (("TEST-50", "fertig"), ("TEST-FAIL", "fehler")):
