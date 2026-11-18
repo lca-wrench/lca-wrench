@@ -112,7 +112,7 @@ def test_job_via_api_and_reference_in_range(setup):
     ids, methods = setup
     body = {"fus": [{"id": str(ids[0]), "amount": 1}, {"id": str(ids[1]), "amount": 1}],
             "methods": [list(m) for m in methods[:2]], "n": 40, "seed": 3, "workers": 2}
-    with TestClient(app, base_url="http://127.0.0.1") as c:
+    with TestClient(app, base_url="http://127.0.0.1", headers={"X-LCA-Wrench": "1"}) as c:
         st = c.post("/api/mc/start", json=body).json()
         assert st["state"] == "läuft" and st["n"] == 40
         for _ in range(300):
@@ -287,7 +287,7 @@ def test_spearman_and_merge_against_scipy_numpy():
 def test_sensitivity_job_via_api(setup):
     ids, methods = setup
     body = {"id": str(ids[0]), "amount": 1, "method": list(methods[0]), "n": 60, "seed": 4, "workers": 2}
-    with TestClient(app, base_url="http://127.0.0.1") as c:
+    with TestClient(app, base_url="http://127.0.0.1", headers={"X-LCA-Wrench": "1"}) as c:
         st = c.post("/api/mc/sensitivity", json=body).json()
         assert st["state"] == "läuft" and "Schritt" in st["phase"]
         for _ in range(300):

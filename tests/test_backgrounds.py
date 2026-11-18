@@ -143,7 +143,7 @@ def test_combined_and_compare_per_item(world):
     sc_elec = bd.get_node(database=SC, code="elec").id
     assert models.system_for(sc_elec).score({sc_elec: 1}, GWP) == pytest.approx(0.02 + 0.001 * 2.28, rel=1e-6)
     assert s.activity(sc_elec, GWP)["calculated_alone"] == SC
-    with TestClient(app, base_url="http://127.0.0.1") as c:
+    with TestClient(app, base_url="http://127.0.0.1", headers={"X-LCA-Wrench": "1"}) as c:
         items = [{"project": TEST_PROJECT, "id": str(world), "amount": 2},
                  {"project": TEST_PROJECT, "id": str(world), "amount": 2, "background": [SC]},
                  {"project": TEST_PROJECT, "id": str(sc_elec), "amount": 1}]
@@ -171,7 +171,7 @@ def test_premise_job_with_stand_in(world, monkeypatch):
     scenarios.forget_constants()
     names = [scenarios.scenario_name(EI, "remind", "TEST-50", y) for y in (2030, 2050)]
     try:
-        with TestClient(app, base_url="http://127.0.0.1") as c:
+        with TestClient(app, base_url="http://127.0.0.1", headers={"X-LCA-Wrench": "1"}) as c:
             o = c.get("/api/import/options").json()
             assert o["premise"]["ei_versions"] == ["3.10"] and [x["name"] for x in o["premise_sources"]] == [EI]
             body = {"name": TEST_PROJECT, "source": "premise", "source_db": EI, "model": "remind", "pathway": "TEST-50",
@@ -243,7 +243,7 @@ def test_premise_offers_only_scenarios_in_its_archive(world, tmp_path, monkeypat
         assert c["local"]["gcam"] == ["SSP2-Base"]
         assert scenarios.offered(c) == {"remind": ["SSP2-NPi", "SSP1-VLLO"], "image": ["SSP2-M", "SSP1-VLLO"],
                                         "gcam": ["SSP2-Base"]}
-        with TestClient(app, base_url="http://127.0.0.1") as cl:
+        with TestClient(app, base_url="http://127.0.0.1", headers={"X-LCA-Wrench": "1"}) as cl:
             o = cl.get("/api/import/options").json()
             assert o["premise_available"]["image"] == ["SSP2-M", "SSP1-VLLO"]
             body = {"name": TEST_PROJECT, "source": "premise", "source_db": EI, "model": "image", "pathway": "SSP2-Base",
@@ -288,7 +288,7 @@ def test_flow_mapping_fills_factors_across_flow_lists(world):
         assert models.system_for(ei).score({ei: 1}, GWP_EF) == pytest.approx(1.0)  # EF's factor on the ecoinvent flow
         assert models.system_for(ef).score({ef: 1}, WATER_EI) == 0.0  # water: never through the mapping
         assert models.system_for(ei).score({ei: 1}, GWP_EI) == pytest.approx(1.0)  # its own factors as they are
-        with TestClient(app, base_url="http://127.0.0.1") as c:
+        with TestClient(app, base_url="http://127.0.0.1", headers={"X-LCA-Wrench": "1"}) as c:
             items = [{"project": TEST_PROJECT, "id": str(ef), "amount": 1}, {"project": TEST_PROJECT, "id": str(ei), "amount": 1}]
             r = c.post("/api/compare", json={"items": items, "method": list(GWP_EI)}).json()
             assert [x["coverage"] for x in r] == ["mapped", "native"] and r[0]["score"] == pytest.approx(2.0)
@@ -467,7 +467,7 @@ def test_exiobase_import_dense_solver_and_hybrid(world, tmp_path):
         assert not any(o["removable"] for o in st["background"]["options"] if o["name"] != SC)
         backgrounds.set_choice("auto", [], models.roles())
         # the same as a job in its own process
-        with TestClient(app, base_url="http://127.0.0.1") as cl:
+        with TestClient(app, base_url="http://127.0.0.1", headers={"X-LCA-Wrench": "1"}) as cl:
             body = {"name": TEST_PROJECT, "source": "exiobase", "path": str(folder), "biosphere": BIO, "db_name": "EXIOBASE job"}
             assert cl.post("/api/import/start", json={**body, "biosphere": "nope"}).status_code == 400
             st = _wait(cl, cl.post("/api/import/start", json=body).json())

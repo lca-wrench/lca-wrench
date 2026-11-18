@@ -54,7 +54,8 @@ export const U = () => methodInfo().unit;
 export const isModelDb = name => S.st.databases.some(d => d.name === name && d.role === 'model');
 
 // the server answers in the language of the UI
-export const langHeader = () => ({ 'X-Lang': LANG });
+// X-LCA-Wrench: the server accepts changes only with it (protection against other websites, see api.local_only)
+export const langHeader = () => ({ 'X-Lang': LANG, 'X-LCA-Wrench': '1' });
 
 export async function api(path, body) {
   S.busy++; renderBusy();

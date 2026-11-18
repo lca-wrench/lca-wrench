@@ -118,7 +118,7 @@ def test_set_move_and_undo(proc):
 
 def test_api_and_description_in_search(proc):
     p, ex = proc
-    with TestClient(app, base_url="http://127.0.0.1") as c:
+    with TestClient(app, base_url="http://127.0.0.1", headers={"X-LCA-Wrench": "1"}) as c:
         r = c.post("/api/models/exchange/uncertainty", json={"exchange": str(ex), "spec": {"type": "uniform", "minimum": "8", "maximum": "12"}})
         assert r.status_code == 200, r.text
         r = c.post("/api/models/exchange/uncertainty", json={"exchange": str(ex), "spec": {"type": "lognormal", "gsd2": "1"}})

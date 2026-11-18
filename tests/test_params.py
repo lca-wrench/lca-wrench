@@ -154,7 +154,7 @@ def test_api(example):
 
     from lca_wrench.api import app
 
-    with TestClient(app, base_url="http://127.0.0.1") as c:
+    with TestClient(app, base_url="http://127.0.0.1", headers={"X-LCA-Wrench": "1"}) as c:
         r = c.post("/api/params/set", json={"scope": "project", "name": "km_jahr", "value": "2,5"})
         assert r.status_code == 200 and r.json()["overview"]["project"][0]["amount"] == 2.5
         r = c.post("/api/params/set", json={"scope": "project", "name": "x", "value": "km_jahr * nix"}, headers={"X-Lang": "en"})

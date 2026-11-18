@@ -123,7 +123,7 @@ def test_api(two_versions):
     from lca_wrench.api import app
 
     bd.projects.set_current(TEST_PROJECT)
-    with TestClient(app, base_url="http://127.0.0.1") as c:
+    with TestClient(app, base_url="http://127.0.0.1", headers={"X-LCA-Wrench": "1"}) as c:
         assert [t["name"] for t in c.get("/api/versions/targets", params={"project": V2}).json()] == [BG]
         body = {"id": str(two_versions["pid"]), "amount": 2, "method": list(s.CLIMATE_METHOD), "project": V2, "database": BG}
         r = c.post("/api/versions", json=body)

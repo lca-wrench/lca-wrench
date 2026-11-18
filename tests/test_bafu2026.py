@@ -124,7 +124,7 @@ def test_failed_import_leaves_nothing(monkeypatch):
 
 
 def test_api_offers_and_refuses(imported, monkeypatch):
-    c = TestClient(app, base_url="http://127.0.0.1")
+    c = TestClient(app, base_url="http://127.0.0.1", headers={"X-LCA-Wrench": "1"})
     bd.projects.set_current(TEST_PROJECT)
     assert c.get("/api/state").json()["bafu2026_import"] is (bafu2026.PROJECT not in bd.projects)
     assert c.get("/api/import/options").json()["bafu2026"] is True

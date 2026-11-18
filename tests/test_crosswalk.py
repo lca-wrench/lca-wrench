@@ -241,7 +241,7 @@ def test_methods_and_units():
 
 
 def test_api(setup):
-    c = TestClient(app, base_url="http://127.0.0.1")
+    c = TestClient(app, base_url="http://127.0.0.1", headers={"X-LCA-Wrench": "1"})
     t = c.get("/api/crosswalk/targets", params={"project": OTHER}).json()
     assert [d["name"] for d in t["databases"]] == [EI] and list(EI_METHOD) in t["methods"]
     r = c.post("/api/crosswalk", json={"id": str(setup["model"]), "amount": 1.0, "method": list(s.CLIMATE_METHOD),

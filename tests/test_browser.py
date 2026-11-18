@@ -394,7 +394,7 @@ def test_10_why_different_in_working_copy(page):
     finally:
         copies = [p for p in registry.load()["copies"]]
         # let the server leave the copy before its folder is deleted
-        page.request.post(f"{URL}/api/project", data={"name": TEST_PROJECT})
+        page.request.post(f"{URL}/api/project", data={"name": TEST_PROJECT}, headers={"X-LCA-Wrench": "1"})
         bd.projects.set_current(TEST_PROJECT)
         for name in copies:
             if name in bd.projects:
