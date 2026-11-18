@@ -70,7 +70,7 @@ def test_rendered_later_in_the_readers_language():
 
 def test_api_answers_in_the_requested_language():
     bd.projects.set_current(TEST_PROJECT)
-    with TestClient(app, base_url="http://127.0.0.1") as c:
+    with TestClient(app, base_url="http://127.0.0.1", headers={"X-LCA-Wrench": "1"}) as c:
         r = c.post("/api/project", json={"name": "gibt-es-nicht"}, headers={"X-Lang": "en"})
         assert r.status_code == 404 and r.json()["detail"] == "There is no project “gibt-es-nicht”."
         r = c.post("/api/project", json={"name": "gibt-es-nicht"}, headers={"X-Lang": "de"})
@@ -81,7 +81,7 @@ def test_api_answers_in_the_requested_language():
 def test_english_is_the_default(monkeypatch):
     """Without X-Lang the server answers in English (the tests set LCA_WRENCH_LANG=de for their German texts)."""
     monkeypatch.setattr(i18n, "DEFAULT", "en")
-    with TestClient(app, base_url="http://127.0.0.1") as c:
+    with TestClient(app, base_url="http://127.0.0.1", headers={"X-LCA-Wrench": "1"}) as c:
         r = c.post("/api/project", json={"name": "gibt-es-nicht"})
         assert r.json()["detail"] == "There is no project “gibt-es-nicht”."
     bd.projects.set_current(TEST_PROJECT)
@@ -92,7 +92,7 @@ def test_english_is_the_default(monkeypatch):
 def test_ui_files_are_versioned():
     """After an update the browser must not mix cached old and new UI modules: the page names its files under
     /ui/<version>/ (a new version means new URLs), the page itself is always asked for again."""
-    with TestClient(app, base_url="http://127.0.0.1") as c:
+    with TestClient(app, base_url="http://127.0.0.1", headers={"X-LCA-Wrench": "1"}) as c:
         r = c.get("/")
         assert r.status_code == 200 and r.headers["cache-control"] == "no-cache"
         m = re.search(r'src="(/ui/([0-9a-f]{12})/js/main\.js)"', r.text)
