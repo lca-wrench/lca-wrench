@@ -1,8 +1,7 @@
-"""Monte-Carlo: every number is checked against a plain bw2calc loop with the same seed."""
+"""Monte-Carlo: every number is checked against a plain bw2calc loop with the same seeds (mc.mc_lca)."""
 
 import time
 
-import bw2calc as bc
 import bw2data as bd
 import numpy as np
 import pytest
@@ -28,9 +27,7 @@ def setup():
 
 
 def bw2calc_scores(node_id, amount, method, n, seed):
-    lca = bc.LCA({bd.get_node(id=node_id): amount}, method, use_distributions=True, seed_override=seed)
-    lca.lci()
-    lca.lcia()
+    lca = mc.mc_lca({bd.get_node(id=node_id): amount}, method, seed)
     out = [lca.score]
     for _ in range(n - 1):
         next(lca)
@@ -152,6 +149,33 @@ def test_own_model_in_draws():
         models.delete_database(r["database"])
 
 
+def test_separate_databases_draw_independently():
+    """Regression: with one seed for every resource group, two alternatives in separate databases got identical
+    draws (correlation 1, P(better) = 0.5 from ties). Each group must get its own variates."""
+    bd.projects.set_current(TEST_PROJECT)
+    bio = ("BAFU-2025-biosphere", next(iter(bd.Database("BAFU-2025-biosphere"))).key[1])
+    names = ["mc-indep-1", "mc-indep-2"]
+    try:
+        for db in names:
+            bd.Database(db).write({(db, "p"): {"name": db, "type": "process", "unit": "kg", "exchanges": [
+                {"input": (db, "p"), "amount": 1, "type": "production"},
+                {"input": bio, "amount": 1.0, "type": "biosphere", "uncertainty type": 2, "loc": 0.0,
+                 "scale": 0.5}]}})
+        bd.Method(("mc-indep",)).write([(bio, 1.0)])
+        fus = [(bd.get_node(database=db, code="p").id, 1.0) for db in names]
+        d = mc.run_chunk(TEST_PROJECT, fus, [("mc-indep",)], 200, SEED)
+        a, b = d[:, 0, 0], d[:, 1, 0]
+        assert abs(np.corrcoef(a, b)[0, 1]) < 0.3
+        assert np.abs(a - b).max() > 0.1
+        assert np.allclose(d, mc.run_chunk(TEST_PROJECT, fus, [("mc-indep",)], 200, SEED))  # still reproducible
+    finally:
+        for db in names:
+            if db in bd.databases:
+                del bd.databases[db]
+        if ("mc-indep",) in bd.methods:
+            bd.Method(("mc-indep",)).deregister()
+
+
 # ---------- sensitivity ----------
 
 @pytest.fixture(scope="module")
@@ -163,10 +187,7 @@ def sens_pilot(setup):
 
 
 def reference_lca(fu, method, seed):
-    lca = bc.LCA({fu[0]: fu[1]}, method, use_distributions=True, seed_override=seed)
-    lca.lci()
-    lca.lcia()
-    return lca
+    return mc.mc_lca({fu[0]: fu[1]}, method, seed)
 
 
 def test_sensitivity_formulas_by_finite_difference(sens_pilot):
