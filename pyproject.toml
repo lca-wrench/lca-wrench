@@ -25,7 +25,7 @@ classifiers = [
 # Brightway itself is pinned to the tested versions (as in requirements-app.txt): a newer one could calculate
 # differently or convert projects when opening them. requirements-lock.txt pins everything, with checksums.
 dependencies = [
-  "bw2data==4.7",
+  "bw2data==4.8",
   "bw2calc==2.5.0",
   "bw2io==0.9.17",
   "bw2parameters==1.1.0",
