@@ -142,10 +142,7 @@ class Background:
                 self.solver = None
                 self.solve = lambda b: refined(lu.solve, self.A, b)
                 self.solve_t = lambda b: refined(lambda v: lu.solve(v, trans="T"), AT, b)
-            diag = self.A.diagonal()
-            prod_row = dict(lca.dicts.product)
-            self.production = np.array([self.A[prod_row[a], c] if a in prod_row else diag[c]
-                                        for c, a in enumerate(self.act_ids)], dtype=float)
+            self.production = _production(self.A, self.act_ids, dict(lca.dicts.product), self.A.diagonal())
         self.act_col = {int(a): i for i, a in enumerate(self.act_ids)}
         self.prod_row = {int(p): i for i, p in enumerate(self.prod_ids)}
         self.bio_row = {int(f): i for i, f in enumerate(self.bio_ids)}
@@ -277,6 +274,17 @@ def refined(solve, M, b: np.ndarray, steps: int = 2) -> np.ndarray:
     return x
 
 
+def _production(A, act_ids, prod_row: dict, fallback: np.ndarray) -> np.ndarray:
+    """Production amount per activity column: A[prod_row[a], c] for activity a in column c, `fallback[c]` where a has
+    no own product row. One vectorized lookup instead of a scalar sparse index per column."""
+    rows = np.array([prod_row.get(int(a), -1) for a in act_ids], dtype=np.int64)
+    out = np.array(fallback, dtype=float, copy=True)
+    has = np.flatnonzero(rows >= 0)
+    if len(has):
+        out[has] = np.asarray(A[rows[has], has]).ravel()
+    return out
+
+
 def _ids_by_index(mapping) -> np.ndarray:
     items = sorted(dict(mapping).items(), key=lambda kv: kv[1])
     return np.array([k for k, _ in items], dtype=np.int64)
@@ -393,12 +401,7 @@ class Foreground:
                 self.lu = splu(self.A_ff.tocsc())
             except RuntimeError:
                 self.errors.append(msg("Das Modell ist nicht lösbar: Die Produktionsmengen heben sich gegenseitig auf (singuläre Matrix)."))
-        diag = {}
-        A = self.A_ff.tocsc()
-        for c, nid in enumerate(cols):
-            r = row.get(nid)
-            diag[c] = A[r, c] if r is not None else 0.0
-        self.production = np.array([diag[c] for c in range(nf)], dtype=float)
+        self.production = _production(self.A_ff.tocsc(), cols, row, np.zeros(nf))
 
     def _empty(self, nb, nbio):
         self.act_ids = self.prod_ids = np.zeros(0, dtype=np.int64)
