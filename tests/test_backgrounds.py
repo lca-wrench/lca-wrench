@@ -211,6 +211,47 @@ def test_premise_job_with_stand_in(world, monkeypatch):
 
 
 
+def test_premise_job_keeps_databases_made_meanwhile(world, monkeypatch, tmp_path):
+    """The user keeps working while premise runs (the dialog says so). A database made meanwhile stays in
+    databases.json when the job succeeds (the worker used to write back its stale copy) and is not deleted when the
+    job fails (the cleanup used to remove every database newer than the job)."""
+    monkeypatch.setenv("LCA_WRENCH_PREMISE_PYTHON", sys.executable)
+    monkeypatch.setenv("LCA_WRENCH_PREMISE_PATH", str(Path(__file__).parent / "fake_premise"))
+    monkeypatch.setenv("FAKE_PREMISE_GATE", str(tmp_path))
+    scenarios.forget_constants()
+    names = [scenarios.scenario_name(EI, "remind", "TEST-50", y) for y in (2030, 2050)]
+    mine = {"TEST-50": "Mein Modell waehrend premise", "TEST-FAIL": "Mein Modell waehrend premise (Fehler)"}
+    try:
+        with TestClient(app, base_url="http://127.0.0.1") as c:
+            body = {"name": TEST_PROJECT, "source": "premise", "source_db": EI, "model": "remind",
+                    "years": [2050, 2030], "key": "x" * 44}
+            for pathway, state in (("TEST-50", "fertig"), ("TEST-FAIL", "fehler")):
+                for f in tmp_path.iterdir():
+                    f.unlink()
+                job = c.post("/api/import/start", json={**body, "pathway": pathway}).json()
+                for _ in range(600):  # the worker has read the database list and is "running premise"
+                    if (tmp_path / "ready").exists():
+                        break
+                    time.sleep(0.1)
+                assert (tmp_path / "ready").exists()
+                db = mine[pathway]
+                with s.LOCK:
+                    bd.Database(db).register()
+                    bd.Database(db).write(_proc(db, "wp", "Waermepumpe", "heat", "CH", "megajoule"))
+                (tmp_path / "go").touch()
+                st = _wait(c, job)
+                assert st["state"] == state, st
+                listing = json.loads((Path(bd.projects.dir) / "databases.json").read_text())
+                assert db in listing and db in bd.databases, (pathway, sorted(listing))
+                assert len(bd.Database(db)) == 1
+                if state == "fertig":
+                    assert all(n in listing for n in names)
+            assert all(d in bd.databases for d in mine.values())
+    finally:
+        _drop(*names, *mine.values())
+        scenarios.forget_constants()
+
+
 def test_premise_offers_only_scenarios_in_its_archive(world, tmp_path, monkeypatch):
     """premise lists every pathway for every model, but its Zenodo archive has only some pairs (premise 2.5.2: no
     SSP2-Base at all, which failed with a 404). Offered are the pairs whose file is in the archive or on this computer."""

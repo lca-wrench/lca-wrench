@@ -4,6 +4,8 @@ name ("TEST-50" -> 0.5; "TEST-60-LATE" fails after writing). Lets the job, the w
 ecoinvent and without a key."""
 
 import copy
+import os
+import time
 from pathlib import Path
 
 import bw2data as bd
@@ -23,6 +25,13 @@ class NewDatabase:
         self.data = None
 
     def update(self, sectors=None):
+        gate = os.environ.get("FAKE_PREMISE_GATE")
+        if gate:  # a test changes the project while "premise" runs: say so, then wait for its go
+            Path(gate, "ready").touch()
+            for _ in range(600):
+                if Path(gate, "go").exists():
+                    break
+                time.sleep(0.1)
         if any(s["pathway"] == "TEST-FAIL" for s in self.scenarios):
             raise RuntimeError("scenario failed on purpose")
         self.data = bd.Database(self.source_db).load()
