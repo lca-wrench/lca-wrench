@@ -21,12 +21,14 @@ opened in the [Activity Browser](https://github.com/LCA-ActivityBrowser/activity
   then start **LCA Wrench** from the Desktop.
 - **Windows:** download `LCA-Wrench-Windows.zip`, unpack, run **Install LCA Wrench**, then **Start LCA Wrench**.
   Windows warns the first time because the script is not signed ("More info" → "Run anyway").
+- **Linux:** download `LCA-Wrench-Linux.tar.gz`, unpack it (e.g. `tar -xzf LCA-Wrench-Linux.tar.gz -C ~`), run
+  `./install.sh` in the folder, then start **LCA Wrench** from the applications menu or with `./start.sh`.
 
-The installers run only from these packages. "Source code (zip)" on the releases page and the `mac/` and `windows/`
-folders of a clone are not installers; to run from a clone, see **From source** below.
+The installers run only from these packages. "Source code (zip)" on the releases page and the `mac/`, `windows/`
+and `linux/` folders of a clone are not installers; to run from a clone, see **From source** below.
 
 The installer sets up its own Python and the packages inside the LCA Wrench folder (no administrator rights, internet
-needed, 3 to 5 minutes). The Windows package is less tested than the macOS one. Details:
+needed, 3 to 5 minutes). The Windows and Linux packages are less tested than the macOS one. Details:
 [docs/install.md](docs/install.md).
 
 **Which data with which installation.** With the release package, a project with BAFU 2026 (EF 3.1 methods) is
