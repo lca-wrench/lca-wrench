@@ -298,9 +298,13 @@ def test_06_sensitivity(page):
     sens = page.locator("#sensCard")
     page.select_option("#sensFu", "0")
     page.click("[data-act=sens-start]")
-    expect(sens.locator("tbody tr").first).to_be_visible(timeout=240_000)
-    n = sens.locator("tbody tr").count()
-    assert 1 <= n <= 10
+    rows = sens.locator("tbody tr")
+    expect(rows.first).to_be_visible(timeout=240_000)
+    # top 10 by rank correlation, then possibly a heading row and up to 5 entries strong only by Sobol (random draws)
+    n = rows.count()
+    main = rows.evaluate_all("rs => { const i = rs.findIndex(r => r.querySelector('td[colspan]')); return i < 0 ? rs.length : i }")
+    assert 1 <= main <= 10
+    assert n - main <= 6
     expect(sens).to_contain_text("Rangkorrelation")
 
 
