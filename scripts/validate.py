@@ -157,7 +157,7 @@ class App:
 
     def post(self, path: str, body: dict):
         req = urllib.request.Request(f"http://127.0.0.1:{self.port}{path}", json.dumps(body).encode(),
-                                     {"Content-Type": "application/json"})
+                                     {"Content-Type": "application/json", "X-LCA-Wrench": "1"})  # the UI header (api.local_only)
         with urllib.request.urlopen(req, timeout=600) as r:
             return json.loads(r.read())
 
