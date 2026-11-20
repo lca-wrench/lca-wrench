@@ -180,6 +180,46 @@ scored on its own data (also one level down); EXIOBASE proxy sectors by ISIC cla
 dataset and typed in, and its export as a conversion factor; both tables (industries and products, with EXIOBASE's
 names) for datasets with ISIC class (ecoinvent), with a category (BAFU 2025) and with a sector only (BAFU 2026).
 
+## Several products and allocation
+
+A process with several products (milk and meat from one farm, boards and chips from one sawmill) is stored as the
+[Activity Browser 3](https://github.com/LCA-ActivityBrowser/activity-browser) stores it, with
+[bw_functional](https://github.com/LCA-ActivityBrowser/bw-functional) (database backend `functional_sqlite`): the
+process and each of its products are nodes of their own. A product names its process (`processor`), carries
+properties per unit of product (mass, price …; with `normalize`, multiplied by the amount produced) and the share of
+the process's inputs and emissions it bears (`allocation_factor`). The process says how the shares are found
+(`allocation`): in equal parts, by a property all its products have, or by hand. Code: `lca_wrench/functional.py`,
+the engine in `lca_wrench/engine.py` (`Foreground`).
+
+- **Calculation:** every input, emission and credit of the process is split onto its products by their shares; each
+  product's own production goes to its own column. This is what bw_functional does when it prepares the database for
+  bw2calc, and the tests check that both give the same result. A process with one product stands for that product; a
+  process with several asks which product to calculate. Shares that do not add up to 1 are calculated as given (as
+  bw_functional does) and noted at the process.
+- **Data sheet of the process:** the card "Products and allocation" lists the products with their amount (editable in
+  own models), share and impact per unit, and the allocation in use. Changing it (in equal parts, by a property, by
+  hand) recalculates at once and is a step in the history that can be undone. By hand, the shares typed in are scaled
+  to add up to 100 %. When the allocation uses a property per unit (price), changing a product's amount moves the
+  shares (revenue = price × amount).
+- **Data sheet of a product:** the process's inputs and emissions, scaled by the product's share, and its result.
+  The amounts are changed in the process ("Open activity").
+- **Compare allocations:** every way the process can be split, side by side: the impact per unit of each product, with
+  its share. Nothing is saved; only the models are recalculated with those shares, the background stays as it is.
+  Choosing an allocation is a modelling choice, so the spread belongs in the result.
+- **Own models only:** as everywhere, LCA Wrench changes only models made in it, or anything in a working copy.
+  Databases made in the Activity Browser 3 are calculated live and changed only in a copy of the project.
+- **bw_functional** is loaded without one part: when a project is opened, it brings the project's databases to its
+  current data structure and writes a version mark into the project. LCA Wrench does not change projects without being
+  asked, so this update runs only right before LCA Wrench itself writes into such a database.
+- **Not yet:** adding products to a process in LCA Wrench (new processes have one product; add products in the
+  Activity Browser 3 for now), system expansion in bw_functional's terms (LCA Wrench's credits remain the way to
+  substitute), and the Circular Footprint Formula of PEF.
+
+Tested in `tests/test_multifunctional.py`: a dairy farm (8 kg milk, 1 kg meat, 9 kg CO2 per run) and cheese made from
+its milk, by hand calculation; the same farm written by bw_functional as the Activity Browser 3 writes it, with LCA
+Wrench's results equal to bw2calc's on bw_functional's processing for allocation by price, by mass, by hand and after
+a changed amount; the data sheets, undo and the comparison.
+
 ## Search
 
 Type English words; a location and a unit group narrow the result:

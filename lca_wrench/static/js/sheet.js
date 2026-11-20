@@ -80,6 +80,45 @@ function uncSummary(a) {
   return all.length ? `<span class="chip" title="${t('Diese Posten gehen mit ihrer Verteilung in die Unsicherheitsrechnung ein.')}">${t('Unsicherheit bei {n} von {m} Posten', { n, m: all.length })}</span>` : '';
 }
 
+// several products, stored as in the Activity Browser 3: how the process's inputs and emissions are split
+const allocLabel = s => s === 'equal' ? t('zu gleichen Teilen') : s === 'manual' ? t('von Hand') : t('nach «{p}»', { p: esc(s) });
+
+function allocCompare(c) {
+  const head = c.products.map(p => `<th style="text-align:right">${esc(p.name)} <span class="muted">${t('pro {u}', { u: esc(p.unit) })}</span></th>`).join('');
+  const rows = c.rows.map(r => `<tr><td>${allocLabel(r.strategy)}${r.current ? ` <span class="chip acc">${t('gewählt')}</span>` : ''}</td>${c.products.map(p => `<td class="num" style="text-align:right">${nf(r.scores[p.id])} <span class="muted">(${pct(r.factors[p.id])})</span></td>`).join('')}</tr>`).join('');
+  return `<div style="display:flex;flex-direction:column;gap:6px"><h4 style="margin:0">${t('Wirkung pro Produkt bei jeder Allokation ({unit})', { unit: esc(c.unit) })}</h4>
+    <div class="tblwrap"><table class="tbl"><thead><tr><th>${t('Allokation')}</th>${head}</tr></thead><tbody>${rows}</tbody></table></div>
+    <p class="muted" style="font-size:12.5px">${t('In Klammern der Anteil des Produkts. Nichts wird gespeichert; alle übrigen Daten bleiben, wie sie sind.')}</p></div>`;
+}
+
+function allocationCard(a, amt, model) {
+  const al = a.allocation;
+  if (!al) return '';
+  const manual = al.strategy === 'manual' && al.editable;
+  const prodEx = id => (a.production_exchanges || []).find(e => e.id === id);
+  const rows = al.products.map(p => `<tr><td><button class="linkbtn" data-act="open" data-k="${p.id}" data-db="${esc(a.database)}">${esc(p.name)}</button>${p.waste ? ` <span class="chip">${t('Abfall')}</span>` : ''}</td>
+      <td>${model && prodEx(p.id) ? amt(prodEx(p.id)) : `<span class="num">${nf(p.amount)}</span>`} <span class="muted">${esc(p.unit || '')}</span></td>
+      <td class="num">${manual ? `<input type="number" step="any" min="0" data-alloc="${p.id}" value="${+(p.factor ?? 1).toPrecision(6)}" aria-label="${t('Anteil von {name}', { name: esc(p.name) })}" style="width:90px">` : pct(p.factor ?? 1)}</td>
+      <td class="num">${p.score === null || p.score === undefined ? '–' : `${nf(p.score)} <span class="muted">${esc(U())}</span>`}</td></tr>`).join('');
+  const off = Math.abs(al.sum - 1) > 1e-6 ? `<div class="warnbox"><span>${t('Die Anteile ergeben zusammen {p} statt 100 %.', { p: pct(al.sum) })}</span></div>` : '';
+  const sel = al.editable
+    ? `<label class="f">${t('Allokation')}<select id="allocSel">${al.strategies.map(s => `<option value="${esc(s)}" ${s === al.strategy ? 'selected' : ''}>${allocLabel(s)}</option>`).join('')}</select></label>`
+    : `<span class="chip">${t('Allokation')}: ${allocLabel(al.strategy)}</span>`;
+  return `<section class="card" style="display:flex;flex-direction:column;gap:10px">
+    <div class="row" style="justify-content:space-between;align-items:flex-end"><h3>${t('Produkte und Allokation · {n}', { n: al.products.length })}</h3>
+      <div class="row" style="gap:8px;align-items:flex-end">${sel}${manual ? `<button class="btn" data-act="alloc-manual">${t('Anteile übernehmen')}</button>` : ''}<button class="btn" data-act="alloc-cmp">${t('Allokationen vergleichen')}</button></div></div>
+    <p class="muted" style="font-size:13.5px">${t('Dieser Prozess stellt mehrere Produkte her. Seine Inputs und Emissionen werden nach den Anteilen auf die Produkte verteilt; jedes Produkt hat ein eigenes Datenblatt.')}</p>
+    ${off}
+    <div class="tblwrap"><table class="tbl"><thead><tr><th>${t('Produkt')}</th><th>${t('Menge')}</th><th>${t('Anteil')}</th><th>${t('Wirkung pro Einheit')}</th></tr></thead><tbody>${rows}</tbody></table></div>
+    ${S.allocCmp && S.allocCmp.process === al.process ? allocCompare(S.allocCmp) : ''}
+  </section>`;
+}
+
+function shareNote(a) {
+  if (a.share === null || a.share === undefined) return '';
+  return `<div class="muted" style="font-size:13.5px">${t('Anteil an den Inputs und Emissionen des Prozesses: {p}. Die Mengen unten sind dieser Anteil; geändert werden sie im Prozess.', { p: pct(a.share) })} <button class="linkbtn" data-act="open" data-k="${a.process_id}" data-db="${esc(a.database)}">${t('Prozess öffnen')}</button></div>`;
+}
+
 export function sheet(a, { showAllTech, showAllBio }) {
   const model = a.edit_mode === 'model', copy = a.edit_mode === 'copy', ro = !a.edit_mode;
   const units = unitChoices();
@@ -105,37 +144,39 @@ export function sheet(a, { showAllTech, showAllBio }) {
   const head = model ? `
     <div class="pform">
       <label class="f wide">${t('Name')}<input type="text" data-pf="name" value="${esc(a.name)}"></label>
-      <label class="f">${t('Referenzprodukt')}<input type="text" data-pf="reference product" value="${esc(a.product || '')}"></label>
-      <label class="f">${t('Einheit')}<select data-pf="unit">${units.map(([v, l]) => `<option value="${v}" ${v === a.unit_raw ? 'selected' : ''}>${l}</option>`).join('')}${units.some(([v]) => v === a.unit_raw) ? '' : `<option value="${esc(a.unit_raw)}" selected>${esc(a.unit)}</option>`}</select></label>
+      ${a.allocation ? '' : `<label class="f">${t('Referenzprodukt')}<input type="text" data-pf="reference product" value="${esc(a.product || '')}"></label>`}
+      ${a.allocation ? '' : `<label class="f">${t('Einheit')}<select data-pf="unit">${units.map(([v, l]) => `<option value="${v}" ${v === a.unit_raw ? 'selected' : ''}>${l}</option>`).join('')}${units.some(([v]) => v === a.unit_raw) ? '' : `<option value="${esc(a.unit_raw)}" selected>${esc(a.unit)}</option>`}</select></label>`}
       <label class="f">${t('Ort')}<input type="text" data-pf="location" value="${esc(a.location || '')}" maxlength="40" style="width:90px"></label>
       <label class="f wide">${t('Beschreibung')}<textarea data-pf="comment" rows="2">${esc(a.comment)}</textarea></label>
     </div>`
-    : `<h2>${esc(a.name)}</h2>${a.product && a.product !== a.name ? `<div class="muted" style="font-size:13.5px">${t('Referenzprodukt')}: ${esc(a.product)}</div>` : ''}${description(a)}`;
+    : `<h2>${esc(a.name)}</h2>${a.product && a.product !== a.name ? `<div class="muted" style="font-size:13.5px">${t('Referenzprodukt')}: ${esc(a.product)}</div>` : ''}${description(a)}${shareNote(a)}`;
 
   const errors = a.errors && a.errors.length ? `<div class="warnbox"><b>${t('Modell nicht lösbar')}</b><span>${a.errors.map(esc).join(' ')}</span></div>` : '';
-  const roBox = ro ? `<div class="ro"><span>${t('Hintergrunddaten bleiben unverändert. Um diesen Prozess anzupassen, kopiere ihn in ein eigenes Modell.')}</span>
+  const roBox = ro && (a.share === null || a.share === undefined) ? `<div class="ro"><span>${t('Hintergrunddaten bleiben unverändert. Um diesen Prozess anzupassen, kopiere ihn in ein eigenes Modell.')}</span>
       <div class="row"><button class="btn primary" data-act="copy-to-model" data-k="${a.id}">${t('In eigenes Modell kopieren')}</button>${S.st.is_copy ? '' : `<button class="btn" data-act="copy" title="${t('Kopiert das ganze Projekt, ca. 420 MB')}">${t('Arbeitskopie des Projekts')}</button>`}</div></div>` : '';
 
   const prodRows = model ? a.production_exchanges.map(e => `<tr><td>${esc(a.product || a.name)}</td><td>${amt(e)}</td><td class="muted">${esc(a.unit)}</td></tr>`).join('') : '';
-  const role = model ? t('Eigenes Modell') : a.role === 'background' ? t('Hintergrunddaten') : esc(a.role || '');
+  const role = model || a.role === 'model' ? t('Eigenes Modell') : a.role === 'background' ? t('Hintergrunddaten') : esc(a.role || '');
 
   return `<section class="card sheethead" style="display:flex;flex-direction:column;gap:12px">
       <div class="row" style="gap:6px"><span class="chip ${model ? 'acc' : ''}">${role}</span><span class="chip">${esc(a.database)}</span>${model ? '' : `<span class="chip">${esc(a.location || '–')}</span><span class="chip">${esc(a.unit)}</span>`}${a.categories ? `<span class="chip">${esc(a.categories)}</span>` : ''}${uncSummary(a)}</div>
       ${head}
       ${errors}
       <div class="row" style="justify-content:space-between;align-items:flex-end">
-        <div><div class="eyebrow">${t('{method} pro 1 {unit}, mit ganzer Lieferkette', { method: esc(methodLabel(m)), unit: esc(a.unit) })}</div>
-          <div class="kpi"><span class="big ${S.prevScore && S.prevScore.id === a.id && S.prevScore.v !== a.score ? 'flashnum' : ''}">${nf(a.score)}</span><span class="u">${esc(U())}</span>${delta(a)}</div>
+        <div>${a.allocation && a.score === null ? '' : `<div class="eyebrow">${t('{method} pro 1 {unit}, mit ganzer Lieferkette', { method: esc(methodLabel(m)), unit: esc(a.unit) })}</div>`}
+          ${a.allocation && a.score === null ? `<div class="muted" style="font-size:13.5px;max-width:52ch">${t('Mehrere Produkte: die Wirkung pro Produkt steht unten bei der Allokation.')}</div>` : ''}
+          ${a.allocation && a.score === null ? '' : `<div class="kpi"><span class="big ${S.prevScore && S.prevScore.id === a.id && S.prevScore.v !== a.score ? 'flashnum' : ''}">${nf(a.score)}</span><span class="u">${esc(U())}</span>${delta(a)}</div>`}
           <div class="muted" style="font-size:13px">${a.score !== null ? t('davon direkt in diesem Prozess: {v} ({p})', { v: `${nf(a.direct)} ${esc(U())}`, p: pct(a.score ? a.direct / a.score : 0) }) : ''}</div>
           ${a.calculated_alone ? `<div class="muted" style="font-size:13px">${t('Allein mit «{db}» gerechnet: diese Datenbank gehört nicht zu den Hintergrunddaten der Rechnung (unter Start wählen).', { db: esc(a.calculated_alone) })}</div>` : ''}</div>
-        <div class="row" style="gap:8px"><button class="btn" data-act="add-cmp-act">${t('Zum Vergleich')}</button><button class="btn" data-act="add-setup" data-k="${a.id}">${t('Zur Rechnung')}</button><button class="btn" data-act="graph-act">${t('Lieferkette')}</button><button class="btn primary" data-act="calc-act">${t('Ergebnis')}</button></div>
+        ${a.allocation && a.score === null ? '' : `<div class="row" style="gap:8px"><button class="btn" data-act="add-cmp-act">${t('Zum Vergleich')}</button><button class="btn" data-act="add-setup" data-k="${a.id}">${t('Zur Rechnung')}</button><button class="btn" data-act="graph-act">${t('Lieferkette')}</button><button class="btn primary" data-act="calc-act">${t('Ergebnis')}</button></div>`}
       </div>
       ${roBox}
     </section>
-    ${model ? `<section class="card"><h3 style="margin-bottom:6px">${t('Referenzfluss')}</h3><p class="muted" style="font-size:13.5px;margin-bottom:6px">${t('Was dieser Prozess herstellt. Alle Mengen unten beziehen sich auf diese Menge.')}</p>
+    ${allocationCard(a, amt, model)}
+    ${model && !a.allocation ? `<section class="card"><h3 style="margin-bottom:6px">${t('Referenzfluss')}</h3><p class="muted" style="font-size:13.5px;margin-bottom:6px">${t('Was dieser Prozess herstellt. Alle Mengen unten beziehen sich auf diese Menge.')}</p>
       <div class="tblwrap"><table class="tbl"><tbody>${prodRows}</tbody></table></div></section>` : ''}
     <section class="card"><div class="row" style="justify-content:space-between;margin-bottom:6px"><h3>${t('Inputs aus anderen Prozessen · {n}', { n: a.technosphere.length })}</h3>${model ? `<button class="btn" data-act="pick-input">${t('+ Input hinzufügen')}</button>` : ''}</div>
-      <div class="tblwrap"><table class="tbl"><thead><tr><th>${t('Input')}</th><th>${t('Menge pro {v}', { v: `${nf(a.production)} ${esc(a.unit)}` })}</th><th>${t('Einheit')}</th>${model ? `<th>${t('Art')}</th>` : ''}<th title="${t('Bereich, in dem die Menge mit 95 % Wahrscheinlichkeit liegt, und die Verteilung')}">${t('Unsicherheit (95 %)')}</th><th>${t('Anteil an der Wirkung')}</th>${model ? '<th></th>' : ''}</tr></thead><tbody>
+      <div class="tblwrap"><table class="tbl"><thead><tr><th>${t('Input')}</th><th>${a.allocation ? t('Menge (für die Produktmengen oben)') : t('Menge pro {v}', { v: `${nf(a.production)} ${esc(a.unit)}` })}</th><th>${t('Einheit')}</th>${model ? `<th>${t('Art')}</th>` : ''}<th title="${t('Bereich, in dem die Menge mit 95 % Wahrscheinlichkeit liegt, und die Verteilung')}">${t('Unsicherheit (95 %)')}</th><th>${t('Anteil an der Wirkung')}</th>${model ? '<th></th>' : ''}</tr></thead><tbody>
       ${tech.map(e => `<tr><td><button class="linkbtn" data-act="open" data-k="${e.id}" data-db="${esc(e.database)}">${esc(e.name)}</button> <span class="muted">${esc(e.location)}</span></td><td>${amt(e)}</td><td class="muted">${esc(e.unit)}</td>${model ? `<td>${kind(e)}</td>` : ''}<td>${uncCell(e, model)}</td><td>${share(e.contribution)}</td>${model ? `<td>${del(e)}</td>` : ''}</tr>${model && S.uncFor === e.exchange ? uncEditor(e, 7) : ''}`).join('') || `<tr><td colspan="7" class="muted">${model ? t('Noch keine Inputs. Füge Material, Energie oder Transporte hinzu.') : t('Keine Inputs.')}</td></tr>`}
       </tbody></table></div>
       ${a.technosphere.length > 30 ? `<button class="linkbtn" data-act="all-tech" style="margin-top:8px">${showAllTech ? t('Weniger anzeigen') : t('Alle {n} anzeigen', { n: a.technosphere.length })}</button>` : ''}

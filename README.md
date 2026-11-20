@@ -57,6 +57,7 @@ Options: `python -m lca_wrench --port 8790 --no-browser`. `./start.sh` still wor
 | Start | Project selection, databases by role (background, own models, biosphere flows), example model with one click, guided tour |
 | Data | Search across all databases (typo-tolerant; filters for unit group and location), data sheet with description, share of each input in the impact, uncertainty, copy of an activity into your own model |
 | Model | Own models (databases) and activities, inputs and emissions, amounts as numbers or formulas, credits, undo for every step, history, [moving a model to another region](docs/features.md#moving-a-model-to-another-region) |
+| Several products | Processes with several products as the Activity Browser 3 stores them: allocation in equal parts, by a product property (mass, price …) or by hand, every allocation compared side by side ([docs](docs/features.md#several-products-and-allocation)) |
 | Parameters | Project, model and activity parameters with formulas, stored as in the Activity Browser ([docs](docs/features.md#parameters-and-formulas)) |
 | Calculate | Calculation setups with several products × methods, stored in the Activity Browser format; cross-check with bw2calc; export as Excel or CSV |
 | Result | Contributions by activity or flow; all categories of one or two methods, or one kind of impact across methods; Sankey; supply chain tree; inventory with filter and CSV; environmental profile in UBP; Excel/CSV export |

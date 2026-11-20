@@ -8,6 +8,8 @@ bw2io==0.9.17
 bw2parameters==1.1.0
 bw-processing==1.6
 matrix-utils==0.9
+# processes with several products, stored as the Activity Browser 3 stores them (lca_wrench/functional.py)
+bw-functional==0.1.1
 fastapi>=0.110
 uvicorn[standard]>=0.29
 # BAFU 2026 with EF 3.1 (lca_wrench/bafu2026.py): a fixed commit from GitHub, as an archive (no git needed)

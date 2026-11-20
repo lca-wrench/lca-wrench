@@ -55,6 +55,14 @@ EN = {
         "The model cannot be solved: the production amounts cancel each other out (singular matrix).",
     "Prozess {id} ist in diesem Projekt nicht berechenbar.": "Activity {id} cannot be calculated in this project.",
     "«{name}» hat mehrere Produkte. Wähle eines davon.": "“{name}” has several products. Choose one of them.",
+    "«{name}» hat nur ein Produkt: eine Allokation ist nicht nötig.": "“{name}” has only one product: no allocation is needed.",
+    "Eine Allokation von «{name}» nach «{strategy}» geht nicht: nicht alle Produkte haben diese Eigenschaft.":
+        "“{name}” cannot be allocated by “{strategy}”: not all of its products have this property.",
+    "Eine Allokation von «{name}» nach «{strategy}» geht nicht: die Werte ergeben zusammen null.":
+        "“{name}” cannot be allocated by “{strategy}”: the values add up to zero.",
+    "Allokation von «{name}» geändert": "Allocation of “{name}” changed",
+    "Allokationen vergleichen geht für eigene Modelle; Hintergrunddaten sind schon alloziert.":
+        "Comparing allocations works for own models; background data are already allocated.",
     "Die Allokationsfaktoren von «{name}» ergeben zusammen {total} statt 1.":
         "The allocation factors of “{name}” add up to {total} instead of 1.",
     # excel

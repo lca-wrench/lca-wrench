@@ -33,8 +33,8 @@ from bw2data.backends.schema import ExchangeDataset
 from bw2data.project import ProjectDataset
 from bw_processing import safe_filename
 
-from . import (analysis, backgrounds, bafu2026, beispiel, completion, engine, flowmap, models, montecarlo, overview, regions,
-               registry, repair, setups)
+from . import (analysis, backgrounds, bafu2026, beispiel, completion, engine, flowmap, functional, models, montecarlo,
+               overview, regions, registry, repair, setups)
 from .analysis import short_unit
 from .i18n import _
 from .models import ReadOnlyError
@@ -700,6 +700,36 @@ def activity(activity_id: int | str, method: tuple) -> dict:
         d["edit_mode"] = None
     d["role"] = roles.get(d["database"])
     return d
+
+
+def allocation_compare(activity_id: int | str, method: tuple) -> dict:
+    """The products of a process (or of the process of a product) under every way the process can be split, per unit
+    of each product: equally, by each property all products have, as stored by hand. Nothing is saved: the models are
+    rebuilt with those shares (engine.with_factors), the rest of the calculation stays as it is."""
+    method = tuple(method)
+    act = bd.get_node(id=int(activity_id))
+    proc = functional.process_of(act)
+    if proc is None or not proc.multifunctional:
+        raise ValueError(_("«{name}» hat nur ein Produkt: eine Allokation ist nicht nötig.", name=act["name"]))
+    if models.roles().get(proc["database"]) != "model":
+        raise ValueError(_("Allokationen vergleichen geht für eigene Modelle; Hintergrunddaten sind schon alloziert."))
+    S = models.system()
+    products = proc.products()
+    current = functional.strategy(proc)
+    rows = []
+    for label in functional.strategies(proc):
+        try:
+            factors = functional.factors(proc, label)
+        except (KeyError, ValueError):
+            continue  # a property that is zero for all products, or manual shares that add up to nothing
+        S2 = engine.with_factors(S, factors)
+        rows.append({"strategy": label, "current": label == current,
+                     "factors": {str(k): v for k, v in factors.items()},
+                     "scores": {str(p.id): S2.score({p.id: 1.0}, method) for p in products}})
+    return {"process": str(proc.id), "name": proc["name"], "unit": short_unit(bd.methods[method].get("unit")),
+            "products": [{"id": str(p.id), "name": p.get("product") or p["name"], "unit": short_unit(p.get("unit"))}
+                         for p in products],
+            "rows": rows}
 
 
 # ---------- results ----------

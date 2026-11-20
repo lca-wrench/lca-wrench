@@ -28,6 +28,7 @@ import bw2data as bd
 import numpy as np
 from scipy.sparse.linalg import spsolve, splu
 
+from . import functional  # noqa: F401  (worker processes open Activity Browser 3 databases too)
 from .i18n import _, msg, render
 
 MAX_ITERATIONS = 10000

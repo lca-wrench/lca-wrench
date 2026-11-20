@@ -231,6 +231,12 @@ class IdIn(BaseModel):
     id: str
 
 
+class AllocationIn(BaseModel):
+    id: str
+    strategy: str
+    manual: dict[str, float] | None = None  # {product id: share}, for "manual"
+
+
 class ExchangeAddIn(BaseModel):
     id: str
     input: str
@@ -783,6 +789,16 @@ def post_model_copy(body: CopyIn):
 def post_model_process_update(body: ProcessUpdateIn):
     run(mdl.update_process, body.id, body.fields)
     return {"ok": True}
+
+
+@app.post("/api/models/allocation")
+def post_model_allocation(body: AllocationIn):
+    return run(mdl.set_allocation, body.id, body.strategy, body.manual)
+
+
+@app.post("/api/allocation/compare")
+def post_allocation_compare(body: ActIn):
+    return run(s.allocation_compare, body.id, _method(body.method))
 
 
 @app.post("/api/models/process/delete")

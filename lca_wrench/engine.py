@@ -36,6 +36,7 @@ from scipy.linalg import lu_factor, lu_solve
 from scipy.sparse.linalg import splu
 
 from . import completion, flowmap, i18n
+from . import functional  # noqa: F401  (registers the backend: Activity Browser 3 databases open at all)
 from .i18n import msg, render
 
 BIOSPHERE_NODE_TYPES = ("emission", "natural resource", "economic", "inventory indicator", "social")
@@ -46,6 +47,8 @@ PROCESS_TYPES = set(labels.process_node_types)
 IMPLICIT_PRODUCTION = set(labels.implicit_production_allowed_node_types)
 # Activity Browser 3 (bw_functional, backend "functional_sqlite"): the products of a process are nodes of their own
 FUNCTION_TYPES = ("product", "waste")
+# processes as listed for the user: also those with several products or none (their products are listed with them)
+LISTED_PROCESS_TYPES = PROCESS_TYPES | {"multifunctional", "nonfunctional"}
 
 _lock = threading.RLock()
 
@@ -289,10 +292,13 @@ def _ids_by_index(mapping) -> np.ndarray:
 class Foreground:
     """Matrices of the model databases, read directly from SQLite."""
 
-    def __init__(self, dbs: list[str], bg: Background, alias: dict | None = None):
+    def __init__(self, dbs: list[str], bg: Background, alias: dict | None = None, factors: dict | None = None):
         """alias: {(database, code): node id} for inputs from a background database that is not in the calculation,
-        taken from its counterpart in the chosen background (e.g. a premise scenario instead of ecoinvent)."""
+        taken from its counterpart in the chosen background (e.g. a premise scenario instead of ecoinvent).
+        factors: {product id: allocation factor} instead of the stored ones (comparing allocations, `with_factors`)."""
         self.dbs = list(dbs)
+        self.alias_keys = dict(alias or {})
+        self.factor_override = dict(factors or {})
         self.errors: list[tuple] = []  # i18n.msg, rendered in the reader's language
         self.notes: list[tuple] = []  # the same, for what calculates but deserves a look (allocation factors)
         self.functions: dict[int, list[tuple[int, float | None]]] = {}  # process id -> [(product id, factor)]
@@ -453,7 +459,7 @@ class Foreground:
             pid = key_id.get(tuple(out_key)) if isinstance(out_key, (list, tuple)) and len(out_key) == 2 else None
             if pid is None:
                 continue
-            factor = data.get("allocation_factor")
+            factor = self.factor_override.get(nid, data.get("allocation_factor"))
             out.setdefault(pid, []).append((nid, float(factor) if _is_number(factor) else None))
         for fs in out.values():
             fs.sort()
@@ -462,6 +468,15 @@ class Foreground:
     def check(self) -> None:
         if self.errors:
             raise ModelError(" ".join(self.error_texts()))
+
+
+def with_factors(S: System, factors: dict[int, float]) -> System:
+    """The same calculation with other allocation factors for some products, nothing saved (comparing allocations).
+    Rebuilds only the models; the background and its factorization are shared. Not cached."""
+    fg = Foreground(S.fg.dbs, S.bg, S.fg.alias_keys, factors={**S.fg.factor_override, **factors})
+    out = System(S.bg, fg)
+    out.substituted, out.pulled, out.pulled_ids = S.substituted, S.pulled, S.pulled_ids
+    return out
 
 
 def _is_number(x) -> bool:

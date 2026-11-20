@@ -109,7 +109,8 @@ async function loadView() {
   if (S.view === 'daten' && S.sel) { S.act = await sheetFor(S.sel); if (!S.act) S.sel = null; }
   if (S.view === 'modell') {
     S.mprocs = S.mdb ? await api(`/api/models/processes?db=${encodeURIComponent(S.mdb)}`) : [];
-    if (S.msel && !S.mprocs.some(p => p.id === S.msel)) { S.msel = null; S.mact = null; }
+    // a product of a process with several products (Activity Browser 3) opens next to its process
+    if (S.msel && !S.mprocs.some(p => p.id === S.msel || (p.products || []).includes(S.msel))) { S.msel = null; S.mact = null; }
     if (S.msel) S.mact = await sheetFor(S.msel);
   }
   if (S.view === 'rechnen' && S.setup) {
@@ -363,6 +364,13 @@ const A = {
     await api('/api/models/process/delete', { id: k });
     await loadState(); S.msel = null; S.mact = null; await loadView(); render();
     toast(t('Prozess gelöscht.'), { act: 'undo', label: t('Rückgängig') });
+  },
+  // several products: compare every allocation (nothing saved), or take over shares typed in by hand
+  async 'alloc-cmp'() { const a = currentSheet(); S.allocCmp = await api('/api/allocation/compare', { id: a.id, method: S.method }); render(); },
+  async 'alloc-manual'() {
+    const a = currentSheet(), manual = {};
+    for (const el of document.querySelectorAll('[data-alloc]')) { const v = parseFloat(el.value); if (!isFinite(v) || v < 0) { toast(t('Bitte eine Zahl eingeben.')); return; } manual[el.dataset.alloc] = v; }
+    await api('/api/models/allocation', { id: a.allocation.process, strategy: 'manual', manual }); S.allocCmp = null; await afterModelChange(); render();
   },
   async 'ex-del'(k) { await api('/api/models/exchange/delete', { exchange: k }); await afterModelChange(); render(); },
   'pick-input'() {
@@ -787,6 +795,10 @@ document.addEventListener('change', ev => {
     else if (el.id === 'uncType') { S.uncType = el.value; render(); document.querySelector('#uncForm input')?.focus(); }
     else if (el.dataset.extype) {
       await api('/api/models/exchange/update', { exchange: el.dataset.extype, kind: el.value }); await afterModelChange(); render();
+    }
+    else if (el.id === 'allocSel') {
+      const a = currentSheet();
+      await api('/api/models/allocation', { id: a.allocation.process, strategy: el.value }); S.allocCmp = null; await afterModelChange(); render();
     }
     else if (el.dataset.pf) {
       const a = currentSheet();

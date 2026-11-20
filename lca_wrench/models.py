@@ -16,7 +16,7 @@ from bw2data.backends.proxies import Exchange
 from bw2data.backends.schema import ActivityDataset as AD
 from bw2data.backends.schema import ExchangeDataset
 
-from . import engine, registry
+from . import engine, functional, registry
 from .analysis import node_info, short_unit
 from .i18n import _, msg, q, render
 
@@ -98,6 +98,8 @@ def _require_model_db(name: str) -> None:
     if roles().get(name) != "model":
         raise ReadOnlyError(_("«{name}» ist eine Hintergrund-Datenbank und bleibt unverändert. "
                               "Kopiere den Prozess in ein eigenes Modell, um ihn zu ändern.", name=name))
+    if functional.is_functional(name):
+        functional.ensure_current()  # bw_functional's data structure, before LCA Wrench writes into it
 
 
 def _require_model_node(node) -> None:
@@ -208,8 +210,16 @@ def database_overview() -> list[dict]:
 
 def list_processes(name: str) -> list[dict]:
     db = bd.Database(name)
-    rows = [{"id": str(a.id), "name": a["name"], "location": a.get("location"), "unit": short_unit(a.get("unit")),
-             "product": a.get("reference product")} for a in db if a.get("type") in engine.PROCESS_TYPES]
+    rows = []
+    for a in db:
+        if a.get("type") not in engine.LISTED_PROCESS_TYPES:
+            continue
+        product, products = a.get("reference product"), []
+        if isinstance(a, functional.Process):  # stored as in the Activity Browser 3: its products
+            products = a.products()
+            product = ", ".join(p.get("product") or p["name"] for p in products) or None
+        rows.append({"id": str(a.id), "name": a["name"], "location": a.get("location"), "unit": short_unit(a.get("unit")),
+                     "product": product, "products": [str(p.id) for p in products]})
     rows.sort(key=lambda r: r["name"].lower())
     return rows
 
@@ -544,9 +554,20 @@ def update_exchange(exchange_id: int, amount: float | None = None, kind: str | N
     if exc["amount"] == old["amount"] and exc["type"] == old["type"]:
         return
     exc.save()
+    _reallocate_after(exc)
     _changed(msg("«{input}» in «{name}»: {old} → {new}", input=exc.input["name"], name=out["name"], old=_fmt(old["amount"]), new=_fmt(exc["amount"])),
              {"op": "update_exchange", "exchange": int(exchange_id), **old, "now": {"amount": float(exc["amount"]), "type": exc["type"]},
               **({"unc": unc} if unc and exc["amount"] != old["amount"] else {})})
+
+
+def _reallocate_after(exc) -> None:
+    """A product's amount changed in a process with several products: the shares follow (a property per unit of
+    product counts with the amount produced), as bw_functional does when its own edge class saves."""
+    if exc["type"] != "production":
+        return
+    proc = functional.process_of(exc.output)
+    if proc is not None and proc.multifunctional:
+        proc.allocate()
 
 
 def delete_exchange(exchange_id: int) -> None:
@@ -597,6 +618,35 @@ def _restore_exchange(snap: dict) -> int:
     exc = Exchange(**data)
     exc.save()
     return exc._document.id
+
+
+# ---------- several products: allocation (functional.py) ----------
+
+def _allocation_state(proc) -> dict:
+    return {"allocation": proc.get("allocation"), "factors": {p["code"]: p.get("allocation_factor") for p in proc.products()}}
+
+
+def set_allocation(node_id: int | str, strategy: str, manual: dict | None = None) -> dict:
+    """Split a process with several products: "equal", by a property all its products have, or "manual" with the
+    shares given ({product id: share}, scaled to add up to 1). Stored as the Activity Browser 3 stores it."""
+    act = bd.get_node(id=int(node_id))
+    proc = functional.process_of(act)
+    if proc is None or not proc.multifunctional:
+        raise ValueError(_("«{name}» hat nur ein Produkt: eine Allokation ist nicht nötig.", name=act["name"]))
+    _require_model_node(proc)
+    if strategy not in functional.strategies(proc):
+        raise ValueError(_("Eine Allokation von «{name}» nach «{strategy}» geht nicht: nicht alle Produkte haben "
+                           "diese Eigenschaft.", strategy=strategy, name=proc["name"]))
+    before = _allocation_state(proc)
+    try:
+        functional.set_allocation(proc, strategy, {int(k): float(v) for k, v in (manual or {}).items()})
+    except (KeyError, ValueError, ZeroDivisionError):
+        raise ValueError(_("Eine Allokation von «{name}» nach «{strategy}» geht nicht: die Werte ergeben zusammen null.",
+                           strategy=strategy, name=proc["name"])) from None
+    proc = bd.get_node(id=proc.id)
+    _changed(msg("Allokation von «{name}» geändert", name=proc["name"]),
+             {"op": "set_allocation", "key": list(proc.key), **before, "now": _allocation_state(proc)})
+    return functional.info(proc)
 
 
 # ---------- undo ----------
@@ -692,6 +742,10 @@ def _check_undo(u: dict) -> None:
         data = ExchangeDataset.get_by_id(u["exchange"]).data
         if any(not _same(_plain(data.get(k)), v) for k, v in u["now"].items()):
             raise UndoConflict()
+    elif op == "set_allocation":
+        proc = node(u["key"])
+        if proc is None or u["key"][0] not in writable_databases() or _allocation_state(proc) != u["now"]:
+            raise UndoConflict()
 
 
 def _apply_undo(u: dict) -> dict[int, int]:
@@ -755,10 +809,21 @@ def _apply_undo(u: dict) -> dict[int, int]:
         exc["amount"] = u["amount"]
         exc["type"] = u["type"]
         exc.save()
+        _reallocate_after(exc)
     elif op == "set_uncertainty":
         exc = Exchange(ExchangeDataset.get_by_id(u["exchange"]))
         _apply_fields(exc, u["fields"])
         exc.save()
+    elif op == "set_allocation":
+        # the strategy first (bw_functional allocates when it changes), then exactly the shares there were
+        proc = bd.get_node(database=u["key"][0], code=u["key"][1])
+        if proc.get("allocation") != u["allocation"]:
+            proc["allocation"] = u["allocation"]
+            proc.save()
+        for p in proc.products():
+            if p["code"] in u["factors"] and p.get("allocation_factor") != u["factors"][p["code"]]:
+                p["allocation_factor"] = u["factors"][p["code"]]
+                p.save()
     return moved
 
 
@@ -770,6 +835,18 @@ def process_detail(node_id: int | str, method: tuple) -> dict:
     S = system_for(act.id) if roles().get(act["database"]) == "background" else system()
     alone = act["database"] if S is not system() else None  # calculated on its own database (system_for)
     editable = act["database"] in writable_databases()
+    # stored as in the Activity Browser 3: a product shows its process's inputs and emissions, scaled by its share
+    # (edited on the process); a process with one product is calculated as that product
+    proc = functional.process_of(act)
+    products = proc.products() if proc is not None else []
+    share = None
+    target = act.id
+    if proc is not None and proc.id != act.id:
+        f = act.get("allocation_factor")
+        share = float(f) if engine._is_number(f) else 1.0
+        editable = False
+    elif proc is not None and len(products) == 1:
+        target = products[0].id
     errors = S.fg.error_texts() if editable else []
     u = None
     if not errors:
@@ -777,12 +854,14 @@ def process_detail(node_id: int | str, method: tuple) -> dict:
             u = S.unit_scores(method)
         except engine.ModelError as e:
             errors.append(str(e))
-    col = S.col.get(act.id)
+    col = S.col.get(target)
     prod = float(S.production[col]) if col is not None else 1.0
     cvec = S.cvec(method) if u is not None else None
     excs = []
-    for e in act.exchanges():
+    for e in (proc if share is not None else act).exchanges():
         try:
+            if share is not None and e["type"] == "production" and e.input.id != act.id:
+                continue  # the production of another product of the process
             excs.append((e, e.input.id))
         except bd.errors.UnknownObject:
             continue
@@ -790,7 +869,7 @@ def process_detail(node_id: int | str, method: tuple) -> dict:
     production, tech, bio = [], [], []
     for e, inp_id in excs:
         meta = info.get(inp_id, {"name": "?", "location": None, "unit": "", "database": "", "categories": ""})
-        amt = float(e["amount"])
+        amt = float(e["amount"]) * (share if share is not None and e["type"] != "production" else 1.0)
         doc = getattr(e, "_document", None)  # input-output tables (EXIOBASE) give read-only exchanges without one
         row = {"exchange": str(doc.id) if doc is not None else None, "id": str(inp_id), "name": meta["name"], "location": meta["location"],
                "unit": meta["unit"], "database": meta["database"], "amount": amt, "type": e["type"],
@@ -815,10 +894,20 @@ def process_detail(node_id: int | str, method: tuple) -> dict:
     bio.sort(key=lambda x: (-abs(x["contribution"] or 0), x["name"]))
     total = direct = None
     if u is not None and col is not None:
-        total = float(u[S.ref_row(act.id)])
+        total = float(u[S.ref_row(target)])
         direct = float(S.direct(method)[col]) / (prod or 1.0)
+    allocation = None
+    if proc is not None and len(products) > 1:
+        allocation = functional.info(proc)
+        allocation["editable"] = proc["database"] in writable_databases()
+        for p in allocation["products"]:
+            try:
+                p["score"] = float(u[S.ref_row(int(p["id"]))]) if u is not None else None
+            except KeyError:
+                p["score"] = None
     return {
-        "id": str(act.id), "name": act["name"], "product": act.get("reference product"),
+        "allocation": allocation, "share": share, "process_id": str(proc.id) if share is not None else None,
+        "id": str(act.id), "name": act["name"], "product": act.get("reference product") or act.get("product"),
         "location": act.get("location"), "unit": short_unit(act.get("unit")), "unit_raw": act.get("unit"),
         "database": act["database"], "comment": act.get("comment") or "",
         "categories": " / ".join(act.get("categories") or ()),

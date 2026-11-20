@@ -31,6 +31,7 @@ dependencies = [
   "bw2parameters==1.1.0",
   "bw-processing==1.6",
   "matrix-utils==0.9",
+  "bw-functional==0.1.1",
   "numpy",
   "scipy",
   "openpyxl",
