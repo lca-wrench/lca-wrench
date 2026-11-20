@@ -30,7 +30,7 @@ def _drop_all():
     for p in [p.name for p in bd.projects if p.name.startswith(PREFIX)]:
         if bd.projects.current == p:
             bd.projects.set_current(TEST_PROJECT)
-        bd.projects.delete_project(p, delete_dir=True)
+        s.remove_project(p)
     bd.projects.set_current(TEST_PROJECT)
 
 

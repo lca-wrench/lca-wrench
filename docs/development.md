@@ -11,7 +11,12 @@ Setup and contribution rules: [../CONTRIBUTING.md](../CONTRIBUTING.md).
 ```
 
 Without the script: `python -m ruff check . && python -m pytest -q`. The GitHub workflow `.github/workflows/check.yml`
-runs the same on Linux for every pull request and push to main.
+runs the same on Linux, Windows and macOS for every pull request and push to main.
+
+On Windows a file that is still open cannot be deleted (WinError 32). The engine's cached calculations keep a
+project's processed datapackages open, so a project is removed with `service.remove_project` (it calls
+`engine.forget` first, then retries the folder); tests clean up with it too. On Windows, opening another project
+also releases the files of the projects opened before, so the Activity Browser can delete or change them.
 
 The browser tests (`tests/test_browser.py`, Playwright) drive the installed Google Chrome and start their own local
 process on port 8795 in the project `lca-wrench-test`. They go through the tour, create the example model, change an

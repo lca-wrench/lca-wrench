@@ -151,7 +151,7 @@ def test_working_copy_keeps_the_background_choice(world):
     finally:
         bd.projects.set_current(TEST_PROJECT)
         if name:
-            bd.projects.delete_project(name, delete_dir=True)
+            s.remove_project(name)
             reg = models.registry.load()
             for key in ("copies", "backgrounds", "models"):
                 reg.get(key, {}).pop(name, None)
@@ -165,7 +165,7 @@ def test_reused_working_copy_name_is_not_served_from_the_cache(world):
 
     def drop(name):
         bd.projects.set_current(TEST_PROJECT)
-        bd.projects.delete_project(name, delete_dir=True)
+        s.remove_project(name)
         reg = models.registry.load()
         for key in ("copies", "backgrounds", "models"):
             reg.get(key, {}).pop(name, None)

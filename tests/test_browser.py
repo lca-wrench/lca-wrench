@@ -23,6 +23,7 @@ from conftest import TEST_PROJECT  # noqa: E402
 pytestmark = pytest.mark.skipif(os.environ.get("LCA_WRENCH_SKIP_BROWSER") == "1", reason="browser tests skipped (LCA_WRENCH_SKIP_BROWSER=1)")
 
 PORT = 8795
+WINDOWS = sys.platform == "win32"
 URL = f"http://127.0.0.1:{PORT}"
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -36,9 +37,11 @@ def num(text: str) -> float:
 @pytest.fixture(scope="module")
 def server():
     env = {**os.environ, "LCA_WRENCH_PROJECT": TEST_PROJECT, "PYTHONWARNINGS": "ignore"}
+    # own process group (POSIX: session), so the server and its Monte-Carlo workers stop together
+    group = {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if WINDOWS else {"start_new_session": True}
     proc = subprocess.Popen(
         [sys.executable, "-m", "uvicorn", "lca_wrench.api:app", "--host", "127.0.0.1", "--port", str(PORT), "--log-level", "warning"],
-        cwd=ROOT, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, start_new_session=True,
+        cwd=ROOT, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, **group,
     )
     import urllib.request
 
@@ -54,7 +57,10 @@ def server():
         proc.kill()
         raise RuntimeError("Server startet nicht")
     yield URL
-    os.killpg(proc.pid, signal.SIGTERM)  # the server and any Monte-Carlo workers it started
+    if WINDOWS:  # os.killpg does not exist there: taskkill /T stops the process tree
+        subprocess.run(["taskkill", "/PID", str(proc.pid), "/T", "/F"], capture_output=True)
+    else:
+        os.killpg(proc.pid, signal.SIGTERM)  # the server and any Monte-Carlo workers it started
     proc.wait(timeout=15)
 
 
@@ -91,7 +97,7 @@ def test_01_start_and_tour(page):
     expect(tour).to_contain_text("1 / 10")
     for n in range(2, 11):
         page.click("[data-tour=next]")
-        expect(tour).to_contain_text(f"{n} / 10")
+        expect(tour).to_contain_text(f"{n} / 10", timeout=30_000)  # a step can wait for the app (slow PCs)
     page.click("[data-tour=skip]")
     expect(tour).to_have_count(0)
     page.click("#rail [data-k=start]")
@@ -370,6 +376,7 @@ def test_10_why_different_in_working_copy(page):
     import bw2data as bd
 
     from lca_wrench import registry
+    from lca_wrench import service as s
 
     page.click("#rail [data-k=daten]")
     page.locator("#q").press_sequentially("electricity low voltage", delay=20)  # right away: the redraw keeps the text
@@ -402,7 +409,7 @@ def test_10_why_different_in_working_copy(page):
         bd.projects.set_current(TEST_PROJECT)
         for name in copies:
             if name in bd.projects:
-                bd.projects.delete_project(name, delete_dir=True)
+                s.remove_project(name)
             reg = registry.load()
             reg["copies"].pop(name, None)
             registry.save(reg)

@@ -31,7 +31,7 @@ def _drop(name):
     if name in bd.projects:
         if bd.projects.current == name:
             bd.projects.set_current(TEST_PROJECT)
-        bd.projects.delete_project(name, delete_dir=True)
+        s.remove_project(name)
 
 
 @pytest.fixture(scope="module")

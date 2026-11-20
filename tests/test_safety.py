@@ -9,6 +9,7 @@
 
 import pickle
 import shutil
+import sys
 from pathlib import Path
 
 import bw2data as bd
@@ -40,7 +41,7 @@ def _files(d: Path) -> dict:
 def _cleanup():
     bd.projects.set_current(TEST_PROJECT)
     for name in [p.name for p in bd.projects if p.name.startswith(PREFIX)]:
-        bd.projects.delete_project(name, delete_dir=True)
+        s.remove_project(name)
 
 
 def _electricity() -> int:
@@ -283,6 +284,7 @@ def test_requests_from_other_websites_are_rejected(client):
     assert big.status_code == 413
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows does not let another program delete the folder of an open project")
 def test_project_deleted_from_outside_is_not_created_again():
     _cleanup()
     name = f"{PREFIX}-weg"

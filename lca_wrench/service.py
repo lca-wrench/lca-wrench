@@ -15,11 +15,13 @@ Rules:
 
 from __future__ import annotations
 
+import gc
 import json
 import logging
 import pickle
 import re
 import shutil
+import sys
 import threading
 import time
 from pathlib import Path
@@ -265,6 +267,8 @@ def set_project(name: str, rebuild: bool = False) -> None:
                            "Testkopie an oder bestätige das Öffnen des Originals.", name=name))
     bd.projects.set_current(name)
     OPEN["project"] = name
+    if sys.platform == "win32":
+        engine.forget_others(name)  # Windows: release the other projects' files (WinError 32 for other programs)
     reg = registry.load()
     if reg.get("last_project") != name:
         reg["last_project"] = name
@@ -357,6 +361,47 @@ def pending_updates(name: str) -> list[str]:
     return sorted(k for k, u in Updates.UPDATES.items() if u["automatic"] and not done.get(k))
 
 
+def remove_project(name: str) -> None:
+    """Delete a project with its folder, also on Windows.
+
+    The project's cached calculations keep its processed files open, and Windows cannot delete an open file
+    (WinError 32): they are dropped first (engine.forget). bw2data unregisters the project before it removes the
+    folder, so a folder that is still locked, e.g. by a virus scanner or the search indexer for a moment, is removed
+    afterwards with a few retries; a left-over folder would block a new project of the same name."""
+    if bd.projects.current == name:
+        # leave it first: deleting the current project would switch to "default" with its automatic updates
+        bd.projects.set_current("default", update=False)
+    engine.forget(name)
+    folder = bd.projects._project_dir(ProjectDataset.get(ProjectDataset.name == name)) if name in bd.projects else None
+    try:
+        if name in bd.projects:
+            bd.projects.delete_project(name, delete_dir=True)
+    except OSError:
+        log.warning("Project %s unregistered, its folder is removed again", name)
+    remove_folder(folder)
+
+
+def _folder_taken(name: str, full_hash: bool) -> bool:
+    """A folder of that name without a registered project: left over where a deletion failed (on Windows before
+    0.1.1). A new copy takes the next name instead of failing with "Project directory already exists"."""
+    return (Path(bd.projects._base_data_dir) / safe_filename(name, full=full_hash)).exists()
+
+
+def remove_folder(folder: Path | None) -> None:
+    """shutil.rmtree, retried while Windows still reports files of it as open."""
+    for wait in (0.2, 0.5, 1.0, 2.0, None):
+        if folder is None or not Path(folder).exists():
+            return
+        try:
+            shutil.rmtree(folder)
+            return
+        except OSError:
+            if wait is None:
+                raise
+            gc.collect()  # packages nobody refers to any more close their files when freed
+            time.sleep(wait)
+
+
 def copy_project_files(name: str) -> str:
     """A test copy of any project: copied file by file without opening the original, then opened (and converted, if
     Brightway wants to) as the copy. Everything in a test copy may be changed; the original stays as it is."""
@@ -364,7 +409,7 @@ def copy_project_files(name: str) -> str:
         raise KeyError(_("Projekt «{name}» gibt es nicht.", name=name))
     src = ProjectDataset.get(ProjectDataset.name == name)
     n, new = 1, _("{base} (LCA Wrench)", base=name)
-    while new in bd.projects:
+    while new in bd.projects or _folder_taken(new, src.full_hash):
         n += 1
         new = _("{base} (LCA Wrench {n})", base=name, n=n)
     src_dir = bd.projects._project_dir(src)
@@ -383,9 +428,9 @@ def copy_project_files(name: str) -> str:
             # leave the copy first: deleting the current project would switch to "default" with its automatic updates
             bd.projects.set_current(before if before and before in bd.projects else "default", update=False)
         if new in bd.projects:
-            bd.projects.delete_project(new, delete_dir=True)
-        elif dst_dir.exists():
-            shutil.rmtree(dst_dir)
+            remove_project(new)
+        else:
+            remove_folder(dst_dir)
         raise
     reg = registry.load()
     reg.setdefault("testcopies", {})[new] = {"original": name, "created": time.strftime("%Y-%m-%dT%H:%M:%S")}
@@ -798,7 +843,7 @@ def make_working_copy() -> str:
     cur = bd.projects.current
     base = reg["copies"].get(cur, {}).get("original", cur)
     n, name = 1, _("{base} – Arbeitskopie", base=base)
-    while name in bd.projects:
+    while name in bd.projects or _folder_taken(name, bd.projects.dataset.full_hash):
         n += 1
         name = _("{base} – Arbeitskopie {n}", base=base, n=n)
     bd.projects.copy_project(name, switch=True)

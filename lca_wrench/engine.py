@@ -22,6 +22,7 @@ tests/test_engine.py checks every quantity against plain bw2calc.
 
 from __future__ import annotations
 
+import gc
 import threading
 from collections import OrderedDict
 
@@ -603,6 +604,44 @@ def bump_all() -> None:
 def bump_foreground(project: str) -> None:
     with _lock:
         _fg_version[project] = _fg_version.get(project, 0) + 1
+
+
+def forget(project: str) -> None:
+    """Drop every cached calculation of `project` and close the processed datapackages they keep open.
+
+    A cached background holds its bw2calc LCA, whose datapackages keep the project's processed/*.zip files open.
+    Windows cannot delete an open file (WinError 32), so a project is forgotten before its folder is removed."""
+    with _lock:
+        gone = [_backgrounds.pop(k) for k in [k for k in _backgrounds if k[0] == project]]
+        for k in [k for k in _systems if k[0] == project]:
+            del _systems[k]
+        _bg_version[project] = _bg_version.get(project, 0) + 1
+        _fg_version[project] = _fg_version.get(project, 0) + 1
+    for bg in gone:
+        _close_packages(bg.lca)
+        bg.lca = None
+    gc.collect()  # what still refers to the packages elsewhere closes its files when it is freed
+
+
+def forget_others(project: str) -> None:
+    """forget() every other project with cached calculations. On Windows when another project is opened: its files
+    stay open otherwise, and another program (the Activity Browser) could not delete or rewrite that project."""
+    with _lock:
+        others = {k[0] for k in _backgrounds} | {k[0] for k in _systems}
+    for p in others - {project}:
+        forget(p)
+
+
+def _close_packages(lca) -> None:
+    for dp in getattr(lca, "packages", None) or []:
+        fs = getattr(dp, "fs", None)
+        try:
+            if hasattr(fs, "zip"):  # fsspec ZipFileSystem: the archive, then the file under it
+                fs.zip.close()
+            if hasattr(getattr(fs, "of", None), "__exit__"):
+                fs.of.__exit__(None, None, None)
+        except Exception:  # noqa: BLE001 - closing is best effort, the folder removal reports what stays open
+            pass
 
 
 def backgrounds_in_use(project: str) -> set[str]:

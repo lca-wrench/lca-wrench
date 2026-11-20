@@ -1,5 +1,6 @@
-# Lint and tests, as ./check.sh runs them locally. The tests need the free BAFU 2025 project (setup_daten.py, 62 MB
-# from files.brightway.dev); the Brightway folder is cached so it is downloaded once per change of setup_daten.py.
+# Lint and tests, as ./check.sh runs them locally, on Linux, Windows and macOS. The tests need the free BAFU 2025
+# project (setup_daten.py, 62 MB from files.brightway.dev); the Brightway folder is cached per system so it is
+# downloaded once per change of setup_daten.py.
 name: check
 on:
   pull_request:
@@ -12,11 +13,19 @@ permissions:
   contents: read
 jobs:
   check:
-    runs-on: ubuntu-latest
-    timeout-minutes: 40
+    strategy:
+      fail-fast: false  # a failure on one system still shows the result of the others
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash  # the same commands everywhere (Git Bash on Windows)
     env:
       BRIGHTWAY2_DIR: ${{ github.workspace }}/.brightway
       PYTHON: python
+      PYTHONUTF8: "1"  # Windows: UTF-8 for files and subprocess output, as the release package sets it
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -31,7 +40,7 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: .brightway
-          key: brightway-${{ hashFiles('setup_daten.py', 'requirements-lock.txt') }}
+          key: brightway-${{ runner.os }}-${{ hashFiles('setup_daten.py', 'requirements-lock.txt') }}
       - run: mkdir -p .brightway && python setup_daten.py
       - run: python -m playwright install --with-deps chrome
       - run: python -m pytest -q

@@ -358,7 +358,7 @@ def _undo(name: str, created: bool, before: str | None, dbs0: set, methods0: set
                 # leave it first: deleting the current project would switch to "default" with its automatic updates
                 back = before if before and before in bd.projects and before != name else "default"
                 bd.projects.set_current(back, update=False)
-            bd.projects.delete_project(name, delete_dir=True)
+            s.remove_project(name)  # closes what keeps its files open (Windows)
         else:
             bd.projects.set_current(name)
             for db in set(bd.databases) - dbs0:

@@ -22,7 +22,7 @@ def working_copy():
     name = s.make_working_copy()
     yield name
     bd.projects.set_current(TEST_PROJECT)
-    bd.projects.delete_project(name, delete_dir=True)
+    s.remove_project(name)
     reg = registry.load()
     reg["copies"].pop(name, None)
     registry.save(reg)
