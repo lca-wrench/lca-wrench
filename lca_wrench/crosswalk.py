@@ -14,7 +14,8 @@ background itself d is just that product. Datasets are matched in this order:
 
 1. a choice the user made (or loaded from a mapping file), kept in the registry per pair of databases;
 2. the same code in the other database (the same database twice, or versions that keep their codes);
-3. a suggestion from name, reference product, location and unit, which the user can confirm or change.
+3. the same name, reference product, location and unit (a premise scenario gives its datasets new codes);
+4. a suggestion from name, reference product, location and unit, which the user can confirm or change.
 
 Mapping files are randonneur JSON as in sentier-mappings (github.com/sentier-dev/sentier-mappings): "replace" entries
 from a source code to a target {database, code}. sentier-mappings has bridges from BAFU 2026 to the EF 3.1 flows (used
@@ -116,6 +117,7 @@ class TargetIndex:
         self.database = database
         self.rows: dict[int, dict] = {}
         self.by_code: dict[str, int] = {}
+        self.by_key: dict[tuple, int] = {}  # (name, product, location, unit): the same dataset under another code
         self.words: dict[str, set[int]] = defaultdict(set)
         for nid, code, data in AD.select(AD.id, AD.code, AD.data).where(AD.database == database,
                                                                         AD.type << list(engine.PROCESS_TYPES)).tuples():
@@ -127,6 +129,7 @@ class TargetIndex:
             d["obsolete"] = d["name"].lower().startswith("xx ")
             self.rows[nid] = d
             self.by_code[code] = nid
+            self.by_key.setdefault((d["name"], d["product"], d["location"], d["unit"]), nid)
             for w in d["words"]:
                 self.words[w].add(nid)
         # an input-output table (EXIOBASE): datasets are matched to their proxy sector, not by name (sectors.py)
@@ -463,6 +466,9 @@ def compare(node_id: int, amount: float, method: tuple, project: str, database: 
                     origin = "missing"
             elif d["code"] in index.by_code:
                 target, origin = index.rows[index.by_code[d["code"]]], "code"
+            elif (key := (d["name"], d.get("product") or "", d["location"] or "", d["unit"] or "")) in index.by_key:
+                # the same name, product, location and unit: e.g. a premise scenario, which gives new codes
+                target, origin = index.rows[index.by_key[key]], "exact"
             elif index.sectors is not None:  # input-output table: the proxy sector in the region
                 src = extra.get(sid, {})
                 sugg, how = index.sectors.propose(d["name"], d.get("product") or "", d["location"], src.get("isic"),
@@ -536,7 +542,7 @@ def compare(node_id: int, amount: float, method: tuple, project: str, database: 
                                      "unmatched": unmatched_flows},
             "open_share": open_a / scale, "unsure_share": unsure_a / scale, "drivers": drivers,
             "counts": {"inputs": len(rows), "matched": sum(1 for r in rows if r["match"]),
-                       "confirmed": sum(1 for r in rows if r["origin"] in ("user", "file", "same", "code") and r["match"]),
+                       "confirmed": sum(1 for r in rows if r["origin"] in ("user", "file", "same", "code", "exact") and r["match"]),
                        "unsure": sum(1 for r in rows if r["origin"] == "auto" and r["quality"] == "unsure")}}
 
 

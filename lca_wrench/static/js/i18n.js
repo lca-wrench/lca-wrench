@@ -660,6 +660,7 @@ const EN = {
   'gespeichert, fehlt aber': 'saved, but missing',
   'gleiche Stoffe, Faktoren der Methode dort': 'same flows, factors of the method there',
   'gleicher Code': 'same code',
+  'gleicher Name, Ort und Einheit': 'same name, location and unit',
   'kein Vorschlag': 'no suggestion',
   'ohne Gegenstück': 'no counterpart',
   'passend zur Methode hier': 'matching the method here',

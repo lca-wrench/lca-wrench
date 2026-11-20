@@ -492,6 +492,7 @@ def test_other_database_scores_a_scenario_not_in_the_calculation(world):
     rows = {r["code"]: r for r in res["rows"]}
     elec_2040 = 0.02 + 0.001 * 2.28
     assert rows["elec"]["origin"] == "code" and rows["elec"]["score_b"] == pytest.approx(10 * elec_2040, rel=1e-5)
+    assert rows["steel"]["origin"] == "exact"  # new code in the scenario, same name, product, location and unit
     assert rows["steel"]["match"]["code"] == "steel-2040" and rows["steel"]["score_b"] == pytest.approx(2.28, rel=1e-5)
     assert res["b"]["score"] == pytest.approx(10 * elec_2040 + 2.28, rel=1e-5)  # heat has no counterpart there
     # one level down: the scenario's electricity, with its own inputs

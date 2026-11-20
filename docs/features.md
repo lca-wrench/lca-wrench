@@ -110,7 +110,9 @@ background itself, d is just that product.
 
 - **Datasets:** every background dataset the product uses directly gets a counterpart, in this order: (1) a choice the
   user made or loaded from a mapping file; (2) the same code in the other database (the same database twice, or versions
-  that keep their codes); (3) a suggestion from name, reference product, location and unit. The user confirms
+  that keep their codes); (3) the same name, reference product, location and unit (a premise scenario gives its
+  datasets new codes), shown as "same name, location and unit" and counted as sure; (4) a suggestion from name,
+  reference product, location and unit. The user confirms
   suggestions ("Confirm suggestion", "Confirm good suggestions (n)") or changes them ("Change", search in the other
   database). "No counterpart" counts as zero on the other side; the share of the result here that such datasets carry is
   shown, as is the share of unsure suggestions.

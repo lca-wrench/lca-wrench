@@ -26,7 +26,7 @@ export async function loadCw() {
 const sign = x => x > 0 ? '+' : x < 0 ? '−' : '';
 const ORIGIN = {
   user: () => ['ok', t('bestätigt')], file: () => ['ok', t('aus Datei')], same: () => ['ok', t('derselbe Datensatz')],
-  code: () => ['ok', t('gleicher Code')], missing: () => ['bad', t('gespeichert, fehlt aber')], unit: () => ['bad', t('Einheit passt nicht')],
+  code: () => ['ok', t('gleicher Code')], exact: () => ['ok', t('gleicher Name, Ort und Einheit')], missing: () => ['bad', t('gespeichert, fehlt aber')], unit: () => ['bad', t('Einheit passt nicht')],
 };
 
 function originChip(r) {
