@@ -8,7 +8,7 @@ LCA Wrench is a local web interface for [Brightway](https://docs.brightway.dev) 
 (Python 3.12, FastAPI, plain JavaScript). It builds product models, calculates several products and methods at once,
 and shows results as contributions, Sankey diagram, supply chain tree and inventory. It runs in the browser on the
 local computer only (127.0.0.1) and works on ordinary Brightway projects, so models and calculation setups can be
-opened in the [Activity Browser](https://github.com/LCA-ActivityBrowser/activity-browser) as well. Version 0.1.0.
+opened in the [Activity Browser](https://github.com/LCA-ActivityBrowser/activity-browser) as well. Version 0.1.1.
 
 ![Result view: climate impact of a product with contributions](docs/screenshots/result.png)
 
@@ -124,13 +124,13 @@ flows without sub-compartment, so emissions into sub-compartments count as zero 
 - [Features](docs/features.md), [Uncertainty and sensitivity](docs/uncertainty.md), [Flow mapping](docs/flow-mapping.md)
 - [Completed factors](docs/completed-factors.md), [Validation](docs/validation.md), [Comparison with other tools](COMPARISON.md)
 - [Demo walkthrough](docs/demo.md), [Development](docs/development.md), [Contributing](CONTRIBUTING.md),
-  [Security](SECURITY.md)
+  [Security](SECURITY.md), [Changelog](CHANGELOG.md)
 
 ## Citation
 
 See [CITATION.cff](CITATION.cff). In plain text:
 
-Pfister, K. and Pfister, S. (2026). LCA Wrench (version 0.1.0). https://github.com/lca-wrench/lca-wrench
+Pfister, K. and Pfister, S. (2026). LCA Wrench (version 0.1.1). https://github.com/lca-wrench/lca-wrench
 
 ## Licence
 
