@@ -112,7 +112,9 @@ flows without sub-compartment, so emissions into sub-compartments count as zero 
   stand-in for premise.
 - Parameters: no uncertainty of parameters in Monte Carlo, no dependencies between activity groups.
 - Changing background data (only in a working copy) rebuilds the matrix.
-- Activities with several products (multifunctional) are not treated specially.
+- Processes with several products: Excel exchange and moving to another region do not work for such models yet;
+  substitution is modelled with LCA Wrench's credits, not with bw_functional's system expansion; no Circular
+  Footprint Formula.
 - The climate method derived from ecological scarcity (BAFU 2025) is not a standalone IPCC method; see
   [docs/data.md](docs/data.md).
 - The Activity Browser and LCA Wrench working on the same project at the same time can overwrite each other's entries;

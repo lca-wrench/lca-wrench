@@ -83,6 +83,10 @@ EN = {
     "Nach «{label}» wird gerade alloziert. Wähle zuerst eine andere Allokation.":
         "The allocation uses “{label}” now. Choose another allocation first.",
     "Eigenschaft «{label}» der Produkte von «{name}» entfernt": "Property “{label}” removed from the products of “{name}”",
+    "«{name}» im Format des Activity Browser 3 gespeichert (mehrere Produkte pro Prozess)":
+        "“{name}” stored in the format of the Activity Browser 3 (several products per activity)",
+    "«{name}» hat mehrere oder fremde Referenzflüsse und lässt sich so nicht umstellen.":
+        "“{name}” has several or foreign reference flows and cannot be converted like this.",
     "Für Modelle im Format des Activity Browser 3 (mehrere Produkte pro Prozess) geht das noch nicht.":
         "This does not work yet for models in the format of the Activity Browser 3 (several products per activity).",
     "Allokationen vergleichen geht für eigene Modelle; Hintergrunddaten sind schon alloziert.":

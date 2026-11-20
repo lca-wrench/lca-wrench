@@ -738,6 +738,125 @@ def _delete_node(node) -> None:
     node.delete()
 
 
+_CONVERTED_FIELDS = ("type", "reference product", "product", "unit", "production amount")
+
+
+def _remap_inputs(database: str, old: str, new: str, production: bool) -> None:
+    """Point exchanges at another node, keeping each exchange (its id, formula and uncertainty): the production of
+    the process (production=True), or every input of it, in any database (production=False)."""
+    cond = (ExchangeDataset.input_database == database) & (ExchangeDataset.input_code == old)
+    cond &= (ExchangeDataset.type == "production") if production else (ExchangeDataset.type != "production")
+    for row in ExchangeDataset.select().where(cond):
+        exc = Exchange(row)
+        exc["input"] = (database, new)
+        exc.save()
+
+
+def _remap_setups(mapping: dict[tuple, tuple]) -> dict:
+    """Functional units of calculation setups keyed by a converted process now name its product. Returns the setups
+    as they were, for undo."""
+    before = {}
+    for name in list(bd.calculation_setups):
+        cs = bd.calculation_setups[name]
+        inv = cs.get("inv", [])
+        new = [{mapping.get(tuple(k), tuple(k)): v for k, v in fu.items()} for fu in inv]
+        if new != [{tuple(k): v for k, v in fu.items()} for fu in inv]:
+            before[name] = [[[list(k), v] for k, v in fu.items()] for fu in inv]
+            cs["inv"] = new
+            bd.calculation_setups[name] = cs
+    if before:
+        bd.calculation_setups.serialize()
+    return before
+
+
+def convert_to_functional(name: str) -> None:
+    """Store an own model as the Activity Browser 3 stores it (bw_functional), in place, so that its processes can
+    have several products. Each process gets a product node; its production edge now produces that product, and
+    every input of the process (also from other models and in calculation setups) now names the product. No exchange
+    is deleted or written anew, so parameters, formulas and uncertainties stay. One step in the history."""
+    from bw2data.backends.proxies import Activity as Plain
+
+    _require_model_db(name)
+    if functional.is_functional(name):
+        return
+    taken = {c for (c,) in AD.select(AD.code).where(AD.database == name).tuples()}
+    processes: dict[str, dict] = {}
+    for row in list(AD.select().where((AD.database == name) & (AD.type << list(engine.PROCESS_TYPES)))):
+        own = [e for e in ExchangeDataset.select().where(
+            (ExchangeDataset.output_database == name) & (ExchangeDataset.output_code == row.code)
+            & (ExchangeDataset.type == "production"))]
+        if len(own) > 1 or any((e.input_database, e.input_code) != (name, row.code) for e in own):
+            raise ValueError(_("«{name}» hat mehrere oder fremde Referenzflüsse und lässt sich so nicht umstellen.",
+                               name=row.name))
+        pcode = row.code + "_function"
+        while pcode in taken:
+            pcode += "_"
+        taken.add(pcode)
+        node = Plain(document=row)
+        amount = float(own[0].data.get("amount", 1.0)) if own else 1.0
+        Plain(database=name, code=pcode, type="product" if amount >= 0 else "waste", name=node["name"],
+              product=node.get("reference product") or node["name"],
+              **{"reference product": node.get("reference product") or node["name"]},
+              unit=node.get("unit"), location=node.get("location"), processor=(name, row.code)).save()
+        processes[row.code] = {"pcode": pcode, "made_edge": not own,
+                               "fields": {k: node.get(k) for k in _CONVERTED_FIELDS if k in node}}
+        if own:
+            _remap_inputs(name, row.code, pcode, production=True)
+        else:  # a process with an implicit production of 1
+            Exchange(input=(name, pcode), output=(name, row.code), amount=1.0, type="production").save()
+        _remap_inputs(name, row.code, pcode, production=False)
+        for k in _CONVERTED_FIELDS:
+            node._data.pop(k, None)
+        node["type"] = "process"
+        node.save()
+    setups = _remap_setups({(name, code): (name, v["pcode"]) for code, v in processes.items()})
+    meta = dict(bd.databases[name])
+    meta.update(backend=functional.BACKEND, default_allocation=meta.get("default_allocation") or "equal")
+    bd.databases[name] = meta
+    bd.databases.flush()
+    bd.databases.set_dirty(name)
+    functional.ensure_current()
+    engine.bump_background(bd.projects.current)
+    _changed(msg("«{name}» im Format des Activity Browser 3 gespeichert (mehrere Produkte pro Prozess)", name=name),
+             {"op": "convert_model", "name": name, "processes": processes, "setups": setups})
+
+
+def _unconvert(u: dict) -> None:
+    """The inverse of convert_to_functional: back to one node per process and product."""
+    from bw2data.backends.proxies import Activity as Plain
+
+    name = u["name"]
+    for code, info in u["processes"].items():
+        pcode = info["pcode"]
+        if info["made_edge"]:
+            ExchangeDataset.delete().where(
+                (ExchangeDataset.output_database == name) & (ExchangeDataset.output_code == code)
+                & (ExchangeDataset.input_database == name) & (ExchangeDataset.input_code == pcode)
+                & (ExchangeDataset.type == "production")).execute()
+        else:
+            _remap_inputs(name, pcode, code, production=True)
+        _remap_inputs(name, pcode, code, production=False)
+        node = Plain(document=AD.get((AD.database == name) & (AD.code == code)))
+        node._data.pop("allocation", None)
+        node._data.update(info["fields"])
+        node.save()
+        AD.delete().where((AD.database == name) & (AD.code == pcode)).execute()
+    for setup, inv in (u.get("setups") or {}).items():
+        if setup in bd.calculation_setups:
+            cs = bd.calculation_setups[setup]
+            cs["inv"] = [{tuple(k): v for k, v in fu} for fu in inv]
+            bd.calculation_setups[setup] = cs
+    if u.get("setups"):
+        bd.calculation_setups.serialize()
+    meta = dict(bd.databases[name])
+    meta["backend"] = "sqlite"
+    meta.pop("default_allocation", None)
+    bd.databases[name] = meta
+    bd.databases.flush()
+    bd.databases.set_dirty(name)
+    engine.bump_background(bd.projects.current)
+
+
 def _functional_process(node_id: int | str):
     proc = bd.get_node(id=int(node_id))
     if not isinstance(proc, functional.Process):
@@ -748,7 +867,12 @@ def _functional_process(node_id: int | str):
 
 
 def add_product(node_id: int | str, name: str, unit: str = "unit", amount: float = 1.0) -> str:
-    """A further product of a process (Activity Browser 3 format); its share follows from the process's allocation."""
+    """A further product of a process; its share follows from the process's allocation. A process of a classic model
+    gets it after its model is stored as the Activity Browser 3 stores it (convert_to_functional, its own step)."""
+    act = bd.get_node(id=int(node_id))
+    if not isinstance(act, functional.Process) and act.get("type") in engine.PROCESS_TYPES:
+        _check_amount(amount)
+        convert_to_functional(act["database"])
     proc = _functional_process(node_id)
     _check_amount(amount)
     if not float(amount):
@@ -930,6 +1054,14 @@ def _check_undo(u: dict) -> None:
         proc = node(u["key"])
         if proc is None or u["key"][0] not in writable_databases() or _allocation_state(proc) != u["now"]:
             raise UndoConflict()
+    elif op == "convert_model":
+        name = u["name"]
+        if name not in writable_databases() or not functional.is_functional(name):
+            raise UndoConflict()
+        for code, info in u["processes"].items():
+            proc = node((name, code))
+            if proc is None or [p["code"] for p in proc.products()] != [info["pcode"]]:
+                raise UndoConflict()  # a further product added since (undo that first) or changed elsewhere
     elif op == "restore_product":
         snap = u["snapshot"]
         if (node(snap["process"]) is None or snap["process"][0] not in writable_databases()
@@ -1015,6 +1147,8 @@ def _apply_undo(u: dict) -> dict[int, int]:
         exc.save()
     elif op == "set_allocation":
         _restore_allocation(u["key"], u)
+    elif op == "convert_model":
+        _unconvert(u)
     elif op == "restore_product":
         _restore_product(u["snapshot"])
         _restore_allocation(u["snapshot"]["process"], u["snapshot"]["allocation"])
@@ -1117,5 +1251,6 @@ def process_detail(node_id: int | str, method: tuple) -> dict:
         "production": prod, "score": total, "direct": direct,
         "production_exchanges": production, "technosphere": tech, "biosphere": bio,
         "editable": editable, "errors": errors, "calculated_alone": alone,
-        "users": users_of(act.id) if editable else [],
+        "users": ([x for p in products for x in users_of(p.id)] if proc is not None and proc.id == act.id
+                  else users_of(act.id)) if editable else [],
     }

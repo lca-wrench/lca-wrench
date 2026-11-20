@@ -1,6 +1,6 @@
 // Data sheet of one process. Read-only for background data, a live editor for own models.
 'use strict';
-import { S, esc, nf, pct, signedPct, U, methodInfo, methodLabel, shareBar, unitChoices, t } from './core.js';
+import { S, esc, nf, pct, signedPct, U, methodInfo, methodLabel, shareBar, unitChoices, explain, t } from './core.js';
 
 const typeLabel = type => type === 'substitution' ? t('Gutschrift') : t('Input');
 
@@ -94,7 +94,10 @@ function allocCompare(c) {
 // adding a product or a property: a small form inside the card
 function productForm(al) {
   if (!S.prodForm || S.prodForm !== al.process) return '';
-  return `<div class="row" style="gap:8px;align-items:flex-end"><label class="f">${t('Neues Produkt')}<input type="text" id="prodName" maxlength="160" placeholder="${t('z.B. Fleisch')}"></label>
+  const hint = al.classic
+    ? t('Mit einem zweiten Produkt (Koppelprodukt) werden Inputs und Emissionen des Prozesses auf seine Produkte aufgeteilt: die Allokation lässt sich danach wählen. Dafür wird das Modell «{db}» im Format des Activity Browser 3 gespeichert (Excel-Austausch und «In andere Region verschieben» gehen dafür noch nicht); «Rückgängig» stellt es zurück.', { db: esc(al.db || '') })
+    : t('Mit einem weiteren Produkt (Koppelprodukt) werden Inputs und Emissionen des Prozesses auf seine Produkte aufgeteilt: die Allokation lässt sich danach wählen.');
+  return `<p class="muted" style="font-size:13px;max-width:72ch">${hint}</p><div class="row" style="gap:8px;align-items:flex-end"><label class="f">${t('Neues Produkt')}<input type="text" id="prodName" maxlength="160" placeholder="${t('z.B. Fleisch')}"></label>
     <label class="f">${t('Menge')}<input type="number" step="any" id="prodAmt" value="1" style="width:90px"></label>
     <label class="f">${t('Einheit')}<select id="prodUnit">${unitChoices().map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select></label>
     <button class="btn primary" data-act="prod-add-save">${t('Hinzufügen')}</button><button class="btn" data-act="prod-add">${t('Abbrechen')}</button></div>`;
@@ -131,6 +134,7 @@ function allocationCard(a, amt, model) {
     <div class="row" style="justify-content:space-between;align-items:flex-end"><h3>${t('Produkte und Allokation · {n}', { n: al.products.length })}</h3>
       <div class="row" style="gap:8px;align-items:flex-end">${sel}${manual ? `<button class="btn" data-act="alloc-manual">${t('Anteile übernehmen')}</button>` : ''}<button class="btn" data-act="alloc-cmp">${t('Allokationen vergleichen')}</button></div></div>
     <p class="muted" style="font-size:13.5px">${t('Dieser Prozess stellt mehrere Produkte her. Seine Inputs und Emissionen werden nach den Anteilen auf die Produkte verteilt; jedes Produkt hat ein eigenes Datenblatt.')}</p>
+    ${explain(t('Allokation nach ISO 14044: wenn möglich vermeiden, indem der Prozess aufgeteilt wird oder das Koppelprodukt als Gutschrift für das gerechnet wird, was es ersetzt (Systemerweiterung; dann bleibt es ein Produkt und ein Input mit «Gutschrift»). Sonst nach einer physikalischen Beziehung (Masse, Energie) aufteilen, erst danach nach dem Preis. «Allokationen vergleichen» zeigt, wie stark die Wahl das Ergebnis verändert.'))}
     ${off}
     <div class="tblwrap"><table class="tbl"><thead><tr><th>${t('Produkt')}</th><th>${t('Menge')}</th>${propHead}<th>${t('Anteil')}</th><th>${t('Wirkung pro Einheit')}</th>${edit ? '<th></th>' : ''}</tr></thead><tbody>${rows}</tbody></table></div>
     ${edit ? `<div class="row" style="gap:8px"><button class="btn small" data-act="prod-add">${t('+ Produkt')}</button><button class="btn small" data-act="prop-add" title="${t('Zum Beispiel Preis oder Masse pro Einheit Produkt: dann lässt sich danach allozieren.')}">${t('+ Eigenschaft')}</button></div>${productForm(al)}${propertyForm(al)}` : ''}
@@ -198,7 +202,7 @@ export function sheet(a, { showAllTech, showAllBio }) {
     </section>
     ${allocationCard(a, amt, model)}
     ${model && !a.allocation ? `<section class="card"><h3 style="margin-bottom:6px">${t('Referenzfluss')}</h3><p class="muted" style="font-size:13.5px;margin-bottom:6px">${t('Was dieser Prozess herstellt. Alle Mengen unten beziehen sich auf diese Menge.')}</p>
-      <div class="tblwrap"><table class="tbl"><tbody>${prodRows}</tbody></table></div>${a.functional ? `<div class="row" style="gap:8px;margin-top:8px"><button class="btn small" data-act="prod-add">${t('+ Produkt')}</button></div>${productForm({ process: a.id })}` : ''}</section>` : ''}
+      <div class="tblwrap"><table class="tbl"><tbody>${prodRows}</tbody></table></div><div class="row" style="gap:8px;margin-top:8px"><button class="btn small" data-act="prod-add" title="${t('Ein Koppelprodukt hinzufügen: dann wird alloziert')}">${t('+ Produkt')}</button></div>${productForm({ process: a.id, classic: !a.functional, db: a.database })}</section>` : ''}
     <section class="card"><div class="row" style="justify-content:space-between;margin-bottom:6px"><h3>${t('Inputs aus anderen Prozessen · {n}', { n: a.technosphere.length })}</h3>${model ? `<button class="btn" data-act="pick-input">${t('+ Input hinzufügen')}</button>` : ''}</div>
       <div class="tblwrap"><table class="tbl"><thead><tr><th>${t('Input')}</th><th>${a.allocation ? t('Menge (für die Produktmengen oben)') : t('Menge pro {v}', { v: `${nf(a.production)} ${esc(a.unit)}` })}</th><th>${t('Einheit')}</th>${model ? `<th>${t('Art')}</th>` : ''}<th title="${t('Bereich, in dem die Menge mit 95 % Wahrscheinlichkeit liegt, und die Verteilung')}">${t('Unsicherheit (95 %)')}</th><th>${t('Anteil an der Wirkung')}</th>${model ? '<th></th>' : ''}</tr></thead><tbody>
       ${tech.map(e => `<tr><td><button class="linkbtn" data-act="open" data-k="${e.id}" data-db="${esc(e.database)}">${esc(e.name)}</button> <span class="muted">${esc(e.location)}</span></td><td>${amt(e)}</td><td class="muted">${esc(e.unit)}</td>${model ? `<td>${kind(e)}</td>` : ''}<td>${uncCell(e, model)}</td><td>${share(e.contribution)}</td>${model ? `<td>${del(e)}</td>` : ''}</tr>${model && S.uncFor === e.exchange ? uncEditor(e, 7) : ''}`).join('') || `<tr><td colspan="7" class="muted">${model ? t('Noch keine Inputs. Füge Material, Energie oder Transporte hinzu.') : t('Keine Inputs.')}</td></tr>`}

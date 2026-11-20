@@ -329,3 +329,72 @@ def test_build_several_products_in_lca_wrench(farm):
         if BUILT in bd.databases:
             models.delete_database(BUILT)
         _drop(BUILT)
+
+
+def test_second_product_on_a_classic_model_converts_it_in_place(farm):
+    """A second product on a process of an ordinary model: the model is stored as the Activity Browser 3 stores it,
+    in place. The process keeps its id, its exchanges keep theirs (formulas stay), inputs from other models and
+    calculation setups now name its product; undo takes all of it back."""
+    from bw2data.parameters import ParameterizedExchange
+
+    from lca_wrench import functional, params, setups
+
+    bd.projects.set_current(TEST_PROJECT)
+    classic, user, setup = "Test MF classic", "Test MF user", "Test MF setup"
+    _drop(classic, user)
+    elec, co2 = bd.get_node(database=BG, code="elec").id, bd.get_node(database=BIO, code="co2").id
+    try:
+        models.create_database(classic)
+        farm_id = int(models.create_process(classic, "dairy farm", "kilogram", "CH", product="raw milk"))
+        e_el = int(models.add_exchange(farm_id, elec, 10.0))
+        models.add_exchange(farm_id, co2, 4.0)
+        edge = next(e for e in bd.get_node(id=farm_id).exchanges() if e["type"] == "production")
+        models.update_exchange(edge._document.id, amount=8.0)
+        params.set_parameter("project", "kwh", "10")
+        params.set_exchange_formula(e_el, "kwh")
+        models.create_database(user)
+        cheese_id = int(models.create_process(user, "cheese making", "kilogram", "CH", product="cheese"))
+        models.add_exchange(cheese_id, farm_id, 10.0)
+        setups.save(setup, [{"id": farm_id, "amount": 1.0}], [list(GWP)])
+        S = models.system()
+        assert S.score({farm_id: 1}, GWP) == pytest.approx(9 / 8, rel=1e-9)
+        assert S.score({cheese_id: 1}, GWP) == pytest.approx(90 / 8, rel=1e-9)
+
+        beef = int(models.add_product(farm_id, "beef", "kilogram", 1.0))
+        assert bd.databases[classic]["backend"] == "functional_sqlite"
+        proc = bd.get_node(id=farm_id)
+        assert isinstance(proc, functional.Process) and proc["type"] == "multifunctional"
+        milk = next(p.id for p in proc.products() if p.get("product") == "raw milk")
+        assert {p.id for p in proc.products()} == {milk, beef}
+        assert ParameterizedExchange.get(ParameterizedExchange.exchange == e_el).formula == "kwh"
+        assert next(e for e in bd.get_node(id=cheese_id).exchanges() if e["type"] == "technosphere").input.id == milk
+        assert setups.get(setup)["fus"][0]["id"] == str(milk)
+        S = models.system()  # in equal parts until another allocation is chosen
+        assert S.score({milk: 1}, GWP) == pytest.approx(0.5 * 9 / 8, rel=1e-9)
+        assert S.score({cheese_id: 1}, GWP) == pytest.approx(10 * 0.5 * 9 / 8, rel=1e-9)
+        assert _bw2calc(milk) == pytest.approx(0.5 * 9 / 8, rel=1e-6)
+        params.set_parameter("project", "kwh", "20")  # the formula still drives the electricity
+        assert models.system().score({milk: 1}, GWP) == pytest.approx(0.5 * 14 / 8, rel=1e-9)
+
+        models.undo()  # kwh = 10
+        models.undo()  # the beef
+        models.undo()  # the conversion
+        assert bd.databases[classic]["backend"] == "sqlite" and "default_allocation" not in bd.databases[classic]
+        back = bd.get_node(id=farm_id)
+        assert back["type"] == "processwithreferenceproduct" and back["reference product"] == "raw milk"
+        assert back["unit"] == "kilogram" and len(bd.Database(classic)) == 1
+        assert next(e for e in bd.get_node(id=cheese_id).exchanges() if e["type"] == "technosphere").input.id == farm_id
+        assert setups.get(setup)["fus"][0]["id"] == str(farm_id)
+        assert ParameterizedExchange.get(ParameterizedExchange.exchange == e_el).formula == "kwh"
+        S = models.system()
+        assert S.score({farm_id: 1}, GWP) == pytest.approx(9 / 8, rel=1e-9)
+        assert S.score({cheese_id: 1}, GWP) == pytest.approx(90 / 8, rel=1e-9)
+        assert _bw2calc(farm_id) == pytest.approx(9 / 8, rel=1e-6)
+    finally:
+        bd.projects.set_current(TEST_PROJECT)
+        if setup in bd.calculation_setups:
+            setups.delete(setup)
+        for name in (user, classic):
+            if name in bd.databases:
+                models.delete_database(name)
+        _drop(user, classic)

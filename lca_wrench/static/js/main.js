@@ -747,7 +747,7 @@ document.addEventListener('submit', ev => {
       p.results = await api(`/api/search?q=${encodeURIComponent(p.q)}&loc=${encodeURIComponent(p.loc)}&kind=${p.kind}&unit=${encodeURIComponent(p.unit)}&comp=${encodeURIComponent(p.comp)}&limit=80`); renderDialog(); $('pkQ').focus();
     } else if (f.id === 'newDbForm') {
       const name = $('newDbName').value.trim();
-      await loadState(await api('/api/models/db', { name, several_products: !!$('newDbMulti')?.checked })); S.newDb = false; S.mdb = name; S.msel = null; S.mact = null; await loadView(); render();
+      await loadState(await api('/api/models/db', { name })); S.newDb = false; S.mdb = name; S.msel = null; S.mact = null; await loadView(); render();
       toast(t('Modell «{name}» angelegt. Jetzt den ersten Prozess anlegen.', { name }));
     } else if (f.id === 'newProcForm') {
       const r = await api('/api/models/process', { database: S.mdb, name: $('npName').value.trim(), unit: $('npUnit').value, location: $('npLoc').value.trim() || 'GLO', comment: ($('npDesc')?.value || '').trim() });
