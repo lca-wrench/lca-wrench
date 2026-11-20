@@ -48,7 +48,7 @@ def node_info(ids) -> dict[int, dict]:
         for nid, db, data in AD.select(AD.id, AD.database, AD.data).where(AD.id << ids[i:i + 500]).tuples():
             out[nid] = {"id": str(nid), "name": data.get("name", ""), "location": data.get("location"),
                         "unit": short_unit(data.get("unit")), "database": db,
-                        "product": data.get("reference product"),
+                        "product": data.get("reference product") or data.get("product"),
                         "categories": " / ".join(data.get("categories") or ())}
     return out
 

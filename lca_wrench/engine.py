@@ -44,6 +44,8 @@ POSITIVE = set(labels.technosphere_positive_edge_types)
 BIOSPHERE = set(labels.biosphere_edge_types)
 PROCESS_TYPES = set(labels.process_node_types)
 IMPLICIT_PRODUCTION = set(labels.implicit_production_allowed_node_types)
+# Activity Browser 3 (bw_functional, backend "functional_sqlite"): the products of a process are nodes of their own
+FUNCTION_TYPES = ("product", "waste")
 
 _lock = threading.RLock()
 
@@ -292,6 +294,8 @@ class Foreground:
         taken from its counterpart in the chosen background (e.g. a premise scenario instead of ecoinvent)."""
         self.dbs = list(dbs)
         self.errors: list[tuple] = []  # i18n.msg, rendered in the reader's language
+        self.notes: list[tuple] = []  # the same, for what calculates but deserves a look (allocation factors)
+        self.functions: dict[int, list[tuple[int, float | None]]] = {}  # process id -> [(product id, factor)]
         self.nodes: dict[int, dict] = {}
         nb, nbio = bg.A.shape[0], len(bg.bio_ids)
         if not self.dbs:
@@ -321,8 +325,21 @@ class Foreground:
                     key_id[(idb, code)] = nid
                     kinds[nid] = typ
 
-        # columns: every process node of the model databases
-        cols = [nid for nid, t in kinds.items() if t in PROCESS_TYPES and self.nodes.get(nid, {}).get("database") in self.dbs]
+        # Processes with products of their own (Activity Browser 3): as in bw_functional's processing, the products
+        # are the columns. Every input, emission and credit of the process is split onto its products by their
+        # allocation factors (a factor that is not set counts as 1); each product's own production edge goes to its
+        # column unchanged.
+        self.functions = self._functions(key_id)
+        for pid, fs in self.functions.items():
+            total = sum(1.0 if a is None else a for _, a in fs)
+            if len(fs) > 1 and abs(total - 1.0) > 1e-6:
+                self.notes.append(msg("Die Allokationsfaktoren von «{name}» ergeben zusammen {total} statt 1.",
+                                      name=self.nodes.get(pid, {}).get("name", pid), total=f"{total:.4g}"))
+
+        # columns: every process node of the model databases, or its products
+        cols = [nid for nid, t in kinds.items() if t in PROCESS_TYPES and nid not in self.functions
+                and self.nodes.get(nid, {}).get("database") in self.dbs]
+        cols += [f for fs in self.functions.values() for f, _ in fs]
         cols.sort()
         col = {nid: i for i, nid in enumerate(cols)}
 
@@ -332,20 +349,32 @@ class Foreground:
         for _, data, idb, icode, odb, ocode, etype in rows:
             out_id = key_id.get((odb, ocode))
             in_id = key_id.get((idb, icode))
-            if out_id is None or out_id not in col:
+            if out_id is None:
+                continue
+            production = etype in POSITIVE and etype not in labels.substitution_edge_types
+            if out_id in self.functions:
+                fs = self.functions[out_id]
+                if production:  # only to the column of the product it produces
+                    targets = [(col[f], 1.0) for f, _ in fs if f == in_id]
+                else:
+                    targets = [(col[f], 1.0 if a is None else a) for f, a in fs]
+            elif out_id in col:
+                targets = [(col[out_id], 1.0)]
+            else:
                 continue
             if in_id is None:
                 broken += 1
                 continue
             amount = float(data.get("amount", 0) or 0)
-            if etype in BIOSPHERE:
-                bio.append((in_id, col[out_id], amount))
-            elif etype in NEGATIVE:
-                tech.append((in_id, col[out_id], -amount))
-            elif etype in POSITIVE:
-                tech.append((in_id, col[out_id], amount))
-                if etype not in labels.substitution_edge_types:
-                    has_production.add(out_id)
+            for c, share in targets:
+                if etype in BIOSPHERE:
+                    bio.append((in_id, c, amount * share))
+                elif etype in NEGATIVE:
+                    tech.append((in_id, c, -amount * share))
+                elif etype in POSITIVE:
+                    tech.append((in_id, c, amount * share))
+                    if production:
+                        has_production.add(cols[c])
         for nid in cols:
             if nid not in has_production:
                 if kinds[nid] in IMPLICIT_PRODUCTION:
@@ -412,9 +441,45 @@ class Foreground:
     def error_texts(self) -> list[str]:
         return [render(e) for e in dict.fromkeys(self.errors)]
 
+    def note_texts(self) -> list[str]:
+        return [render(e) for e in dict.fromkeys(self.notes)]
+
+    def _functions(self, key_id: dict) -> dict[int, list[tuple[int, float | None]]]:
+        """Process id -> its products [(product id, allocation factor or None)], from the products' `processor`."""
+        out: dict[int, list[tuple[int, float | None]]] = {}
+        for nid, data in (AD.select(AD.id, AD.data)
+                          .where((AD.database << self.dbs) & (AD.type << list(FUNCTION_TYPES))).tuples()):
+            out_key = data.get("processor")
+            pid = key_id.get(tuple(out_key)) if isinstance(out_key, (list, tuple)) and len(out_key) == 2 else None
+            if pid is None:
+                continue
+            factor = data.get("allocation_factor")
+            out.setdefault(pid, []).append((nid, float(factor) if _is_number(factor) else None))
+        for fs in out.values():
+            fs.sort()
+        return out
+
     def check(self) -> None:
         if self.errors:
             raise ModelError(" ".join(self.error_texts()))
+
+
+def _is_number(x) -> bool:
+    return isinstance(x, (int, float)) and not isinstance(x, bool) and np.isfinite(x)
+
+
+def products_of(node_id: int) -> list[tuple[int, float | None]]:
+    """The products of a process stored as in Activity Browser 3 [(product id, allocation factor)]; [] otherwise."""
+    node = AD.get_or_none(AD.id == int(node_id))
+    if node is None or node.type in FUNCTION_TYPES:
+        return []
+    out = []
+    for nid, data in (AD.select(AD.id, AD.data)
+                      .where((AD.database == node.database) & (AD.type << list(FUNCTION_TYPES))).tuples()):
+        if tuple(data.get("processor") or ()) == (node.database, node.code):
+            factor = data.get("allocation_factor")
+            out.append((nid, float(factor) if _is_number(factor) else None))
+    return sorted(out)
 
 
 def _coo(entries, shape) -> sparse.csc_matrix:
@@ -521,6 +586,13 @@ class System:
             pos = colv.indices[colv.data > 0]
             if len(pos):
                 return int(pos[0])
+        # a process stored as in Activity Browser 3: its product; with several products the user has to choose one
+        fs = self.fg.functions.get(node_id) or products_of(node_id)
+        if len(fs) == 1:
+            return self.ref_row(fs[0][0])
+        if fs:
+            name = AD.select(AD.name).where(AD.id == node_id).scalar()
+            raise KeyError(i18n._("«{name}» hat mehrere Produkte. Wähle eines davon.", name=name))
         other = self.counterpart(node_id)
         if other is not None and other != node_id:
             return self.ref_row(other)

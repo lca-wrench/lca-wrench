@@ -54,6 +54,9 @@ EN = {
     "Das Modell ist nicht lösbar: Die Produktionsmengen heben sich gegenseitig auf (singuläre Matrix).":
         "The model cannot be solved: the production amounts cancel each other out (singular matrix).",
     "Prozess {id} ist in diesem Projekt nicht berechenbar.": "Activity {id} cannot be calculated in this project.",
+    "«{name}» hat mehrere Produkte. Wähle eines davon.": "“{name}” has several products. Choose one of them.",
+    "Die Allokationsfaktoren von «{name}» ergeben zusammen {total} statt 1.":
+        "The allocation factors of “{name}” add up to {total} instead of 1.",
     # excel
     "Die Datei ist leer.": "The file is empty.",
     "Die Datei ist zu gross (höchstens 25 MB).": "The file is too large (25 MB at most).",
