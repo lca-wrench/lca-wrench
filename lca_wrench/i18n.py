@@ -339,4 +339,20 @@ EN = {
     "Schätzung, falls gleich bewertet": "Estimate if assessed alike",
     "Ergänzte Faktoren": "Completed factors",
     "Übernommen von": "Taken from",
+    # single scores (singlescore.py)
+    "EF 3.1, normalisiert und gewichtet": "EF 3.1, normalized and weighted",
+    "ReCiPe 2016 Endpoint ({p}), Punkte": "ReCiPe 2016 endpoint ({p}), points",
+    "Ökologische Knappheit 2021, UBP gesamt": "Ecological Scarcity 2021, total UBP",
+    "Diesen Einzelwert gibt es in diesem Projekt nicht.": "This single score does not exist in this project.",
+    "Ohne {n} Kategorie(n), die in diesem Projekt fehlen: {names}.":
+        "Without {n} category(ies) that this project lacks: {names}.",
+    "Die Kategorien von «{area}» ergeben {part} statt {total}.": "The categories of “{area}” add up to {part} instead of {total}.",
+    "Gewichtung {ws}: Menschliche Gesundheit {hh}, Ökosysteme {eq}, Ressourcen {res} (Panel von Eco-indicator 99, wie in SimaPro). Normalisierung: RIVM, Welt 2010, pro Person.":
+        "Weighting {ws}: human health {hh}, ecosystems {eq}, resources {res} (Eco-indicator 99 panel, as in SimaPro). Normalization: RIVM, world 2010, per person.",
+    "RIVMs Normalisierung enthält keine Landnutzung, und die mineralischen Ressourcen machen fast die ganze Ressourcen-Normalisierung aus (bitte prüfen).":
+        "RIVM's normalization has no land use, and mineral resources make up almost all of the resource normalization (please check).",
+    "Die Kategorien ergeben {part} UBP, die Methode «gesamt» {total} UBP.": "The categories add up to {part} UBP, the “total” method to {total} UBP.",
+    "Menschliche Gesundheit": "Human health",
+    "Ökosystemqualität": "Ecosystem quality",
+    "Natürliche Ressourcen": "Natural resources",
 }

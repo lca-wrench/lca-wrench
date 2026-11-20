@@ -1,0 +1,171 @@
+{
+ "source": "EF 3.1 normalisation (global, per person) and weighting factors of the JRC EF 3.1 reference package; identical to tables 61 and 62 of the PEFCR for dairy products.",
+ "single_score": "sum over the 16 categories of result / normalisation x weighting / 100, in mPt (x 1000)",
+ "unit": "mPt",
+ "scale": 1000.0,
+ "categories": [
+  {
+   "label": "Climate change",
+   "unit": "kg CO2 eq",
+   "normalisation": 7553.083162851173,
+   "weighting": 21.06,
+   "names": [
+    "climate change"
+   ]
+  },
+  {
+   "label": "Ozone depletion",
+   "unit": "kg CFC-11 eq",
+   "normalisation": 0.0523483833840181,
+   "weighting": 6.31,
+   "names": [
+    "ozone depletion"
+   ]
+  },
+  {
+   "label": "Ionising radiation, human health",
+   "unit": "kBq U-235 eq",
+   "normalisation": 4220.163390149926,
+   "weighting": 5.01,
+   "names": [
+    "ionising radiation, human health",
+    "ionising radiation: human health",
+    "ionizing radiation, human health"
+   ]
+  },
+  {
+   "label": "Photochemical ozone formation, human health",
+   "unit": "kg NMVOC eq",
+   "normalisation": 40.85919773477717,
+   "weighting": 4.78,
+   "names": [
+    "photochemical ozone formation - human health",
+    "photochemical ozone formation, human health",
+    "photochemical oxidant formation: human health"
+   ]
+  },
+  {
+   "label": "Particulate matter",
+   "unit": "disease incidence",
+   "normalisation": 0.0005953668211254782,
+   "weighting": 8.96,
+   "names": [
+    "ef-particulate matter",
+    "particulate matter",
+    "particulate matter formation",
+    "respiratory inorganics"
+   ]
+  },
+  {
+   "label": "Human toxicity, non-cancer",
+   "unit": "CTUh",
+   "normalisation": 0.00012873573500807206,
+   "weighting": 1.84,
+   "names": [
+    "human toxicity, non-cancer",
+    "human toxicity: non-carcinogenic",
+    "human toxicity, non-cancer effects"
+   ]
+  },
+  {
+   "label": "Human toxicity, cancer",
+   "unit": "CTUh",
+   "normalisation": 1.725289765387052e-05,
+   "weighting": 2.13,
+   "names": [
+    "human toxicity, cancer",
+    "human toxicity: carcinogenic",
+    "human toxicity, cancer effects"
+   ]
+  },
+  {
+   "label": "Acidification",
+   "unit": "mol H+ eq",
+   "normalisation": 55.569541230601935,
+   "weighting": 6.2,
+   "names": [
+    "acidification"
+   ]
+  },
+  {
+   "label": "Eutrophication, freshwater",
+   "unit": "kg P eq",
+   "normalisation": 1.6068521282881294,
+   "weighting": 2.8,
+   "names": [
+    "eutrophication, freshwater",
+    "eutrophication: freshwater"
+   ]
+  },
+  {
+   "label": "Eutrophication, marine",
+   "unit": "kg N eq",
+   "normalisation": 19.54518155191912,
+   "weighting": 2.96,
+   "names": [
+    "eutrophication marine",
+    "eutrophication, marine",
+    "eutrophication: marine"
+   ]
+  },
+  {
+   "label": "Eutrophication, terrestrial",
+   "unit": "mol N eq",
+   "normalisation": 176.75499978894175,
+   "weighting": 3.71,
+   "names": [
+    "eutrophication, terrestrial",
+    "eutrophication: terrestrial"
+   ]
+  },
+  {
+   "label": "Ecotoxicity, freshwater",
+   "unit": "CTUe",
+   "normalisation": 56716.58633705956,
+   "weighting": 1.92,
+   "names": [
+    "ecotoxicity, freshwater",
+    "ecotoxicity: freshwater"
+   ]
+  },
+  {
+   "label": "Land use",
+   "unit": "Pt",
+   "normalisation": 819498.1829230306,
+   "weighting": 7.94,
+   "names": [
+    "land use"
+   ]
+  },
+  {
+   "label": "Water use",
+   "unit": "m3 world eq deprived",
+   "normalisation": 11468.708640759718,
+   "weighting": 8.51,
+   "names": [
+    "water use"
+   ]
+  },
+  {
+   "label": "Resource use, fossils",
+   "unit": "MJ",
+   "normalisation": 65004.259664016536,
+   "weighting": 8.32,
+   "names": [
+    "resource use, fossils",
+    "energy resources: non-renewable",
+    "resource use, energy carriers"
+   ]
+  },
+  {
+   "label": "Resource use, minerals and metals",
+   "unit": "kg Sb eq",
+   "normalisation": 0.06362261523695466,
+   "weighting": 7.55,
+   "names": [
+    "resource use, minerals and metals",
+    "material resources: metals/minerals"
+   ]
+  }
+ ]
+}

@@ -3,8 +3,9 @@
 import { S, esc, nf, pct, U, explain, bars, methodInfo, methodLabel, familyLabel, mKey, api, topicNames, t } from '../core.js';
 import { treeSvg, sankeySvg } from '../charts.js';
 import { loadCw, tCw } from './crosswalk.js';
+import { locale } from '../i18n.js';
 
-export const tabs = () => [['beitraege', t('Beiträge')], ['kategorien', t('Alle Kategorien')], ['sankey', t('Sankey')], ['lieferkette', t('Lieferkette')], ['inventar', t('Inventar')], ['profil', t('Umweltprofil')], ['warum', t('Warum anders?')], ['versionen', t('Versionen')], ['crosswalk', t('Andere Datenbank')]];
+export const tabs = () => [['beitraege', t('Beiträge')], ['kategorien', t('Alle Kategorien')], ['einzelwert', t('Einzelwert')], ['sankey', t('Sankey')], ['lieferkette', t('Lieferkette')], ['inventar', t('Inventar')], ['profil', t('Umweltprofil')], ['warum', t('Warum anders?')], ['versionen', t('Versionen')], ['crosswalk', t('Andere Datenbank')]];
 
 export async function loadErgebnis() {
   if (!S.fu) return;
@@ -18,6 +19,7 @@ export async function loadErgebnis() {
   }
   if (S.tab === 'warum' && (!S.why || S.why._key !== key())) { S.why = await api('/api/why', base); S.why._key = key(); }
   if (S.tab === 'kategorien') await loadCats();
+  if (S.tab === 'einzelwert') await loadSS();
   if (S.tab === 'versionen') await loadTargets();
   if (S.tab === 'crosswalk') await loadCw();
   if (S.tab === 'inventar' && (!S.inv || S.inv._key !== key())) {
@@ -49,7 +51,7 @@ export async function loadCats() {
 }
 
 const key = () => JSON.stringify([S.fu.id, S.fu.amount, S.method, S.st.journal.length, S.st.changes.length, S.st.completion?.enabled, S.st.flowmap?.enabled]);
-export function resetErgebnis() { S.cats.res = null; S.calc = S.sankey = S.graph = S.inv = S.why = null; S.gsel = S.sksel = null; S.fuVerify = null; S.ver = { ...S.ver, res: null, detail: null, k: null, error: null }; S.cw = { ...S.cw, res: null, error: null, open: null, hits: null, trace: {} }; }
+export function resetErgebnis() { S.cats.res = null; S.calc = S.sankey = S.graph = S.inv = S.why = null; S.gsel = S.sksel = null; S.fuVerify = null; S.ver = { ...S.ver, res: null, detail: null, k: null, error: null }; S.cw = { ...S.cw, res: null, error: null, open: null, hits: null, trace: {} }; S.ss = { ...S.ss, res: null, error: null }; }
 
 // what the method does not assess: inventory flows without a factor, and the switch for completed factors
 function factorNotice(r) {
@@ -95,7 +97,7 @@ export function vErgebnis() {
   </section>
   <nav class="tabs" role="tablist" aria-label="${t('Auswertungen')}">${tabs().filter(([k]) => (k !== 'profil' || S.st.profile_family) && (k !== 'warum' || (S.st.is_copy && S.st.changes.length)) && (k !== 'versionen' || !r?.model)).map(([k, l]) => `<button role="tab" aria-selected="${S.tab === k}" data-act="tab" data-k="${k}">${l}</button>`).join('')}</nav>`;
   if (!r) return head;
-  return head + ({ beitraege: tBeitraege, kategorien: tKategorien, sankey: tSankey, lieferkette: tTree, inventar: tInventar, profil: tProfil, warum: tWarum, versionen: tVersionen, crosswalk: tCw })[S.tab]();
+  return head + ({ beitraege: tBeitraege, kategorien: tKategorien, einzelwert: tEinzelwert, sankey: tSankey, lieferkette: tTree, inventar: tInventar, profil: tProfil, warum: tWarum, versionen: tVersionen, crosswalk: tCw })[S.tab]();
 }
 
 function tBeitraege() {
@@ -144,6 +146,57 @@ function tKategorien() {
       ${f.rows.length ? `<div class="tblwrap"><table class="tbl">${head(false, R.bars)}<tbody>${f.rows.map((r, i) => R.html(r, fi, i)).join('')}</tbody></table></div>` : `<p class="muted">${t('Keine Kategorie dieser Art.')}</p>`}</section>`;
   };
   return `${controls}<div class="catgrid ${c.res.families.length > 1 ? 'two' : ''}">${c.res.families.map(card).join('')}</div>`;
+}
+
+// ---------- single score: EF 3.1, ReCiPe 2016 endpoint, total UBP of ecological scarcity 2021 ----------
+
+// the sets the project's methods allow (by project and number of methods); the score of the chosen set
+const ssKey = () => JSON.stringify([S.fu.id, S.fu.amount, S.st.journal.length, S.st.changes.length, S.st.completion?.enabled, S.st.flowmap?.enabled, S.ss.set, S.ss.w]);
+export async function loadSS() {
+  const s = S.ss, k = S.st.project + '|' + S.st.methods.length;
+  if (s.setsKey !== k) { s.sets = (await api('/api/singlescore/sets')).sets; s.setsKey = k; s.res = null; }
+  if (!s.sets.length) return;
+  if (!s.sets.some(x => x.id === s.set)) { s.set = s.sets[0].id; s.w = null; }
+  if (s.res && s.res._key === ssKey()) return;
+  s.error = null;
+  try { s.res = await api('/api/singlescore', { id: S.fu.id, amount: S.fu.amount, set: s.set, weighting: s.w }); s.res._key = ssKey(); }
+  catch (e) { s.res = null; s.error = e.message; }
+}
+
+function tEinzelwert() {
+  const s = S.ss, r = s.res;
+  const intro = explain(t('Ein <b>Einzelwert</b> fasst die Wirkungskategorien einer Methode in einer Zahl zusammen. <b>EF 3.1</b>: jede der 16 Kategorien geteilt durch die Jahreswirkung einer Person (Normalisierung), mal ihr Gewicht, in Millipunkten (mPt). <b>ReCiPe 2016 Endpoint</b>: menschliche Gesundheit, Ökosysteme und Ressourcen, normalisiert und gewichtet, in Punkten (1000 Pt sind die Jahreswirkung einer Person). <b>Ökologische Knappheit 2021</b>: die Ökofaktoren gewichten schon, der Einzelwert ist das Total in UBP. Gewichten ist eine Wertung: wer vergleicht, schaut auch auf die Kategorien.'));
+  if (!s.sets) return intro + busy();
+  if (!s.sets.length) return intro + `<p class="empty">${t('In diesem Projekt fehlen die Methoden für einen Einzelwert: EF 3.1, ReCiPe 2016 Endpoint oder ökologische Knappheit 2021.')}</p>`;
+  const cur = s.sets.find(x => x.id === s.set) || s.sets[0];
+  const w = s.w || cur.weighting;
+  const found = cur.kind === 'ef31' ? t('{n} von 16 Kategorien', { n: cur.found }) : cur.kind === 'recipe2016' ? t('{n} von 3 Schutzgütern', { n: cur.found }) : t('{n} Kategorien', { n: cur.found });
+  const controls = `<section class="card row" style="justify-content:space-between">
+    <span class="muted" style="font-size:13.5px">${found}</span>
+    <div class="row"><label class="f">${t('Einzelwert')}<select id="ssSel">${s.sets.map(x => `<option value="${esc(x.id)}" ${x.id === cur.id ? 'selected' : ''}>${esc(x.label)}</option>`).join('')}</select></label>
+      ${cur.kind === 'recipe2016' ? `<label class="f" title="${t('Gewichte der Schutzgüter (Panel von Eco-indicator 99): I/I individualistisch, H/A hierarchistisch mit Durchschnittsgewichten, H/H hierarchistisch, E/E egalitär')}">${t('Gewichtung')}<select id="ssW">${cur.weightings.map(x => `<option value="${esc(x)}" ${x === w ? 'selected' : ''}>${esc(x)}${x === cur.weighting ? ' · ' + t('Standard für {p}', { p: cur.perspective }) : ''}</option>`).join('')}</select></label>` : ''}</div></section>`;
+  if (s.error) return intro + controls + `<div class="warnbox"><b>${t('Hinweis')}</b><span>${esc(s.error)}</span></div>`;
+  if (!r) return intro + controls + busy();
+  const weighted = r.kind !== 'es2021', recipe = r.kind === 'recipe2016';
+  const num = (v, digits) => v === null || v === undefined ? '–' : digits ? v.toLocaleString(locale(), { maximumFractionDigits: digits }) : nf(v);
+  // ReCiPe: the three areas of protection with their sums; the table by area, the largest first
+  const areas = recipe ? [...new Set(r.rows.map(x => x.group))].map(g => ({ g, v: r.rows.filter(x => x.group === g).reduce((a, x) => a + x.score, 0) })).sort((a, b) => Math.abs(b.v) - Math.abs(a.v)) : [];
+  const rows = recipe ? areas.flatMap(a => r.rows.filter(x => x.group === a.g)) : r.rows;
+  const td = v => `<td class="num nw" style="text-align:right">${v}</td>`;
+  const head = `<tr>${recipe ? `<th>${t('Schutzgut')}</th>` : ''}<th>${t('Kategorie')}</th><th style="text-align:right">${t('Ergebnis')}</th><th>${t('Einheit')}</th>${weighted ? `<th style="text-align:right" title="${t('Die Jahreswirkung einer Person (Welt)')}">${t('Normalisierung pro Person')}</th><th style="text-align:right" title="${t('Ergebnis geteilt durch die Normalisierung: Personenjahre')}">${t('Normalisiert')}</th><th style="text-align:right">${r.kind === 'ef31' ? t('Gewicht (%)') : t('Gewicht (Pt)')}</th><th style="text-align:right">${esc(r.unit)}</th>` : ''}<th style="text-align:right">${t('Anteil')}</th></tr>`;
+  const body = rows.map(x => `<tr>${recipe ? `<td class="muted">${esc(x.group || '')}</td>` : ''}<td><button class="linkbtn" data-act="ss-open" data-k="${r.rows.indexOf(x)}" title="${t('Beiträge zu dieser Kategorie zeigen')}">${esc(x.label)}</button></td>${td(nf(x.result))}<td class="muted nw">${esc(x.unit)}</td>${weighted ? td(num(x.normalisation)) + td(num(x.normalised)) + td(num(x.weight, 2)) + td(nf(x.score)) : ''}${td(x.share === null ? '–' : pct(x.share))}</tr>`).join('');
+  const shown = r.rows.filter(x => Math.abs(x.score) > 0);
+  return intro + controls + `<section class="card" style="display:flex;flex-direction:column;gap:12px">
+    <div class="row" style="justify-content:space-between;align-items:flex-end">
+      <div><span class="eyebrow">${esc(r.label)}${recipe ? ' · ' + t('Gewichtung {w}', { w: esc(r.weighting) }) : ''}</span><div class="kpi"><span class="big">${nf(r.total)}</span><span class="u">${esc(r.unit)}</span></div></div>
+      ${areas.length ? `<div class="row">${areas.map(a => `<span class="chip">${esc(a.g)}: <span class="num">${nf(a.v)}</span> ${esc(r.unit)}</span>`).join('')}</div>` : ''}
+    </div>
+    <div class="bars">${bars(shown.map(x => ({ name: x.label, categories: recipe && x.group !== x.label ? x.group : '', value: x.score })), 0, r.total, null)}</div>
+  </section>
+  <section class="card" style="display:flex;flex-direction:column;gap:10px"><h3>${t('Rechenweg')}</h3>
+    <div class="tblwrap"><table class="tbl"><thead>${head}</thead><tbody>${body}</tbody></table></div>
+    ${r.notes.length ? `<ul class="muted" style="font-size:13px;margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px">${r.notes.map(n => `<li>${esc(n)}</li>`).join('')}</ul>` : ''}
+  </section>`;
 }
 
 function tSankey() {

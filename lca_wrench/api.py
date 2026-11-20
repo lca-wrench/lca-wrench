@@ -145,6 +145,13 @@ class CalcIn(ActIn):
     amount: float = Field(1.0, gt=0)
 
 
+class SingleScoreIn(BaseModel):
+    id: str
+    amount: float = Field(1.0, gt=0)
+    set: str  # an id from /api/singlescore/sets
+    weighting: str | None = None  # ReCiPe: another weighting set than the perspective's default
+
+
 class GraphIn(CalcIn):
     cutoff: float = Field(0.01, ge=0, le=0.5)
     depth: int = Field(4, ge=1, le=8)
@@ -498,6 +505,16 @@ def post_activity(body: ActIn):
 
 
 # ---------- results ----------
+
+@app.get("/api/singlescore/sets")
+def get_singlescore_sets():
+    return run(s.single_score_sets)
+
+
+@app.post("/api/singlescore")
+def post_singlescore(body: SingleScoreIn):
+    return run(s.single_score, body.id, body.amount, body.set, body.weighting)
+
 
 @app.post("/api/calc")
 def post_calc(body: CalcIn):
