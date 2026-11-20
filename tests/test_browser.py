@@ -36,6 +36,11 @@ def num(text: str) -> float:
 
 @pytest.fixture(scope="module")
 def server():
+    import socket
+
+    with socket.socket() as sock:  # a server left over from an earlier run would answer in place of this one
+        if sock.connect_ex(("127.0.0.1", PORT)) == 0:
+            raise RuntimeError(f"Port {PORT} is in use (an LCA Wrench test server left over?): stop it first")
     env = {**os.environ, "LCA_WRENCH_PROJECT": TEST_PROJECT, "PYTHONWARNINGS": "ignore"}
     # own process group (POSIX: session), so the server and its Monte-Carlo workers stop together
     group = {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if WINDOWS else {"start_new_session": True}

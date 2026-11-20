@@ -532,6 +532,7 @@ def test_exiobase_import_dense_solver_and_hybrid(world, tmp_path):
         lca.lci()
         lca.lcia()
         assert lca.score == pytest.approx(want, rel=1e-6)
+        del lca  # its datapackages keep the table's processed file open; on Windows it could not be removed below
         # before any model uses the table: search finds its sectors (also by "money"), and a sector outside the chosen
         # background is calculated on its table alone (data sheet, result)
         backgrounds.set_choice("auto", [], roles)
