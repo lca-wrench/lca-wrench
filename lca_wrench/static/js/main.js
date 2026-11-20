@@ -372,6 +372,21 @@ const A = {
     for (const el of document.querySelectorAll('[data-alloc]')) { const v = parseFloat(el.value); if (!isFinite(v) || v < 0) { toast(t('Bitte eine Zahl eingeben.')); return; } manual[el.dataset.alloc] = v; }
     await api('/api/models/allocation', { id: a.allocation.process, strategy: 'manual', manual }); S.allocCmp = null; await afterModelChange(); render();
   },
+  // products and their properties (Activity Browser 3 format)
+  'prod-add'() { const a = currentSheet(), id = a.allocation ? a.allocation.process : a.id; S.prodForm = S.prodForm === id ? null : id; S.propForm = null; render(); $('prodName')?.focus(); },
+  async 'prod-add-save'() {
+    const name = ($('prodName')?.value || '').trim(), amount = parseFloat($('prodAmt')?.value || '1');
+    if (!name) { toast(t('Bitte einen Namen eingeben.')); return; }
+    if (!isFinite(amount) || !amount) { toast(t('Bitte eine Zahl eingeben.')); return; }
+    await api('/api/models/product/add', { id: S.prodForm, name, unit: $('prodUnit').value, amount }); S.prodForm = null; S.allocCmp = null; await afterModelChange(); render();
+  },
+  async 'prod-del'(k) { await api('/api/models/product/delete', { id: k }); S.allocCmp = null; await afterModelChange(); render(); },
+  'prop-add'() { const a = currentSheet(); S.propForm = S.propForm === a.allocation.process ? null : a.allocation.process; S.prodForm = null; render(); $('propLabel')?.focus(); },
+  async 'prop-add-save'() {
+    const label = ($('propLabel')?.value || '').trim(); if (!label) { toast(t('Bitte einen Namen eingeben.')); return; }
+    await api('/api/models/property/add', { id: S.propForm, label, unit: ($('propUnit')?.value || '').trim() }); S.propForm = null; S.allocCmp = null; await afterModelChange(); render();
+  },
+  async 'prop-del'(k) { const a = currentSheet(); await api('/api/models/property/delete', { id: a.allocation.process, label: k }); S.allocCmp = null; await afterModelChange(); render(); },
   async 'ex-del'(k) { await api('/api/models/exchange/delete', { exchange: k }); await afterModelChange(); render(); },
   'pick-input'() {
     const a = currentSheet();
@@ -732,7 +747,7 @@ document.addEventListener('submit', ev => {
       p.results = await api(`/api/search?q=${encodeURIComponent(p.q)}&loc=${encodeURIComponent(p.loc)}&kind=${p.kind}&unit=${encodeURIComponent(p.unit)}&comp=${encodeURIComponent(p.comp)}&limit=80`); renderDialog(); $('pkQ').focus();
     } else if (f.id === 'newDbForm') {
       const name = $('newDbName').value.trim();
-      await loadState(await api('/api/models/db', { name })); S.newDb = false; S.mdb = name; S.msel = null; S.mact = null; await loadView(); render();
+      await loadState(await api('/api/models/db', { name, several_products: !!$('newDbMulti')?.checked })); S.newDb = false; S.mdb = name; S.msel = null; S.mact = null; await loadView(); render();
       toast(t('Modell «{name}» angelegt. Jetzt den ersten Prozess anlegen.', { name }));
     } else if (f.id === 'newProcForm') {
       const r = await api('/api/models/process', { database: S.mdb, name: $('npName').value.trim(), unit: $('npUnit').value, location: $('npLoc').value.trim() || 'GLO', comment: ($('npDesc')?.value || '').trim() });
@@ -795,6 +810,13 @@ document.addEventListener('change', ev => {
     else if (el.id === 'uncType') { S.uncType = el.value; render(); document.querySelector('#uncForm input')?.focus(); }
     else if (el.dataset.extype) {
       await api('/api/models/exchange/update', { exchange: el.dataset.extype, kind: el.value }); await afterModelChange(); render();
+    }
+    else if (el.dataset.prop) {
+      const v = parseFloat(el.value); if (!isFinite(v)) { toast(t('Bitte eine Zahl eingeben.')); render(); return; }
+      await api('/api/models/property/set', { id: el.dataset.k, label: el.dataset.prop, amount: v }); S.allocCmp = null; await afterModelChange(); render();
+    }
+    else if (el.dataset.pp) {
+      await api('/api/models/process/update', { id: el.dataset.k, fields: { [el.dataset.pp]: el.value } }); await afterModelChange(); render();
     }
     else if (el.id === 'allocSel') {
       const a = currentSheet();

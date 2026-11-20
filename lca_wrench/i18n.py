@@ -61,6 +61,30 @@ EN = {
     "Eine Allokation von «{name}» nach «{strategy}» geht nicht: die Werte ergeben zusammen null.":
         "“{name}” cannot be allocated by “{strategy}”: the values add up to zero.",
     "Allokation von «{name}» geändert": "Allocation of “{name}” changed",
+    "Mehrere Produkte gibt es in Modellen im Format des Activity Browser 3. Lege dafür ein Modell mit mehreren Produkten "
+    "pro Prozess an und kopiere den Prozess hinein.":
+        "Several products exist in models in the format of the Activity Browser 3. Create a model with several products "
+        "per activity for this and copy the activity into it.",
+    "«{name}» hat mehrere Produkte: kopiere eines davon.": "“{name}” has several products: copy one of them.",
+    "Inputs gehören zum Prozess, nicht zum Produkt: öffne den Prozess.":
+        "Inputs belong to the activity, not to the product: open the activity.",
+    "«{name}» hat mehrere Produkte: wähle eines davon als Input.": "“{name}” has several products: choose one of them as input.",
+    "Die Menge eines Produkts kann nicht null sein.": "The amount of a product cannot be zero.",
+    "Produkt «{product}» zu «{name}» hinzugefügt": "Product “{product}” added to “{name}”",
+    "Das ist kein Produkt.": "This is not a product.",
+    "Ein Prozess braucht mindestens ein Produkt.": "An activity needs at least one product.",
+    "Dieses Produkt wird noch verwendet von {names}. Entferne dort zuerst den Input.":
+        "This product is still used by {names}. Remove the input there first.",
+    "Produkt «{product}» aus «{name}» entfernt": "Product “{product}” removed from “{name}”",
+    "«{label}» von «{product}» geändert": "“{label}” of “{product}” changed",
+    "Bitte einen Namen für die Eigenschaft eingeben (nicht «equal» oder «manual»).":
+        "Please enter a name for the property (not “equal” or “manual”).",
+    "Eigenschaft «{label}» für die Produkte von «{name}»": "Property “{label}” for the products of “{name}”",
+    "Nach «{label}» wird gerade alloziert. Wähle zuerst eine andere Allokation.":
+        "The allocation uses “{label}” now. Choose another allocation first.",
+    "Eigenschaft «{label}» der Produkte von «{name}» entfernt": "Property “{label}” removed from the products of “{name}”",
+    "Für Modelle im Format des Activity Browser 3 (mehrere Produkte pro Prozess) geht das noch nicht.":
+        "This does not work yet for models in the format of the Activity Browser 3 (several products per activity).",
     "Allokationen vergleichen geht für eigene Modelle; Hintergrunddaten sind schon alloziert.":
         "Comparing allocations works for own models; background data are already allocated.",
     "Die Allokationsfaktoren von «{name}» ergeben zusammen {total} statt 1.":

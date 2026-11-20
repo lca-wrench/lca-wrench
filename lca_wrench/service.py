@@ -123,7 +123,9 @@ def _project_state(reg: dict, cur: str) -> dict:
     for n in sorted(bd.databases):
         try:
             count = len(bd.Database(n))
-        except Exception:  # e.g. a backend this Brightway does not know (multifunctional)
+            if functional.is_functional(n):  # Activity Browser 3 format: the processes, not also their product nodes
+                count = AD.select().where((AD.database == n) & (AD.type << list(engine.LISTED_PROCESS_TYPES))).count()
+        except Exception:  # e.g. a backend this Brightway does not know
             count = 0
         dbs.append({"name": n, "count": count, "role": roles.get(n, "empty"), "biosphere": roles.get(n) == "biosphere",
                     "writable": n in writable})

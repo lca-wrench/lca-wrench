@@ -144,14 +144,22 @@ def journal() -> list[dict]:
 
 # ---------- databases ----------
 
-def create_database(name: str) -> str:
+def create_database(name: str, several_products: bool = False) -> str:
+    """A new own model; with several_products, stored as the Activity Browser 3 stores it (bw_functional), so its
+    processes can have several products."""
     name = (name or "").strip()
     if not name:
         raise ValueError(_("Bitte einen Namen eingeben."))
     if name in bd.databases:
         raise ValueError(_("Eine Datenbank «{name}» gibt es schon.", name=name))
-    db = bd.Database(name)
-    db.register(backend="sqlite", description="Own model, made in LCA Wrench")
+    if several_products:
+        db = bd.Database(name, backend=functional.BACKEND)
+        db.register(description="Own model, made in LCA Wrench, stored as in the Activity Browser 3 "
+                                "(processes with several products)")
+        functional.ensure_current()
+    else:
+        db = bd.Database(name)
+        db.register(backend="sqlite", description="Own model, made in LCA Wrench")
     reg = registry.load()
     lst = reg.setdefault("models", {}).setdefault(bd.projects.current, [])
     if name not in lst:
@@ -232,6 +240,11 @@ def create_process(database: str, name: str, unit: str = "unit", location: str =
     name = (name or "").strip()
     if not name:
         raise ValueError(_("Bitte einen Namen eingeben."))
+    if functional.is_functional(database):  # a process node and its product node
+        proc = functional.new_process(database, name, location or "GLO", comment or "", (product or name).strip(),
+                                      unit or "unit")
+        _changed(msg("Prozess «{name}» angelegt", name=name), {"op": "delete_process", "key": list(proc.key)})
+        return str(proc.id)
     act = bd.Database(database).new_activity(
         code=uuid.uuid4().hex, name=name, unit=unit or "unit", location=location or "GLO",
         type="processwithreferenceproduct", comment=comment or "",
@@ -246,10 +259,23 @@ def copy_process(node_id: int | str, database: str) -> str:
     """Copy any process (also from a background database) into a model, with all exchanges."""
     _require_model_db(database)
     src = bd.get_node(id=int(node_id))
-    new = src.copy(database=database, code=uuid.uuid4().hex)
-    if new.get("type") not in engine.PROCESS_TYPES:
-        new["type"] = "processwithreferenceproduct"
+    src_proc = functional.process_of(src)
+    if functional.is_functional(database):  # into a model of the Activity Browser 3 format: process and products
+        new = functional.copy_process(src_proc, database) if src_proc is not None else functional.copy_classic(src, database)
+    elif src_proc is not None:  # a product of such a process into a classic model: its share of the process
+        products = [src] if isinstance(src, functional.Product) else src_proc.products()
+        if len(products) != 1:
+            raise ValueError(_("«{name}» hat mehrere Produkte: kopiere eines davon.", name=src["name"]))
+        d = functional.allocated(products[0])
+        new = bd.Database(database).new_activity(code=uuid.uuid4().hex, **d["data"])
         new.save()
+        for ex in d["exchanges"]:
+            new.new_exchange(**{**ex, "input": new.key if ex["input"] is None else tuple(ex["input"])}).save()
+    else:
+        new = src.copy(database=database, code=uuid.uuid4().hex)
+        if new.get("type") not in engine.PROCESS_TYPES:
+            new["type"] = "processwithreferenceproduct"
+            new.save()
     bd.databases.set_dirty(database)
     _changed(msg("«{name}» in «{database}» kopiert", name=src["name"], database=database), {"op": "delete_process", "key": list(new.key)})
     return str(new.id)
@@ -257,8 +283,20 @@ def copy_process(node_id: int | str, database: str) -> str:
 
 def update_process(node_id: int | str, fields: dict) -> None:
     act = bd.get_node(id=int(node_id))
-    _require_model_node(act)
-    allowed = {"name", "unit", "location", "reference product", "comment"}
+    if isinstance(act, functional.Product):  # name, location and model come from its process
+        _require_model_node(act.processor)
+        allowed = {"product", "reference product", "unit", "comment"}
+    else:
+        _require_model_node(act)
+        allowed = {"name", "unit", "location", "reference product", "comment"}
+        if isinstance(act, functional.Process):
+            # the product's name and unit belong to the product; with one product they are edited on the process
+            products = act.products()
+            moved = {k: v for k, v in fields.items() if k in ("reference product", "unit")}
+            if moved and len(products) == 1:
+                update_process(products[0].id, moved)
+            fields = {k: v for k, v in fields.items() if k not in moved}
+            allowed = {"name", "location", "comment"}
     old = {k: act.get(k) for k in fields if k in allowed}
     changed = False
     for k, v in fields.items():
@@ -283,17 +321,23 @@ def users_of(node_id: int | str) -> list[dict]:
 
 def delete_process(node_id: int | str) -> None:
     act = bd.get_node(id=int(node_id))
+    if isinstance(act, functional.Product):
+        return delete_product(act.id)
     _require_model_node(act)
-    users = users_of(act.id)
+    products = act.products() if isinstance(act, functional.Process) else []
+    users = users_of(act.id) + [u for p in products for u in users_of(p.id)]
     if users:
         names = ", ".join(q(u["name"]) for u in users[:3])
         raise ValueError(_("Dieser Prozess wird noch verwendet von {names}. Entferne dort zuerst den Input.", names=names))
     from . import params  # Brightway deletes the process's parameters with it; undo brings them back
 
     snapshot = {"key": list(act.key), "data": _jsonable(dict(act._data)),
-                "exchanges": [_exchange_snapshot(e) for e in act.exchanges()], "params": params._jsonable(params.state())}
+                "exchanges": [_exchange_snapshot(e) for e in act.exchanges() if not (products and e["type"] == "production")],
+                "params": params._jsonable(params.state()),
+                "products": [_product_snapshot(p) for p in products],
+                "allocation": _allocation_state(act) if products else None}
     name = act["name"]
-    act.delete()
+    _delete_node(act)
     _changed(msg("Prozess «{name}» gelöscht", name=name), {"op": "restore_process", "snapshot": snapshot})
 
 
@@ -301,8 +345,15 @@ def delete_process(node_id: int | str) -> None:
 
 def add_exchange(node_id: int | str, input_id: int | str, amount: float = 1.0, kind: str | None = None) -> str:
     act = bd.get_node(id=int(node_id))
+    if isinstance(act, functional.Product):
+        raise ValueError(_("Inputs gehören zum Prozess, nicht zum Produkt: öffne den Prozess."))
     _require_model_node(act)
     inp = bd.get_node(id=int(input_id))
+    if isinstance(inp, functional.Process):  # stored as in the Activity Browser 3: the input is one of its products
+        products = inp.products()
+        if len(products) != 1:
+            raise ValueError(_("«{name}» hat mehrere Produkte: wähle eines davon als Input.", name=inp["name"]))
+        inp = products[0]
     if kind is None:
         kind = "biosphere" if roles().get(inp["database"]) == "biosphere" else "technosphere"
     if kind not in ("technosphere", "biosphere", "substitution"):
@@ -649,6 +700,139 @@ def set_allocation(node_id: int | str, strategy: str, manual: dict | None = None
     return functional.info(proc)
 
 
+def _product_snapshot(p) -> dict:
+    return {"data": _jsonable(dict(p._data)), "amount": functional._amount(p)}
+
+
+def _restore_product(snap: dict) -> None:
+    """A product as it was, with its own production (bw_functional allocates its process again)."""
+    data = dict(snap["data"])
+    data["processor"] = tuple(data["processor"])
+    prod = functional.Product(**data)
+    prod.save()
+    edge = bd.get_node(database=data["database"], code=data["code"]).processing_edge
+    if edge is not None and float(edge["amount"]) != float(snap["amount"]):
+        edge["amount"] = float(snap["amount"])
+        edge.save()
+
+
+def _restore_allocation(key, state: dict) -> None:
+    """The allocation and exactly the shares there were: the strategy first (bw_functional allocates when it
+    changes), then each share."""
+    proc = bd.get_node(database=key[0], code=key[1])
+    if proc.get("allocation") != state["allocation"]:
+        proc["allocation"] = state["allocation"]
+        proc.save()
+    for p in proc.products():
+        if p["code"] in state["factors"] and p.get("allocation_factor") != state["factors"][p["code"]]:
+            p["allocation_factor"] = state["factors"][p["code"]]
+            p.save()
+
+
+def _delete_node(node) -> None:
+    """Delete a node; a process stored as in the Activity Browser 3 together with its products."""
+    if isinstance(node, functional.Process):
+        for p in node.products():
+            p.delete()  # with its production; bw_functional allocates the rest again
+        node = bd.get_node(id=node.id)
+    node.delete()
+
+
+def _functional_process(node_id: int | str):
+    proc = bd.get_node(id=int(node_id))
+    if not isinstance(proc, functional.Process):
+        raise ValueError(_("Mehrere Produkte gibt es in Modellen im Format des Activity Browser 3. Lege dafür ein Modell "
+                           "mit mehreren Produkten pro Prozess an und kopiere den Prozess hinein."))
+    _require_model_node(proc)
+    return proc
+
+
+def add_product(node_id: int | str, name: str, unit: str = "unit", amount: float = 1.0) -> str:
+    """A further product of a process (Activity Browser 3 format); its share follows from the process's allocation."""
+    proc = _functional_process(node_id)
+    _check_amount(amount)
+    if not float(amount):
+        raise ValueError(_("Die Menge eines Produkts kann nicht null sein."))
+    prod = functional.add_product(proc, name, unit, float(amount))
+    _changed(msg("Produkt «{product}» zu «{name}» hinzugefügt", product=prod.get("product"), name=proc["name"]),
+             {"op": "delete_process", "key": list(prod.key)})
+    return str(prod.id)
+
+
+def delete_product(node_id: int | str) -> None:
+    prod = bd.get_node(id=int(node_id))
+    proc = functional.process_of(prod)
+    if proc is None or proc.id == prod.id:
+        raise ValueError(_("Das ist kein Produkt."))
+    _require_model_node(proc)
+    if len(proc.products()) < 2:
+        raise ValueError(_("Ein Prozess braucht mindestens ein Produkt."))
+    users = users_of(prod.id)
+    if users:
+        names = ", ".join(q(u["name"]) for u in users[:3])
+        raise ValueError(_("Dieses Produkt wird noch verwendet von {names}. Entferne dort zuerst den Input.", names=names))
+    snapshot = {**_product_snapshot(prod), "process": list(proc.key), "allocation": _allocation_state(proc)}
+    name = prod.get("product") or prod["name"]
+    prod.delete()
+    _changed(msg("Produkt «{product}» aus «{name}» entfernt", product=name, name=proc["name"]),
+             {"op": "restore_product", "snapshot": snapshot})
+
+
+def _set_properties(products, change, label: tuple) -> None:
+    """Apply `change(properties) -> properties` to each product, as one step to undo."""
+    items = []
+    for p in products:
+        old = _jsonable(dict(p.get("properties") or {}))
+        new = change({k: dict(v) if isinstance(v, dict) else {"amount": v} for k, v in old.items()})
+        if new == old:
+            continue
+        p["properties"] = new
+        p.save()  # bw_functional allocates again if the property in use changed
+        items.append({"key": list(p.key), "fields": {"properties": old}, "now": {"properties": new}})
+    if items:
+        _changed(label, {"op": "update_nodes", "items": items})
+
+
+def set_property(node_id: int | str, label: str, amount: float) -> None:
+    """The value of a property (per unit of product) of one product."""
+    prod = bd.get_node(id=int(node_id))
+    proc = functional.process_of(prod)
+    if proc is None or proc.id == prod.id:
+        raise ValueError(_("Das ist kein Produkt."))
+    _require_model_node(proc)
+    _check_amount(amount)
+
+    def change(props):
+        props.setdefault(label, {"unit": "", "normalize": True})["amount"] = float(amount)
+        return props
+
+    _set_properties([prod], change, msg("«{label}» von «{product}» geändert", label=label,
+                                        product=prod.get("product") or prod["name"]))
+
+
+def add_property(node_id: int | str, label: str, unit: str = "", normalize: bool = True) -> None:
+    """A property for every product of the process (1 per unit until set), e.g. price in EUR per kg."""
+    proc = _functional_process(node_id)
+    label = (label or "").strip()
+    if not label or label in functional.FIXED:
+        raise ValueError(_("Bitte einen Namen für die Eigenschaft eingeben (nicht «equal» oder «manual»)."))
+
+    def change(props):
+        props.setdefault(label, {"amount": 1.0, "unit": unit or "", "normalize": bool(normalize)})
+        return props
+
+    _set_properties(proc.products(), change, msg("Eigenschaft «{label}» für die Produkte von «{name}»", label=label,
+                                                 name=proc["name"]))
+
+
+def remove_property(node_id: int | str, label: str) -> None:
+    proc = _functional_process(node_id)
+    if functional.strategy(proc) == label:
+        raise ValueError(_("Nach «{label}» wird gerade alloziert. Wähle zuerst eine andere Allokation.", label=label))
+    _set_properties(proc.products(), lambda props: {k: v for k, v in props.items() if k != label},
+                    msg("Eigenschaft «{label}» der Produkte von «{name}» entfernt", label=label, name=proc["name"]))
+
+
 # ---------- undo ----------
 
 class UndoConflict(ValueError):
@@ -746,6 +930,17 @@ def _check_undo(u: dict) -> None:
         proc = node(u["key"])
         if proc is None or u["key"][0] not in writable_databases() or _allocation_state(proc) != u["now"]:
             raise UndoConflict()
+    elif op == "restore_product":
+        snap = u["snapshot"]
+        if (node(snap["process"]) is None or snap["process"][0] not in writable_databases()
+                or node((snap["data"]["database"], snap["data"]["code"])) is not None):
+            raise UndoConflict()
+    elif op == "update_nodes":
+        for item in u["items"]:
+            act = node(item["key"])
+            if act is None or item["key"][0] not in writable_databases() or any(
+                    _jsonable({k: act.get(k)}).get(k) != v for k, v in item["now"].items()):
+                raise UndoConflict()
 
 
 def _apply_undo(u: dict) -> dict[int, int]:
@@ -754,7 +949,7 @@ def _apply_undo(u: dict) -> dict[int, int]:
     moved: dict[int, int] = {}
     if op == "delete_process":
         try:
-            bd.get_node(database=u["key"][0], code=u["key"][1]).delete()
+            _delete_node(bd.get_node(database=u["key"][0], code=u["key"][1]))
         except bd.errors.UnknownObject:
             pass
     elif op == "restore_process":
@@ -763,8 +958,12 @@ def _apply_undo(u: dict) -> dict[int, int]:
         act = bd.Database(snap["key"][0]).new_activity(code=snap["key"][1], **{k: v for k, v in data.items()
                                                                                 if k not in ("code", "database")})
         act.save()
+        for prod in snap.get("products") or []:  # stored as in the Activity Browser 3: the products first
+            _restore_product(prod)
         for e in snap["exchanges"]:
             moved[e.get("_id")] = _restore_exchange(e)
+        if snap.get("allocation"):
+            _restore_allocation(snap["key"], snap["allocation"])
         bd.databases.set_dirty(snap["key"][0])
         if snap.get("params"):
             from . import params
@@ -815,15 +1014,16 @@ def _apply_undo(u: dict) -> dict[int, int]:
         _apply_fields(exc, u["fields"])
         exc.save()
     elif op == "set_allocation":
-        # the strategy first (bw_functional allocates when it changes), then exactly the shares there were
-        proc = bd.get_node(database=u["key"][0], code=u["key"][1])
-        if proc.get("allocation") != u["allocation"]:
-            proc["allocation"] = u["allocation"]
-            proc.save()
-        for p in proc.products():
-            if p["code"] in u["factors"] and p.get("allocation_factor") != u["factors"][p["code"]]:
-                p["allocation_factor"] = u["factors"][p["code"]]
-                p.save()
+        _restore_allocation(u["key"], u)
+    elif op == "restore_product":
+        _restore_product(u["snapshot"])
+        _restore_allocation(u["snapshot"]["process"], u["snapshot"]["allocation"])
+    elif op == "update_nodes":
+        for item in u["items"]:
+            act = bd.get_node(database=item["key"][0], code=item["key"][1])
+            for k, v in item["fields"].items():
+                act[k] = v
+            act.save()
     return moved
 
 
@@ -905,10 +1105,13 @@ def process_detail(node_id: int | str, method: tuple) -> dict:
                 p["score"] = float(u[S.ref_row(int(p["id"]))]) if u is not None else None
             except KeyError:
                 p["score"] = None
+    # a process with one product (Activity Browser 3 format) shows that product's name and unit, it has none itself
+    shown = products[0] if proc is not None and proc.id == act.id and len(products) == 1 else act
     return {
         "allocation": allocation, "share": share, "process_id": str(proc.id) if share is not None else None,
-        "id": str(act.id), "name": act["name"], "product": act.get("reference product") or act.get("product"),
-        "location": act.get("location"), "unit": short_unit(act.get("unit")), "unit_raw": act.get("unit"),
+        "functional": proc is not None,
+        "id": str(act.id), "name": act["name"], "product": shown.get("reference product") or shown.get("product"),
+        "location": act.get("location"), "unit": short_unit(shown.get("unit")), "unit_raw": shown.get("unit"),
         "database": act["database"], "comment": act.get("comment") or "",
         "categories": " / ".join(act.get("categories") or ()),
         "production": prod, "score": total, "direct": direct,

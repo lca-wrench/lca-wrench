@@ -211,14 +211,30 @@ the engine in `lca_wrench/engine.py` (`Foreground`).
 - **bw_functional** is loaded without one part: when a project is opened, it brings the project's databases to its
   current data structure and writes a version mark into the project. LCA Wrench does not change projects without being
   asked, so this update runs only right before LCA Wrench itself writes into such a database.
-- **Not yet:** adding products to a process in LCA Wrench (new processes have one product; add products in the
-  Activity Browser 3 for now), system expansion in bw_functional's terms (LCA Wrench's credits remain the way to
-  substitute), and the Circular Footprint Formula of PEF.
+- **Building such models in LCA Wrench:** "+ Model" with the option "Activities with several products" makes a
+  model in this format. A new process there gets one product (name and unit as given); "+ Product" adds more, each with
+  its amount and unit, and × removes one again (not the last, and not while another process uses it). "+ Property"
+  gives every product of the process a property (price, mass …, per unit of product, 1 until set); its values are
+  typed into the table, and the allocation can then use it. A property the allocation uses cannot be removed. Every
+  step can be undone; deleting a process deletes its products with it, and undo brings both back.
+- **Inputs:** a process of this format is an input only through one of its products: choosing a process with several
+  products as input is refused, one with a single product stands for that product.
+- **Copying:** a dataset of BAFU or ecoinvent copied into such a model becomes a process with one product (with all
+  inputs and emissions); a process of such a model is copied with all its products, their properties and its
+  allocation. A product copied into a classic model becomes one dataset with its share of the process (every input
+  and emission times its allocation factor). LCA Wrench copies these itself: bw_functional 0.1.1's own copy of a
+  process deletes the original's products.
+- **Not yet:** turning an existing classic model into this format (exchange ids, parameters and links from other
+  models would change; for now copy its processes into a new model), Excel exchange and "Move to another region" for
+  such models (both refuse with a message), system expansion in bw_functional's terms (LCA Wrench's credits remain
+  the way to substitute), and the Circular Footprint Formula of PEF.
 
 Tested in `tests/test_multifunctional.py`: a dairy farm (8 kg milk, 1 kg meat, 9 kg CO2 per run) and cheese made from
 its milk, by hand calculation; the same farm written by bw_functional as the Activity Browser 3 writes it, with LCA
 Wrench's results equal to bw2calc's on bw_functional's processing for allocation by price, by mass, by hand and after
-a changed amount; the data sheets, undo and the comparison.
+a changed amount; the data sheets, undo and the comparison; the farm built step by step in LCA Wrench (new model,
+process, second product, price property, allocation, inputs, removing and restoring a product, copies both ways,
+deleting the process and undoing it), again equal to bw2calc.
 
 ## Search
 

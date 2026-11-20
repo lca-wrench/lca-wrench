@@ -208,6 +208,25 @@ class NameIn(BaseModel):
     name: str
 
 
+class DbIn(NameIn):
+    several_products: bool = False  # stored as in the Activity Browser 3
+
+
+class ProductIn(BaseModel):
+    id: str  # the process
+    name: str
+    unit: str = "unit"
+    amount: float = 1.0
+
+
+class PropertyIn(BaseModel):
+    id: str  # a product (set) or the process (add, delete)
+    label: str
+    amount: float = 1.0
+    unit: str = ""
+    normalize: bool = True
+
+
 class ProcessIn(BaseModel):
     database: str
     name: str
@@ -748,8 +767,8 @@ def get_model_processes(db: str):
 
 
 @app.post("/api/models/db")
-def post_model_db(body: NameIn):
-    run(mdl.create_database, body.name)
+def post_model_db(body: DbIn):
+    run(mdl.create_database, body.name, body.several_products)
     return run(s.state)
 
 
@@ -788,6 +807,35 @@ def post_model_copy(body: CopyIn):
 @app.post("/api/models/process/update")
 def post_model_process_update(body: ProcessUpdateIn):
     run(mdl.update_process, body.id, body.fields)
+    return {"ok": True}
+
+
+@app.post("/api/models/product/add")
+def post_product_add(body: ProductIn):
+    return {"id": run(mdl.add_product, body.id, body.name, body.unit, body.amount)}
+
+
+@app.post("/api/models/product/delete")
+def post_product_delete(body: IdIn):
+    run(mdl.delete_product, body.id)
+    return {"ok": True}
+
+
+@app.post("/api/models/property/set")
+def post_property_set(body: PropertyIn):
+    run(mdl.set_property, body.id, body.label, body.amount)
+    return {"ok": True}
+
+
+@app.post("/api/models/property/add")
+def post_property_add(body: PropertyIn):
+    run(mdl.add_property, body.id, body.label, body.unit, body.normalize)
+    return {"ok": True}
+
+
+@app.post("/api/models/property/delete")
+def post_property_delete(body: PropertyIn):
+    run(mdl.remove_property, body.id, body.label)
     return {"ok": True}
 
 

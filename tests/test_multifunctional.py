@@ -246,3 +246,86 @@ def test_ab3_amount_change_moves_the_shares(ab3):
     S = models.system()
     assert S.score({ab3["milk"]: 1}, GWP) == pytest.approx(8 / 14 * 9 / 16, rel=1e-9)
     assert _bw2calc(ab3["milk"]) == pytest.approx(8 / 14 * 9 / 16, rel=1e-6)
+
+
+# ---------- the same farm built in LCA Wrench, in a model of the Activity Browser 3 format ----------
+
+BUILT = "Test MF built"
+
+
+def test_build_several_products_in_lca_wrench(farm):
+    from lca_wrench import functional
+
+    bd.projects.set_current(TEST_PROJECT)
+    _drop(BUILT)
+    elec, co2 = bd.get_node(database=BG, code="elec").id, bd.get_node(database=BIO, code="co2").id
+    try:
+        models.create_database(BUILT, several_products=True)
+        assert bd.databases[BUILT]["backend"] == "functional_sqlite" and BUILT in models.writable_databases()
+        farm_id = int(models.create_process(BUILT, "dairy farm", "kilogram", "CH", product="raw milk"))
+        proc = bd.get_node(id=farm_id)
+        assert isinstance(proc, functional.Process) and [p.get("product") for p in proc.products()] == ["raw milk"]
+        milk = proc.products()[0].id
+        models.add_exchange(farm_id, elec, 10.0)
+        models.add_exchange(farm_id, co2, 4.0)
+        edge = next(e for e in bd.get_node(id=farm_id).exchanges() if e["type"] == "production")
+        models.update_exchange(edge._document.id, amount=8.0)  # 8 kg of milk per run
+        assert models.system().score({milk: 1}, GWP) == pytest.approx(9 / 8, rel=1e-9)  # one product bears all
+
+        beef = int(models.add_product(farm_id, "beef", "kilogram", 1.0))
+        assert bd.get_node(id=farm_id)["type"] == "multifunctional"
+        models.add_property(farm_id, "price", "EUR")
+        models.set_property(milk, "price", 0.5)
+        models.set_property(beef, "price", 6.0)
+        models.set_allocation(farm_id, "price")
+        S = models.system()
+        assert S.score({milk: 1}, GWP) == pytest.approx(0.45, rel=1e-9)
+        assert S.score({beef: 1}, GWP) == pytest.approx(5.4, rel=1e-9)
+        assert _bw2calc(beef) == pytest.approx(5.4, rel=1e-6)
+        with pytest.raises(ValueError):
+            models.remove_property(farm_id, "price")  # the allocation uses it
+
+        # cheese from the milk: the farm itself is no input (which product?), its milk is
+        dairy = int(models.create_process(BUILT, "cheese making", "kilogram", "CH", product="cheese"))
+        with pytest.raises(ValueError, match="mehrere Produkte"):
+            models.add_exchange(dairy, farm_id, 10.0)
+        models.add_exchange(dairy, milk, 10.0)
+        cheese = bd.get_node(id=dairy).products()[0].id
+        assert models.system().score({cheese: 1}, GWP) == pytest.approx(4.5, rel=1e-9)
+        assert models.system().score({dairy: 1}, GWP) == pytest.approx(4.5, rel=1e-9)
+
+        # remove the beef and bring it back with undo: its amount, its price and the allocation by price
+        models.delete_product(beef)
+        assert len(bd.get_node(id=farm_id).products()) == 1
+        models.undo()
+        back = {p.get("product"): p for p in bd.get_node(id=farm_id).products()}
+        assert set(back) == {"raw milk", "beef"} and functional._amount(back["beef"]) == 1.0
+        assert back["beef"]["properties"]["price"]["amount"] == 6.0 and bd.get_node(id=farm_id)["allocation"] == "price"
+        assert models.system().score({back["beef"].id: 1}, GWP) == pytest.approx(5.4, rel=1e-9)
+        beef = back["beef"].id
+
+        # copies: a background dataset into this model (process and product), the beef into a classic model (its share)
+        copied = int(models.copy_process(elec, BUILT))
+        assert [p.get("product") for p in bd.get_node(id=copied).products()] == ["electricity"]
+        assert models.system().score({copied: 1}, GWP) == pytest.approx(0.5, rel=1e-9)
+        classic = int(models.copy_process(beef, MODEL))
+        assert bd.get_node(id=classic)["type"] == "processwithreferenceproduct"
+        assert models.system().score({classic: 1}, GWP) == pytest.approx(5.4, rel=1e-9)
+
+        # deleting the farm: refused while cheese making uses its milk; then with its products, and back with undo
+        with pytest.raises(ValueError):
+            models.delete_process(farm_id)
+        models.delete_process(dairy)
+        models.delete_process(farm_id)
+        assert not [n for n in bd.Database(BUILT) if n.get("product") in ("raw milk", "beef")]
+        models.undo()
+        farm_back = bd.get_node(database=BUILT, code=proc["code"])
+        assert sorted(p.get("product") for p in farm_back.products()) == ["beef", "raw milk"]
+        milk = next(p.id for p in farm_back.products() if p.get("product") == "raw milk")  # restored: same code, new id
+        assert models.system().score({milk: 1}, GWP) == pytest.approx(0.45, rel=1e-9)
+        assert _bw2calc(milk) == pytest.approx(0.45, rel=1e-6)
+    finally:
+        bd.projects.set_current(TEST_PROJECT)
+        if BUILT in bd.databases:
+            models.delete_database(BUILT)
+        _drop(BUILT)

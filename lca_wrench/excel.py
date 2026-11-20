@@ -54,6 +54,8 @@ def _formatter():
 def export_model(db_name: str) -> tuple[bytes, str]:
     """The model database as .xlsx bytes plus a file name."""
     models._require_model_db(db_name)
+    if models.functional.is_functional(db_name):
+        raise ValueError(_("Für Modelle im Format des Activity Browser 3 (mehrere Produkte pro Prozess) geht das noch nicht."))
     import bw2io.export.excel as xl
 
     # write_lci_excel has no hook for the exchange columns; requests run one at a time (service.LOCK)

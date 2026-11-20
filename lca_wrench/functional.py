@@ -16,6 +16,8 @@ LCA Wrench itself writes into such a database (`ensure_current`), as the Activit
 
 from __future__ import annotations
 
+import uuid
+
 import bw2data as bd
 import bw_functional
 from bw2data.signals import project_changed
@@ -126,3 +128,90 @@ def set_allocation(process: Process, label: str, manual: dict[int, float] | None
         process.save()  # bw_functional allocates when the strategy changes
     else:
         process.allocate()
+
+
+# ---------- building models in this format ----------
+
+_NOT_COPIED = {"id", "database", "code", "type", "reference product", "product", "unit", "production amount",
+               "exchanges", "processor", "allocation_factor", "properties", "allocation"}
+
+
+def add_product(process: Process, name: str, unit: str | None, amount: float = 1.0) -> Product:
+    """A further product of the process, with its own production; bw_functional saves the process again (its type:
+    one product or several) and allocates it anew."""
+    prod = process.new_product(code=uuid.uuid4().hex, product=(name or "").strip() or process["name"], unit=unit or "unit")
+    prod.save()
+    if float(amount) != 1.0:
+        edge = prod.processing_edge
+        edge["amount"] = float(amount)
+        edge.save()
+    return bd.get_node(id=prod.id)
+
+
+def new_process(database: str, name: str, location: str, comment: str, product: str, unit: str) -> Process:
+    """A process with one product, as the Activity Browser 3 makes it: a process node and a product node."""
+    proc = bd.Database(database).new_node(code=uuid.uuid4().hex, name=name, location=location, comment=comment)
+    proc.save()
+    add_product(proc, product, unit)
+    return bd.get_node(id=proc.id)
+
+
+def copy_classic(src, database: str) -> Process:
+    """A dataset stored the classic way (process and product in one node, e.g. from BAFU or ecoinvent) as process and
+    product in a database of this format, with all its inputs and emissions."""
+    proc = bd.Database(database).new_node(code=uuid.uuid4().hex, **{k: v for k, v in src.items() if k not in _NOT_COPIED})
+    proc.save()
+    production = [e for e in src.exchanges() if e["type"] == "production"]
+    add_product(proc, src.get("reference product") or src["name"], src.get("unit"),
+                float(production[0]["amount"]) if production else 1.0)
+    for e in src.exchanges():
+        if e["type"] != "production":
+            proc.new_edge(**{k: v for k, v in e.as_dict().items() if k not in ("output", "id")}).save()
+    return bd.get_node(id=proc.id)
+
+
+def allocated(product: Product) -> dict:
+    """The product's share of its process as one classic dataset (bw_functional's own conversion: every input and
+    emission times the allocation factor, a formula times it too), for copying into a classic model."""
+    proc = product.processor
+    factor = product.get("allocation_factor")
+    share = float(factor) if isinstance(factor, (int, float)) and not isinstance(factor, bool) else 1.0
+    data = {k: v for k, v in proc.items() if k not in _NOT_COPIED}
+    data.update({"type": "processwithreferenceproduct", "reference product": product.get("product") or product["name"],
+                 "unit": product.get("unit")})
+    exchanges = []
+    for e in proc.exchanges():
+        ex = {k: v for k, v in e.as_dict().items() if k not in ("output", "id")}
+        if e["type"] == "production":
+            if e.input.id != product.id:
+                continue
+            ex["input"] = None  # the copy itself
+        elif share != 1.0:
+            ex["amount"] = float(ex["amount"]) * share
+            if ex.get("formula"):
+                ex["formula"] = f"({ex['formula']}) * {share!r}"
+        exchanges.append(ex)
+    return {"data": data, "exchanges": exchanges, "share": share}
+
+
+def copy_process(process: Process, database: str) -> Process:
+    """A copy of a process with all its products, their properties and its allocation. Not bw_functional's own
+    Process.copy: in version 0.1.1 it deletes the copied production edges one by one, and deleting a production edge
+    deletes the product it points to, which is still the original's."""
+    new = bd.Database(database).new_node(code=uuid.uuid4().hex, allocation=process.get("allocation"),
+                                         **{k: v for k, v in process.items() if k not in _NOT_COPIED})
+    new.save()
+    manual = strategy(process) == "manual"
+    for p in process.products():
+        q = add_product(new, p.get("product") or p["name"], p.get("unit"), _amount(p))
+        if p.get("properties") or manual:
+            q["properties"] = dict(p.get("properties") or {})
+            if manual and p.get("allocation_factor") is not None:
+                q["allocation_factor"] = p["allocation_factor"]
+            q.save()
+    for e in process.exchanges():
+        if e["type"] != "production":
+            new.new_edge(**{k: v for k, v in e.as_dict().items() if k not in ("output", "id")}).save()
+    new = bd.get_node(id=new.id)
+    new.allocate()
+    return new
