@@ -639,6 +639,7 @@ class CrosswalkChoiceIn(BaseModel):
     target_database: str
     target_code: str | None = None
     reset: bool = False
+    price: float | None = None  # euro per unit of the product, for a sector of an input-output table
 
 
 class CrosswalkConfirmIn(BaseModel):
@@ -671,7 +672,8 @@ def post_crosswalk_search(body: CrosswalkSearchIn):
 
 @app.post("/api/crosswalk/choose")
 def post_crosswalk_choose(body: CrosswalkChoiceIn):
-    run(crosswalk.choose, body.source_database, body.source_code, body.target_database, body.target_code, body.reset)
+    run(crosswalk.choose, body.source_database, body.source_code, body.target_database, body.target_code, body.reset,
+        body.price)
     return {"ok": True}
 
 

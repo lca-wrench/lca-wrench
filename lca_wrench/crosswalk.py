@@ -40,7 +40,7 @@ import bw2data as bd
 import numpy as np
 from bw2data.backends.schema import ActivityDataset as AD
 
-from . import engine, models, regions, registry
+from . import engine, models, regions, registry, sectors
 from .analysis import short_unit
 from .i18n import _
 from .versions import _node_attrs
@@ -111,6 +111,8 @@ class TargetIndex:
     """The datasets of one background database, searchable by word."""
 
     def __init__(self, database: str):
+        from . import backgrounds
+
         self.database = database
         self.rows: dict[int, dict] = {}
         self.by_code: dict[str, int] = {}
@@ -118,7 +120,8 @@ class TargetIndex:
         for nid, code, data in AD.select(AD.id, AD.code, AD.data).where(AD.database == database,
                                                                         AD.type << list(engine.PROCESS_TYPES)).tuples():
             d = {"id": nid, "code": code, "name": data.get("name", ""), "product": data.get("reference product") or "",
-                 "location": data.get("location") or "", "unit": data.get("unit") or ""}
+                 "location": data.get("location") or "", "unit": data.get("unit") or "",
+                 "volume": data.get("production volume")}
             d["p_words"], d["words"] = _tokens(d["product"]), _tokens(_core(d["product"]) + " " + _core(d["name"]))
             d["market"] = d["name"].lower().startswith("market")
             d["obsolete"] = d["name"].lower().startswith("xx ")
@@ -126,6 +129,8 @@ class TargetIndex:
             self.by_code[code] = nid
             for w in d["words"]:
                 self.words[w].add(nid)
+        # an input-output table (EXIOBASE): datasets are matched to their proxy sector, not by name (sectors.py)
+        self.sectors = sectors.Sectors(self.rows) if backgrounds.kind(database) == "mrio" else None
 
     def score(self, d: dict, words: set, head: set, market: bool, location: str, name: str = "") -> float:
         if not words:
@@ -300,10 +305,15 @@ def _save(src_db: str, tgt_db: str, entries: dict[str, dict | None]) -> None:
 
 
 def choose(source_database: str, source_code: str, target_database: str, target_code: str | None,
-           reset: bool = False) -> None:
-    """Keep the user's counterpart of one dataset (None: it has none); reset forgets it (back to the suggestion)."""
-    _save(source_database, target_database,
-          {source_code: None if reset else {"code": target_code, "origin": "user", "date": time.strftime("%Y-%m-%d")}})
+           reset: bool = False, price: float | None = None) -> None:
+    """Keep the user's counterpart of one dataset (None: it has none); reset forgets it (back to the suggestion).
+    price: euro per unit of the dataset's product, for a sector of an input-output table (in money)."""
+    entry = {"code": target_code, "origin": "user", "date": time.strftime("%Y-%m-%d")}
+    if price is not None:
+        if not price > 0:
+            raise ValueError(_("Der Preis muss grösser als 0 sein."))
+        entry["price"] = float(price)
+    _save(source_database, target_database, {source_code: None if reset else entry})
 
 
 def confirm_all(source_database: str, target_database: str, pairs: list[dict]) -> int:
@@ -334,6 +344,9 @@ def export_mapping(source_database: str, target_database: str) -> dict:
                 "target": {"database": target_database, "code": e["code"]}}
         if e.get("factor") not in (None, 1, 1.0):
             item["conversion_factor"] = e["factor"]
+        elif e.get("price"):  # into an input-output table in million euro
+            item["conversion_factor"] = e["price"] / 1e6
+            item["comment"] = f"price {e['price']} EUR per {d.get('unit')}"
         replace.append(item)
     return {
         "name": f"{source_database}__{target_database}",
@@ -419,6 +432,7 @@ def compare(node_id: int, amount: float, method: tuple, project: str, database: 
     side_a = _demand(node_id, amount, method)
     info = _node_attrs(side_a["ids"])
     finfo = _node_attrs(side_a["flow_ids"])
+    extra = sectors.source_info(side_a["ids"])  # ISIC and price, for an input-output table on the other side
     unit_a = bd.methods[method].get("unit")
     try:
         if project != cur:
@@ -429,8 +443,8 @@ def compare(node_id: int, amount: float, method: tuple, project: str, database: 
         if method_b is None or method_b not in bd.methods:
             raise ValueError(_("Im Projekt «{name}» gibt es keine passende Methode. Wähle sie bei «Methode dort».", name=project))
         index = _index(project, database)
-        sysb = models.system()
-        s_b = sysb.bg.unit_scores(method_b)
+        bgb = _target_background(database)
+        s_b = bgb.unit_scores(method_b)
         rows = []
         for k, sid in enumerate(side_a["ids"]):
             d = info[sid]
@@ -449,6 +463,17 @@ def compare(node_id: int, amount: float, method: tuple, project: str, database: 
                     origin = "missing"
             elif d["code"] in index.by_code:
                 target, origin = index.rows[index.by_code[d["code"]]], "code"
+            elif index.sectors is not None:  # input-output table: the proxy sector in the region
+                src = extra.get(sid, {})
+                sugg, how = index.sectors.propose(d["name"], d.get("product") or "", d["location"], src.get("isic"),
+                                                  src.get("category") or "")
+                row["candidates"] = [{"code": c["code"], "name": c["name"], "product": c["product"],
+                                      "location": c["location"], "unit": short_unit(c["unit"]), "score": sc}
+                                     for sc, c in sugg]
+                row["proxy"] = how  # isic, rule, category or name
+                if sugg:
+                    target, origin = sugg[0][1], "auto"
+                    quality = "good" if sugg[0][0] >= 0.6 else "unsure"
             else:
                 sugg = index.suggest(d["name"], d["unit"], d["location"])
                 row["candidates"] = [{"code": c["code"], "name": c["name"], "product": c["product"],
@@ -461,10 +486,20 @@ def compare(node_id: int, amount: float, method: tuple, project: str, database: 
             if target is not None:
                 k_ = (choice or {}).get("factor") if origin in ("user", "file") else None
                 k_ = k_ or factor(d["unit"], target["unit"])
-                if k_ is None:
+                per = sectors.money(target["unit"])
+                if k_ is None and per:  # physical amount into money: the price, the user's or the dataset's own
+                    price = (choice or {}).get("price") if origin in ("user", "file") else None
+                    price = price or extra.get(sid, {}).get("price")
+                    row["price"] = price
+                    k_ = price / per if price else None
+                if k_ is None and per:  # the sector is found, but counts only once it has a price
+                    row["problem"] = "price"
+                    row["pending"] = {"code": target["code"], "name": target["name"], "location": target["location"],
+                                      "unit": short_unit(target["unit"])}
+                elif k_ is None:
                     row["origin"], row["problem"] = "unit", target["unit"]
                 else:
-                    s1 = float(s_b[sysb.bg.prod_row[target["id"]]]) if target["id"] in sysb.bg.prod_row else 0.0
+                    s1 = float(s_b[bgb.prod_row[target["id"]]]) if target["id"] in bgb.prod_row else 0.0
                     amount_b = float(side_a["d"][k] * k_)
                     row["match"] = {"code": target["code"], "name": target["name"], "product": target["product"],
                                     "location": target["location"], "unit": short_unit(target["unit"]), "factor": k_,
@@ -505,6 +540,14 @@ def compare(node_id: int, amount: float, method: tuple, project: str, database: 
                        "unsure": sum(1 for r in rows if r["origin"] == "auto" and r["quality"] == "unsure")}}
 
 
+def _target_background(database: str) -> engine.Background:
+    """The background that calculates the datasets of `database` (current project): the calculation's own if it
+    includes the database, else the database alone. A premise scenario or EXIOBASE is not part of the calculation
+    until chosen under Start; taking the calculation's background regardless gave its datasets a score of 0."""
+    bg = models.system().bg
+    return bg if database in bg.dbs else engine.alone(database).bg
+
+
 def _drivers(rows: list[dict], direct_a: float, direct_b: float, difference: float) -> dict:
     """Which datasets make the difference between the two results, largest first.
 
@@ -539,12 +582,12 @@ def _rank(parts: list[dict], difference: float) -> dict:
 
 # ---------- one level deeper ----------
 
-def _inputs(node_id: int, method: tuple) -> tuple[list[dict], float, float]:
+def _inputs(node_id: int, method: tuple, bg: engine.Background | None = None) -> tuple[list[dict], float, float]:
     """Direct inputs of a background dataset per unit of its product, each with its share of the dataset's score.
 
     Column c of A: A_cc s_c = sum_(r != c) -A_rc s_r + direct_c, so the inputs and the own emissions add up exactly
     to the unit score. Returns (inputs, own emissions, unit score)."""
-    bg = models.system().bg
+    bg = bg or models.system().bg
     if node_id not in bg.act_col or node_id not in bg.prod_row:
         raise KeyError(_("Prozess {id} ist in diesem Projekt nicht berechenbar.", id=node_id))
     c, own = bg.act_col[node_id], bg.prod_row[node_id]
@@ -622,7 +665,7 @@ def trace(source_id: int, target_code: str, scale_a: float, scale_b: float, meth
         if target_code not in index.by_code:
             raise KeyError(_("Das Gegenstück gibt es in «{name}» nicht mehr. Rechne den Vergleich neu.", name=database))
         target_id = index.by_code[target_code]
-        ins_b, own_b, s_b = _inputs(target_id, method_b)
+        ins_b, own_b, s_b = _inputs(target_id, method_b, _target_background(database))
         pairs = _pairs(ins_a, ins_b, database, index)
     finally:
         service.leave(cur)
@@ -664,7 +707,8 @@ def search(project: str, database: str, q: str, unit: str | None = None, locatio
             raise KeyError(_("Die Datenbank «{name}» gibt es in diesem Projekt nicht.", name=database))
         rows, spelling = _index(project, database).search(q, unit, location=location)
         return [{"code": d["code"], "name": d["name"], "product": d["product"], "location": d["location"],
-                 "unit": short_unit(d["unit"]), "convertible": factor(unit, d["unit"]) is not None,
+                 "unit": short_unit(d["unit"]),
+                 "convertible": factor(unit, d["unit"]) is not None or sectors.money(d["unit"]) is not None,
                  **({"spelling": spelling} if spelling else {})} for d in rows]
     finally:
         service.leave(cur)

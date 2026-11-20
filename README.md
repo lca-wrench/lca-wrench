@@ -75,7 +75,8 @@ Options: `python -m lca_wrench --port 8790 --no-browser`. `./start.sh` still wor
 
 ## Data
 
-Nothing is bundled except the flow mapping (CC BY 4.0, see `lca_wrench/data/flowmaps/README.md`). All LCA data are
+Nothing is bundled except the flow mapping (CC BY 4.0, see `lca_wrench/data/flowmaps/README.md`) and the sector matching
+for EXIOBASE (Peng & Pfister 2023 and the EXIOBASE classification, see `lca_wrench/data/sectors/README.md`). All LCA data are
 downloaded or imported by the user: the BAFU 2025 template from files.brightway.dev, BAFU 2026 via sentier-brightway,
 ecoinvent with the user's own licence, premise scenarios and EXIOBASE. Background data stays unchanged; changes happen in
 your own models or in a working copy of the project. Details, licences and citation wording for data sources:

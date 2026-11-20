@@ -36,6 +36,13 @@ function originChip(r) {
   return `<span class="chip ${k === 'bad' ? 'hot' : 'acc'}">${l}</span>`;
 }
 
+// a sector of an input-output table: found by ISIC class or only by words, and the price that converts the amount
+function proxyNote(r) {
+  if (!r.proxy || r.origin === 'user' || r.origin === 'file') return r.price && r.match ? `<br><span class="muted" style="font-size:12.5px">${t('Preis {p} EUR', { p: nf(r.price) })}</span>` : '';
+  const how = { isic: t('Sektor über ISIC-Klasse'), rule: t('Sektor über Name und Kategorie'), category: t('Sektor nur über die Kategorie') }[r.proxy] || t('Sektor nur über Wörter im Namen');
+  return `<br><span class="muted" style="font-size:12.5px">${how}${r.price && r.match ? ' · ' + t('Preis {p} EUR', { p: nf(r.price) }) : ''}</span>`;
+}
+
 function editor(r) {
   const c = S.cw;
   const cand = (r.candidates || []).concat(c.hits || []);
@@ -50,6 +57,9 @@ function editor(r) {
       <button class="btn small" data-act="cw-none">${t('Kein Gegenstück')}</button>
       ${r.origin === 'user' || r.origin === 'file' ? `<button class="btn small" data-act="cw-reset">${t('Zurück zum Vorschlag')}</button>` : ''}
       <button class="btn small" data-act="cw-close">${t('Schliessen')}</button></div>
+    ${r.proxy ? `<div class="row" style="align-items:flex-end;gap:8px"><label class="f" style="width:220px">${t('Preis (EUR pro {unit})', { unit: esc(r.unit || '') })}<input id="cwPrice" inputmode="decimal" value="${r.price ?? ''}"></label>
+      ${r.match || r.pending ? `<button class="btn small" data-act="cw-price">${t('Mit diesem Preis übernehmen')}</button>` : ''}
+      <span class="muted" style="font-size:12.5px">${t('Der Preis rechnet die Menge in Geld um (EXIOBASE: Mio. €). Vorgabe: der Preis im Datensatz, falls vorhanden.')}</span></div>` : ''}
     ${list ? `${spellingNote(c.hits || [])}<div class="reslist" style="max-height:260px;overflow:auto">${list}</div>` : `<p class="muted">${t('Keine Kandidaten. Suche nach einem anderen Begriff.')}</p>`}
   </div></td></tr>`;
 }
@@ -153,7 +163,7 @@ export function tCw() {
     const line = `<tr class="${c.open === r.key ? 'sel' : ''}">
       <td><b>${esc(r.name)}</b> <span class="muted">${esc(r.location || '')}</span><br><span class="muted" style="font-size:12.5px">${nf(r.amount)} ${esc(r.unit || '')}${r.database !== srcDb ? ' · ' + esc(r.database) : ''}</span></td>
       <td class="num nw" style="text-align:right">${nf(r.score_a)}${bar(r.score_a, 'hot')}</td>
-      <td>${m ? `<b>${esc(m.name)}</b> <span class="muted">${esc(m.location || '')}</span><br><span class="muted" style="font-size:12.5px">${nf(m.amount)} ${esc(m.unit || '')}${m.factor !== 1 ? ' · ' + t('Faktor {f}', { f: nf(m.factor) }) : ''}</span>` : `<span class="muted">${r.problem ? t('Einheit {u} passt nicht', { u: esc(r.problem) }) : '–'}</span>`} ${originChip(r)}</td>
+      <td>${m ? `<b>${esc(m.name)}</b> <span class="muted">${esc(m.location || '')}</span><br><span class="muted" style="font-size:12.5px">${nf(m.amount)} ${esc(m.unit || '')}${m.factor !== 1 ? ' · ' + t('Faktor {f}', { f: nf(m.factor) }) : ''}</span>` : r.pending ? `<b>${esc(r.pending.name)}</b> <span class="muted">${esc(r.pending.location || '')}</span><br><span class="chip hot">${t('Preis fehlt')}</span>` : `<span class="muted">${r.problem ? t('Einheit {u} passt nicht', { u: esc(r.problem) }) : '–'}</span>`} ${originChip(r)}${proxyNote(r)}</td>
       <td class="num nw" style="text-align:right">${m ? nf(r.score_b) : '–'}${m ? bar(r.score_b, '') : ''}</td>
       <td class="num nw" style="text-align:right">${m ? sign(r.score_b - r.score_a) + nf(Math.abs(r.score_b - r.score_a)) : ''}</td>
       <td class="nw">${r.origin === 'auto' && m ? `<button class="btn small" data-act="cw-ok" data-k="${i}" title="${t('Vorschlag bestätigen')}">✓</button> ` : ''}${r.origin !== 'same' ? `<button class="btn small" data-act="cw-edit" data-k="${i}">${t('Ändern')}</button>` : ''}</td></tr>`;

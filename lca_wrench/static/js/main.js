@@ -284,6 +284,7 @@ async function followJob(store, job, onDone) {
 
 // ---------- actions ----------
 const cwRow = () => S.cw.res?.rows.find(r => r.key === S.cw.open);
+const cwPrice = () => { const v = parseFloat(($('cwPrice')?.value || '').replace(',', '.')); return v > 0 ? { price: v } : {}; };
 async function cwChoose(choice) {
   const r = cwRow(); if (!r) return;
   await api('/api/crosswalk/choose', { source_database: r.database, source_code: r.code, target_database: S.cw.database, ...choice });
@@ -649,7 +650,12 @@ const A = {
     c.hits = c.q ? await api('/api/crosswalk/search', { project: c.project, database: c.database, q: c.q, unit: r?.unit_long, location: c.loc || null }) : null;
     render(); $('cwQ')?.focus();
   },
-  async 'cw-pick'(code) { await cwChoose({ target_code: code }); },
+  async 'cw-pick'(code) { await cwChoose({ target_code: code, ...cwPrice() }); },
+  // a sector in money (EXIOBASE): the one shown, with the price typed in
+  async 'cw-price'() {
+    const r = cwRow(), p = cwPrice(); if (!r || !p.price) { toast(t('Bitte einen Preis grösser als 0 eingeben.')); return; }
+    await cwChoose({ target_code: (r.match || r.pending).code, ...p });
+  },
   async 'cw-none'() { await cwChoose({ target_code: null }); },
   async 'cw-reset'() { await cwChoose({ reset: true }); },
   async 'cw-ok'(k) {

@@ -198,6 +198,7 @@ EN = {
     "«{name}» ({location}) gibt es in «{database}» nicht eindeutig.": "“{name}” ({location}) does not exist exactly once in “{database}”.",
     "Wähle eine andere Datenbank oder ein anderes Projekt als Vergleich.": "Choose another database or another project to compare with.",
     "Die Datenbank «{name}» gibt es in diesem Projekt nicht.": "The database “{name}” does not exist in this project.",
+    "Der Preis muss grösser als 0 sein.": "The price must be greater than 0.",
     "Das Gegenstück gibt es in «{name}» nicht mehr. Rechne den Vergleich neu.": "The counterpart no longer exists in “{name}”. Run the comparison again.",
     "Diesen Vergleich gibt es nicht mehr. Bitte neu vergleichen.": "This comparison no longer exists. Please compare again.",
     # setups

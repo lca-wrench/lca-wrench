@@ -116,6 +116,33 @@ background itself, d is just that product.
   shown, as is the share of unsure suggestions.
 - **Units:** converted where both units measure the same thing (mass, energy, volume, freight, area, time …); otherwise
   the match is marked "Unit does not fit".
+- **Scenarios and EXIOBASE on the other side:** the datasets there are scored on their own database when the
+  calculation does not include it (a premise scenario or EXIOBASE is only part of it once chosen under Start).
+- **EXIOBASE (proxy sectors):** an input-output table has no dataset of the same name. Each dataset gets the industry
+  its activity belongs to, or that industry's product, in the region of its location (`lca_wrench/sectors.py`). Both
+  tables work: industry by industry (163 industries) and product by product (200 products), recognised by their
+  names. The industry, in this order:
+  1. **ISIC** (ecoinvent): the dataset's ISIC rev.4 class through the sector matching of Peng & Pfister (2023),
+     coarsened to 3 and 2 digits where a class is not listed;
+  2. **name rules**: words of the name and reference product, with BAFU 2025's EcoSpold01 category and BAFU 2026's
+     sector ("Electricity, hydropower, at power plant" → electricity by hydro, "Diesel, at regional storage" →
+     petroleum refinery, "Transport, freight, lorry …" → other land transport). With ISIC candidates a rule only
+     narrows them ("market for electricity, low voltage" → distribution and trade of electricity);
+  3. **category or sector alone** (BAFU "chemicals" → the chemical industries), marked unsure;
+  4. **words only**: the industries sharing most words with the name, marked unsure.
+
+  Several candidates are ranked by the words they share with the dataset; among equals the "nec" industry comes first
+  (ISIC 2011 → chemicals nec). In the product table each industry stands for its products, the one the name points to
+  first ("Heavy fuel oil" → Heavy Fuel Oil, "Petrol" → Motor Gasoline), else its main product. Region: the region
+  matching of Peng & Pfister (2023); a location covering several regions (GLO, RER, RoW) takes the one with the largest
+  production of the sector. Checked on all datasets of BAFU 2025 (90 % by name rules, the rest by category), BAFU 2026
+  (90 % by name rules) and ecoinvent 3.9.1 (by ISIC), and against the EXIOBASE 3.8.2 tables of 2022 (all 163
+  industry and 200 product names recognised).
+
+  The amount is converted into million euro with the price of the product: ecoinvent's property "price" (EUR 2005, not
+  deflated to the table's year) or a price typed in under "Change" ("Use with this price"); without one, the sector is
+  shown with "Price missing" and counts as zero. BAFU datasets have no price, so each needs one typed in. The tables are
+  in `lca_wrench/data/sectors`.
 - **Direct emissions** of the model's own activities: same code, otherwise the same name and compartment after
   normalizing the spelling ("Carbon dioxide, fossil" in "emissions to air" = "Carbon Dioxide (fossil)" in
   "Emissions / Emissions to air").
@@ -146,7 +173,10 @@ ecoinvent-shaped database in another project): side A equals the normal result; 
 the matched datasets, the unit conversion and the direct emissions; suggestions, the user's choice, "No counterpart"
 and going back; export in the format of sentier-mappings (ecoinvent by code only) and loading it again; the same
 database twice gives the same result; method and unit matching; API. The first calculation against another database
-prepares it, which takes some time.
+prepares it, which takes some time. `tests/test_backgrounds.py`: a premise-like scenario outside the calculation is
+scored on its own data (also one level down); EXIOBASE proxy sectors by ISIC class and region, the price from the
+dataset and typed in, and its export as a conversion factor; both tables (industries and products, with EXIOBASE's
+names) for datasets with ISIC class (ecoinvent), with a category (BAFU 2025) and with a sector only (BAFU 2026).
 
 ## Search
 

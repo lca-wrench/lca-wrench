@@ -1,6 +1,7 @@
 # Data and imports
 
-Nothing is bundled except the flow mapping (see [flow-mapping.md](flow-mapping.md)). All LCA data are downloaded or
+Nothing is bundled except the flow mapping (see [flow-mapping.md](flow-mapping.md)) and the sector matching for EXIOBASE
+(`lca_wrench/data/sectors`, see [features.md](features.md#other-database-the-same-product-with-another-background-database)). All LCA data are downloaded or
 imported by the user, under the terms of their publisher. A new project is made from the start page or the project
 selection (**New project**): an empty Brightway project, or one with background data right away. An empty open project
 shows "This project is still empty" with the same imports. Code: `lca_wrench/imports.py` (projects, jobs),

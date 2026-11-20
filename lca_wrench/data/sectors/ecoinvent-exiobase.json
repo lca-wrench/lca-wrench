@@ -1,0 +1,3615 @@
+{
+ "source": "Sector matching ISIC -> EXIOBASE and region matching: Peng, S. & Pfister, S. (2023), J Ind Ecol, supporting information S2 and S3 (github.com/ecological-systems-design/regionalize_lcidb_with_mrio, BSD 3-Clause), industry codes converted to those of the EXIOBASE files by name. EXIOBASE 3 industries and products: Stadler et al. (2018), codes and names as in the EXIOBASE files (listed in pymrio).",
+ "isic_to_exiobase": {
+  "0111": [
+   "i01.b",
+   "i01.c",
+   "i01.e"
+  ],
+  "0112": [
+   "i01.a"
+  ],
+  "0113": [
+   "i01.d"
+  ],
+  "0114": [
+   "i01.f"
+  ],
+  "0115": [
+   "i01.h"
+  ],
+  "0116": [
+   "i01.g"
+  ],
+  "0119": [
+   "i01.h"
+  ],
+  "0121": [
+   "i01.d"
+  ],
+  "0122": [
+   "i01.d"
+  ],
+  "0123": [
+   "i01.d"
+  ],
+  "0124": [
+   "i01.d"
+  ],
+  "0125": [
+   "i01.d"
+  ],
+  "0126": [
+   "i01.d"
+  ],
+  "0127": [
+   "i01.h"
+  ],
+  "0128": [
+   "i01.h"
+  ],
+  "0129": [
+   "i01.h"
+  ],
+  "0130": [
+   "i01.h"
+  ],
+  "0141": [
+   "i01.i"
+  ],
+  "0142": [
+   "i01.l"
+  ],
+  "0143": [
+   "i01.l"
+  ],
+  "0144": [
+   "i01.l"
+  ],
+  "0145": [
+   "i01.j"
+  ],
+  "0146": [
+   "i01.k"
+  ],
+  "0149": [
+   "i01.l"
+  ],
+  "0150": [
+   "i01.a",
+   "i01.b",
+   "i01.c",
+   "i01.d",
+   "i01.e",
+   "i01.f",
+   "i01.g",
+   "i01.h",
+   "i01.i",
+   "i01.j",
+   "i01.k",
+   "i01.l",
+   "i01.m",
+   "i01.n",
+   "i01.o"
+  ],
+  "0161": [
+   "i01.a",
+   "i01.b",
+   "i01.c",
+   "i01.d",
+   "i01.e",
+   "i01.f",
+   "i01.g",
+   "i01.h"
+  ],
+  "0162": [
+   "i01.i",
+   "i01.j",
+   "i01.k",
+   "i01.l",
+   "i01.m"
+  ],
+  "0163": [
+   "i01.a",
+   "i01.b",
+   "i01.c",
+   "i01.d",
+   "i01.e",
+   "i01.f",
+   "i01.g",
+   "i01.h"
+  ],
+  "0164": [
+   "i01.a",
+   "i01.b",
+   "i01.c",
+   "i01.d",
+   "i01.e",
+   "i01.f",
+   "i01.g",
+   "i01.h"
+  ],
+  "0170": [
+   "i02"
+  ],
+  "0210": [
+   "i02"
+  ],
+  "0220": [
+   "i02"
+  ],
+  "0230": [
+   "i02"
+  ],
+  "0240": [
+   "i02"
+  ],
+  "0311": [
+   "i05"
+  ],
+  "0312": [
+   "i05"
+  ],
+  "0321": [
+   "i05"
+  ],
+  "0322": [
+   "i05"
+  ],
+  "0510": [
+   "i10"
+  ],
+  "0520": [
+   "i10"
+  ],
+  "0610": [
+   "i11.a"
+  ],
+  "0620": [
+   "i11.b"
+  ],
+  "0710": [
+   "i13.1"
+  ],
+  "0721": [
+   "i12"
+  ],
+  "0729": [
+   "i13.20.11",
+   "i13.20.12",
+   "i13.20.13",
+   "i13.20.14",
+   "i13.20.15",
+   "i13.20.16"
+  ],
+  "0810": [
+   "i14.1",
+   "i14.2"
+  ],
+  "0891": [
+   "i14.3"
+  ],
+  "0892": [
+   "i14.3"
+  ],
+  "0893": [
+   "i14.3"
+  ],
+  "0899": [
+   "i14.3"
+  ],
+  "0910": [
+   "i11.b",
+   "i11.c"
+  ],
+  "0990": [
+   "i14.3"
+  ],
+  "1010": [
+   "i15.a",
+   "i15.b",
+   "i15.c",
+   "i15.d"
+  ],
+  "1020": [
+   "i15.k"
+  ],
+  "1030": [
+   "i15.e"
+  ],
+  "1040": [
+   "i15.e"
+  ],
+  "1050": [
+   "i15.f"
+  ],
+  "1061": [
+   "i15.g",
+   "i15.i"
+  ],
+  "1062": [
+   "i15.g",
+   "i15.i"
+  ],
+  "1071": [
+   "i15.g",
+   "i15.i"
+  ],
+  "1072": [
+   "i15.h"
+  ],
+  "1073": [
+   "i15.i"
+  ],
+  "1074": [
+   "i15.i"
+  ],
+  "1075": [
+   "i15.g",
+   "i15.i"
+  ],
+  "1079": [
+   "i15.i"
+  ],
+  "1080": [
+   "i15.i"
+  ],
+  "1101": [
+   "i15.j"
+  ],
+  "1102": [
+   "i15.j"
+  ],
+  "1103": [
+   "i15.j"
+  ],
+  "1104": [
+   "i15.j"
+  ],
+  "1200": [
+   "i16"
+  ],
+  "1311": [
+   "i17"
+  ],
+  "1312": [
+   "i17"
+  ],
+  "1313": [
+   "i17"
+  ],
+  "1391": [
+   "i17"
+  ],
+  "1392": [
+   "i17"
+  ],
+  "1393": [
+   "i17"
+  ],
+  "1394": [
+   "i17"
+  ],
+  "1399": [
+   "i17"
+  ],
+  "1410": [
+   "i18"
+  ],
+  "1420": [
+   "i18"
+  ],
+  "1430": [
+   "i18"
+  ],
+  "1511": [
+   "i19"
+  ],
+  "1512": [
+   "i19"
+  ],
+  "1520": [
+   "i19"
+  ],
+  "1610": [
+   "i20"
+  ],
+  "1621": [
+   "i20"
+  ],
+  "1622": [
+   "i20"
+  ],
+  "1623": [
+   "i20"
+  ],
+  "1629": [
+   "i20"
+  ],
+  "1701": [
+   "i21.1"
+  ],
+  "1702": [
+   "i21.2"
+  ],
+  "1709": [
+   "i21.2"
+  ],
+  "1811": [
+   "i22"
+  ],
+  "1812": [
+   "i22"
+  ],
+  "1820": [
+   "i22"
+  ],
+  "1910": [
+   "i23.1"
+  ],
+  "1920": [
+   "i23.2"
+  ],
+  "2011": [
+   "i24.a",
+   "i24.d"
+  ],
+  "2012": [
+   "i24.b",
+   "i24.c",
+   "i24.d"
+  ],
+  "2013": [
+   "i24.a",
+   "i24.d"
+  ],
+  "2021": [
+   "i24.c"
+  ],
+  "2022": [
+   "i24.d"
+  ],
+  "2023": [
+   "i24.d"
+  ],
+  "2029": [
+   "i24.d"
+  ],
+  "2030": [
+   "i24.d"
+  ],
+  "2100": [
+   "i24.d"
+  ],
+  "2211": [
+   "i25"
+  ],
+  "2219": [
+   "i25"
+  ],
+  "2220": [
+   "i25"
+  ],
+  "2310": [
+   "i26.a"
+  ],
+  "2391": [
+   "i26.c"
+  ],
+  "2392": [
+   "i26.c"
+  ],
+  "2393": [
+   "i26.b"
+  ],
+  "2394": [
+   "i26.d"
+  ],
+  "2395": [
+   "i26.d"
+  ],
+  "2396": [
+   "i26.e"
+  ],
+  "2399": [
+   "i26.e"
+  ],
+  "2410": [
+   "i27.a"
+  ],
+  "2420": [
+   "i27.41",
+   "i27.42",
+   "i27.43",
+   "i27.44",
+   "i27.45"
+  ],
+  "2431": [
+   "i27.5"
+  ],
+  "2432": [
+   "i27.5"
+  ],
+  "2511": [
+   "i28"
+  ],
+  "2512": [
+   "i28"
+  ],
+  "2513": [
+   "i28"
+  ],
+  "2520": [
+   "i28"
+  ],
+  "2591": [
+   "i28"
+  ],
+  "2592": [
+   "i28"
+  ],
+  "2593": [
+   "i28"
+  ],
+  "2599": [
+   "i28"
+  ],
+  "2610": [
+   "i30"
+  ],
+  "2620": [
+   "i30"
+  ],
+  "2630": [
+   "i32"
+  ],
+  "2640": [
+   "i31"
+  ],
+  "2651": [
+   "i31"
+  ],
+  "2652": [
+   "i33"
+  ],
+  "2660": [
+   "i33"
+  ],
+  "2670": [
+   "i33"
+  ],
+  "2680": [
+   "i33"
+  ],
+  "2710": [
+   "i31"
+  ],
+  "2720": [
+   "i31"
+  ],
+  "2731": [
+   "i31"
+  ],
+  "2732": [
+   "i31"
+  ],
+  "2733": [
+   "i31"
+  ],
+  "2740": [
+   "i31"
+  ],
+  "2750": [
+   "i31"
+  ],
+  "2790": [
+   "i31"
+  ],
+  "2811": [
+   "i29"
+  ],
+  "2812": [
+   "i29"
+  ],
+  "2813": [
+   "i29"
+  ],
+  "2814": [
+   "i29"
+  ],
+  "2815": [
+   "i29"
+  ],
+  "2816": [
+   "i29"
+  ],
+  "2817": [
+   "i30"
+  ],
+  "2818": [
+   "i29"
+  ],
+  "2819": [
+   "i29"
+  ],
+  "2821": [
+   "i29"
+  ],
+  "2822": [
+   "i29"
+  ],
+  "2823": [
+   "i29"
+  ],
+  "2824": [
+   "i29"
+  ],
+  "2825": [
+   "i29"
+  ],
+  "2826": [
+   "i29"
+  ],
+  "2829": [
+   "i29"
+  ],
+  "2910": [
+   "i34"
+  ],
+  "2920": [
+   "i34"
+  ],
+  "2930": [
+   "i34"
+  ],
+  "3011": [
+   "i35"
+  ],
+  "3012": [
+   "i35"
+  ],
+  "3020": [
+   "i35"
+  ],
+  "3030": [
+   "i35"
+  ],
+  "3040": [
+   "i35"
+  ],
+  "3091": [
+   "i35"
+  ],
+  "3092": [
+   "i35"
+  ],
+  "3099": [
+   "i35"
+  ],
+  "3100": [
+   "i36"
+  ],
+  "3211": [
+   "i36"
+  ],
+  "3212": [
+   "i36"
+  ],
+  "3220": [
+   "i36"
+  ],
+  "3230": [
+   "i36"
+  ],
+  "3240": [
+   "i36"
+  ],
+  "3250": [
+   "i36"
+  ],
+  "3290": [
+   "i36"
+  ],
+  "3311": [
+   "i52"
+  ],
+  "3312": [
+   "i52"
+  ],
+  "3313": [
+   "i52"
+  ],
+  "3314": [
+   "i52"
+  ],
+  "3315": [
+   "i52"
+  ],
+  "3319": [
+   "i52"
+  ],
+  "3320": [
+   "i29"
+  ],
+  "3510": [
+   "i40.11.a",
+   "i40.11.b",
+   "i40.11.c",
+   "i40.11.d",
+   "i40.11.e",
+   "i40.11.f",
+   "i40.11.g",
+   "i40.11.h",
+   "i40.11.i",
+   "i40.11.j",
+   "i40.11.k",
+   "i40.11.l",
+   "i40.12",
+   "i40.13"
+  ],
+  "3520": [
+   "i40.2"
+  ],
+  "3530": [
+   "i40.3"
+  ],
+  "3600": [
+   "i41"
+  ],
+  "3700": [
+   "i41"
+  ],
+  "3811": [
+   "i90.1.a",
+   "i90.1.b",
+   "i90.1.c",
+   "i90.1.d",
+   "i90.1.e",
+   "i90.1.f",
+   "i90.1.g",
+   "i90.2.a",
+   "i90.2.b",
+   "i90.2.c",
+   "i90.3.a",
+   "i90.3.b",
+   "i90.4.a",
+   "i90.4.b",
+   "i90.5.a",
+   "i90.5.b",
+   "i90.5.c",
+   "i90.5.d",
+   "i90.5.e",
+   "i90.5.f"
+  ],
+  "3812": [
+   "i23.3",
+   "i90.1.a",
+   "i90.1.b",
+   "i90.1.c",
+   "i90.1.d",
+   "i90.1.e",
+   "i90.1.f",
+   "i90.1.g",
+   "i90.2.a",
+   "i90.2.b",
+   "i90.2.c",
+   "i90.3.a",
+   "i90.3.b",
+   "i90.4.a",
+   "i90.4.b",
+   "i90.5.a",
+   "i90.5.b",
+   "i90.5.c",
+   "i90.5.d",
+   "i90.5.e",
+   "i90.5.f"
+  ],
+  "3821": [
+   "i90.1.a",
+   "i90.1.b",
+   "i90.1.c",
+   "i90.1.d",
+   "i90.1.e",
+   "i90.1.f",
+   "i90.1.g",
+   "i90.2.a",
+   "i90.2.b",
+   "i90.2.c",
+   "i90.3.a",
+   "i90.3.b",
+   "i90.4.a",
+   "i90.4.b",
+   "i90.5.a",
+   "i90.5.b",
+   "i90.5.c",
+   "i90.5.d",
+   "i90.5.e",
+   "i90.5.f"
+  ],
+  "3822": [
+   "i23.3",
+   "i90.1.a",
+   "i90.1.b",
+   "i90.1.c",
+   "i90.1.d",
+   "i90.1.e",
+   "i90.1.f",
+   "i90.1.g",
+   "i90.2.a",
+   "i90.2.b",
+   "i90.2.c",
+   "i90.3.a",
+   "i90.3.b",
+   "i90.4.a",
+   "i90.4.b",
+   "i90.5.a",
+   "i90.5.b",
+   "i90.5.c",
+   "i90.5.d",
+   "i90.5.e",
+   "i90.5.f"
+  ],
+  "3830": [
+   "i37",
+   "i37.w.1"
+  ],
+  "3900": [
+   "i37"
+  ],
+  "4100": [
+   "i45"
+  ],
+  "4210": [
+   "i45"
+  ],
+  "4220": [
+   "i45"
+  ],
+  "4290": [
+   "i45"
+  ],
+  "4311": [
+   "i45"
+  ],
+  "4312": [
+   "i45"
+  ],
+  "4321": [
+   "i45"
+  ],
+  "4322": [
+   "i45"
+  ],
+  "4329": [
+   "i45"
+  ],
+  "4330": [
+   "i45"
+  ],
+  "4390": [
+   "i45"
+  ],
+  "4510": [
+   "i50.a"
+  ],
+  "4520": [
+   "i50.a"
+  ],
+  "4530": [
+   "i50.a"
+  ],
+  "4540": [
+   "i50.a"
+  ],
+  "4610": [
+   "i51"
+  ],
+  "4620": [
+   "i51"
+  ],
+  "4630": [
+   "i51"
+  ],
+  "4641": [
+   "i51"
+  ],
+  "4649": [
+   "i51"
+  ],
+  "4651": [
+   "i51"
+  ],
+  "4652": [
+   "i51"
+  ],
+  "4653": [
+   "i51"
+  ],
+  "4659": [
+   "i51"
+  ],
+  "4661": [
+   "i51"
+  ],
+  "4662": [
+   "i51"
+  ],
+  "4663": [
+   "i51"
+  ],
+  "4669": [
+   "i51"
+  ],
+  "4690": [
+   "i51"
+  ],
+  "4711": [
+   "i52"
+  ],
+  "4719": [
+   "i52"
+  ],
+  "4721": [
+   "i52"
+  ],
+  "4722": [
+   "i52"
+  ],
+  "4723": [
+   "i52"
+  ],
+  "4730": [
+   "i50.b"
+  ],
+  "4741": [
+   "i52"
+  ],
+  "4742": [
+   "i52"
+  ],
+  "4751": [
+   "i52"
+  ],
+  "4752": [
+   "i52"
+  ],
+  "4753": [
+   "i52"
+  ],
+  "4759": [
+   "i52"
+  ],
+  "4761": [
+   "i52"
+  ],
+  "4762": [
+   "i52"
+  ],
+  "4763": [
+   "i52"
+  ],
+  "4764": [
+   "i52"
+  ],
+  "4771": [
+   "i52"
+  ],
+  "4772": [
+   "i52"
+  ],
+  "4773": [
+   "i52"
+  ],
+  "4774": [
+   "i52"
+  ],
+  "4781": [
+   "i52"
+  ],
+  "4782": [
+   "i52"
+  ],
+  "4789": [
+   "i52"
+  ],
+  "4791": [
+   "i52"
+  ],
+  "4799": [
+   "i52"
+  ],
+  "4911": [
+   "i60.1"
+  ],
+  "4912": [
+   "i60.1"
+  ],
+  "4921": [
+   "i60.2"
+  ],
+  "4922": [
+   "i60.2"
+  ],
+  "4923": [
+   "i60.2"
+  ],
+  "4930": [
+   "i60.3"
+  ],
+  "5011": [
+   "i61.1"
+  ],
+  "5012": [
+   "i61.1"
+  ],
+  "5021": [
+   "i61.2"
+  ],
+  "5022": [
+   "i61.2"
+  ],
+  "5110": [
+   "i62"
+  ],
+  "5120": [
+   "i62"
+  ],
+  "5210": [
+   "i63"
+  ],
+  "5221": [
+   "i63"
+  ],
+  "5222": [
+   "i63"
+  ],
+  "5223": [
+   "i63"
+  ],
+  "5224": [
+   "i63"
+  ],
+  "5229": [
+   "i63"
+  ],
+  "5310": [
+   "i64"
+  ],
+  "5320": [
+   "i64"
+  ],
+  "5510": [
+   "i55"
+  ],
+  "5520": [
+   "i55"
+  ],
+  "5590": [
+   "i55"
+  ],
+  "5610": [
+   "i55"
+  ],
+  "5621": [
+   "i55"
+  ],
+  "5629": [
+   "i55"
+  ],
+  "5630": [
+   "i55"
+  ],
+  "5811": [
+   "i22",
+   "i72"
+  ],
+  "5812": [
+   "i22",
+   "i72"
+  ],
+  "5813": [
+   "i22",
+   "i72"
+  ],
+  "5819": [
+   "i22",
+   "i72"
+  ],
+  "5820": [
+   "i72"
+  ],
+  "5911": [
+   "i92"
+  ],
+  "5912": [
+   "i92"
+  ],
+  "5913": [
+   "i92"
+  ],
+  "5914": [
+   "i92"
+  ],
+  "5920": [
+   "i92"
+  ],
+  "6010": [
+   "i92"
+  ],
+  "6020": [
+   "i92"
+  ],
+  "6110": [
+   "i64"
+  ],
+  "6120": [
+   "i64"
+  ],
+  "6130": [
+   "i64"
+  ],
+  "6190": [
+   "i64"
+  ],
+  "6201": [
+   "i72"
+  ],
+  "6202": [
+   "i72"
+  ],
+  "6209": [
+   "i72"
+  ],
+  "631": [
+   "i72"
+  ],
+  "6311": [
+   "i72"
+  ],
+  "6312": [
+   "i72"
+  ],
+  "6391": [
+   "i92"
+  ],
+  "6399": [
+   "i93"
+  ],
+  "6411": [
+   "i65"
+  ],
+  "6419": [
+   "i65"
+  ],
+  "6420": [
+   "i65"
+  ],
+  "6430": [
+   "i65"
+  ],
+  "6491": [
+   "i65"
+  ],
+  "6492": [
+   "i65"
+  ],
+  "6499": [
+   "i65"
+  ],
+  "6511": [
+   "i66"
+  ],
+  "6512": [
+   "i66"
+  ],
+  "6520": [
+   "i66"
+  ],
+  "6530": [
+   "i66"
+  ],
+  "6611": [
+   "i67"
+  ],
+  "6612": [
+   "i67"
+  ],
+  "6619": [
+   "i67"
+  ],
+  "6621": [
+   "i67"
+  ],
+  "6622": [
+   "i67"
+  ],
+  "6629": [
+   "i67"
+  ],
+  "6630": [
+   "i67"
+  ],
+  "6810": [
+   "i70"
+  ],
+  "6820": [
+   "i70"
+  ],
+  "6910": [
+   "i74"
+  ],
+  "6920": [
+   "i74"
+  ],
+  "7010": [
+   "i74"
+  ],
+  "7020": [
+   "i74"
+  ],
+  "7110": [
+   "i74"
+  ],
+  "7120": [
+   "i74"
+  ],
+  "7210": [
+   "i73"
+  ],
+  "7220": [
+   "i73"
+  ],
+  "7310": [
+   "i74"
+  ],
+  "7320": [
+   "i74"
+  ],
+  "7410": [
+   "i74"
+  ],
+  "7420": [
+   "i74"
+  ],
+  "7490": [
+   "i74"
+  ],
+  "7500": [
+   "i85"
+  ],
+  "7710": [
+   "i71"
+  ],
+  "7721": [
+   "i71"
+  ],
+  "7722": [
+   "i71"
+  ],
+  "7729": [
+   "i71"
+  ],
+  "7730": [
+   "i71"
+  ],
+  "7740": [
+   "i65"
+  ],
+  "7810": [
+   "i74"
+  ],
+  "7820": [
+   "i74"
+  ],
+  "7830": [
+   "i74"
+  ],
+  "7911": [
+   "i63"
+  ],
+  "7912": [
+   "i63"
+  ],
+  "7990": [
+   "i63"
+  ],
+  "8010": [
+   "i74"
+  ],
+  "8020": [
+   "i74"
+  ],
+  "8030": [
+   "i74"
+  ],
+  "8110": [
+   "i70"
+  ],
+  "8121": [
+   "i74"
+  ],
+  "8129": [
+   "i74"
+  ],
+  "8130": [
+   "i92"
+  ],
+  "8211": [
+   "i74"
+  ],
+  "8219": [
+   "i74"
+  ],
+  "8220": [
+   "i74"
+  ],
+  "8230": [
+   "i74"
+  ],
+  "8291": [
+   "i74"
+  ],
+  "8292": [
+   "i74"
+  ],
+  "8299": [
+   "i74"
+  ],
+  "8411": [
+   "i75"
+  ],
+  "8412": [
+   "i75"
+  ],
+  "8413": [
+   "i75"
+  ],
+  "8421": [
+   "i75"
+  ],
+  "8422": [
+   "i75"
+  ],
+  "8423": [
+   "i75"
+  ],
+  "8430": [
+   "i75"
+  ],
+  "8510": [
+   "i80"
+  ],
+  "8521": [
+   "i80"
+  ],
+  "8522": [
+   "i80"
+  ],
+  "8530": [
+   "i80"
+  ],
+  "8541": [
+   "i80"
+  ],
+  "8542": [
+   "i80"
+  ],
+  "8549": [
+   "i80"
+  ],
+  "8550": [
+   "i80"
+  ],
+  "8610": [
+   "i85"
+  ],
+  "8620": [
+   "i85"
+  ],
+  "8690": [
+   "i85"
+  ],
+  "8710": [
+   "i85"
+  ],
+  "8720": [
+   "i85"
+  ],
+  "8730": [
+   "i85"
+  ],
+  "8790": [
+   "i85"
+  ],
+  "8810": [
+   "i85"
+  ],
+  "8890": [
+   "i85"
+  ],
+  "9000": [
+   "i92"
+  ],
+  "9101": [
+   "i92"
+  ],
+  "9102": [
+   "i92"
+  ],
+  "9103": [
+   "i92"
+  ],
+  "9200": [
+   "i92"
+  ],
+  "9311": [
+   "i92"
+  ],
+  "9312": [
+   "i92"
+  ],
+  "9319": [
+   "i92"
+  ],
+  "9321": [
+   "i92"
+  ],
+  "9329": [
+   "i92"
+  ],
+  "9411": [
+   "i91"
+  ],
+  "9412": [
+   "i91"
+  ],
+  "9420": [
+   "i91"
+  ],
+  "9491": [
+   "i91"
+  ],
+  "9492": [
+   "i91"
+  ],
+  "9499": [
+   "i91"
+  ],
+  "9511": [
+   "i72"
+  ],
+  "9512": [
+   "i52"
+  ],
+  "9521": [
+   "i52"
+  ],
+  "9522": [
+   "i52"
+  ],
+  "9523": [
+   "i52"
+  ],
+  "9524": [
+   "i52"
+  ],
+  "9529": [
+   "i52"
+  ],
+  "9601": [
+   "i93"
+  ],
+  "9602": [
+   "i93"
+  ],
+  "9603": [
+   "i93"
+  ],
+  "9609": [
+   "i93"
+  ],
+  "9700": [
+   "i95"
+  ],
+  "9810": [
+   "i95"
+  ],
+  "9820": [
+   "i95"
+  ],
+  "9900": [
+   "i99"
+  ]
+ },
+ "exiobase_sectors": {
+  "i01.a": "Cultivation of paddy rice",
+  "i01.b": "Cultivation of wheat",
+  "i01.c": "Cultivation of cereal grains nec",
+  "i01.d": "Cultivation of vegetables, fruit, nuts",
+  "i01.e": "Cultivation of oil seeds",
+  "i01.f": "Cultivation of sugar cane, sugar beet",
+  "i01.g": "Cultivation of plant-based fibers",
+  "i01.h": "Cultivation of crops nec",
+  "i01.i": "Cattle farming",
+  "i01.j": "Pigs farming",
+  "i01.k": "Poultry farming",
+  "i01.l": "Meat animals nec",
+  "i01.m": "Animal products nec",
+  "i01.n": "Raw milk",
+  "i01.o": "Wool, silk-worm cocoons",
+  "i01.w.1": "Manure treatment (conventional), storage and land application",
+  "i01.w.2": "Manure treatment (biogas), storage and land application",
+  "i02": "Forestry, logging and related service activities",
+  "i05": "Fishing, operating of fish hatcheries and fish farms; service activities incidental to fishing",
+  "i10": "Mining of coal and lignite; extraction of peat",
+  "i11.a": "Extraction of crude petroleum and services related to crude oil extraction, excluding surveying",
+  "i11.b": "Extraction of natural gas and services related to natural gas extraction, excluding surveying",
+  "i11.c": "Extraction, liquefaction, and regasification of other petroleum and gaseous materials",
+  "i12": "Mining of uranium and thorium ores",
+  "i13.1": "Mining of iron ores",
+  "i13.20.11": "Mining of copper ores and concentrates",
+  "i13.20.12": "Mining of nickel ores and concentrates",
+  "i13.20.13": "Mining of aluminium ores and concentrates",
+  "i13.20.14": "Mining of precious metal ores and concentrates",
+  "i13.20.15": "Mining of lead, zinc and tin ores and concentrates",
+  "i13.20.16": "Mining of other non-ferrous metal ores and concentrates",
+  "i14.1": "Quarrying of stone",
+  "i14.2": "Quarrying of sand and clay",
+  "i14.3": "Mining of chemical and fertilizer minerals, production of salt, other mining and quarrying n.e.c.",
+  "i15.a": "Processing of meat cattle",
+  "i15.b": "Processing of meat pigs",
+  "i15.c": "Processing of meat poultry",
+  "i15.d": "Production of meat products nec",
+  "i15.e": "Processing vegetable oils and fats",
+  "i15.f": "Processing of dairy products",
+  "i15.g": "Processed rice",
+  "i15.h": "Sugar refining",
+  "i15.i": "Processing of Food products nec",
+  "i15.j": "Manufacture of beverages",
+  "i15.k": "Manufacture of fish products",
+  "i16": "Manufacture of tobacco products",
+  "i17": "Manufacture of textiles",
+  "i18": "Manufacture of wearing apparel; dressing and dyeing of fur",
+  "i19": "Tanning and dressing of leather; manufacture of luggage, handbags, saddlery, harness and footwear",
+  "i20": "Manufacture of wood and of products of wood and cork, except furniture; manufacture of articles of straw and plaiting materials",
+  "i20.w": "Re-processing of secondary wood material into new wood material",
+  "i21.1": "Pulp",
+  "i21.w.1": "Re-processing of secondary paper into new pulp",
+  "i21.2": "Paper",
+  "i22": "Publishing, printing and reproduction of recorded media",
+  "i23.1": "Manufacture of coke oven products",
+  "i23.2": "Petroleum Refinery",
+  "i23.3": "Processing of nuclear fuel",
+  "i24.a": "Plastics, basic",
+  "i24.a.w": "Re-processing of secondary plastic into new plastic",
+  "i24.b": "N-fertiliser",
+  "i24.c": "P- and other fertiliser",
+  "i24.d": "Chemicals nec",
+  "i25": "Manufacture of rubber and plastic products",
+  "i26.a": "Manufacture of glass and glass products",
+  "i26.a.w": "Re-processing of secondary glass into new glass",
+  "i26.b": "Manufacture of ceramic goods",
+  "i26.c": "Manufacture of bricks, tiles and construction products, in baked clay",
+  "i26.d": "Manufacture of cement, lime and plaster",
+  "i26.d.w": "Re-processing of ash into clinker",
+  "i26.e": "Manufacture of other non-metallic mineral products n.e.c.",
+  "i27.a": "Manufacture of basic iron and steel and of ferro-alloys and first products thereof",
+  "i27.a.w": "Re-processing of secondary steel into new steel",
+  "i27.41": "Precious metals production",
+  "i27.41.w": "Re-processing of secondary preciuos metals into new preciuos metals",
+  "i27.42": "Aluminium production",
+  "i27.42.w": "Re-processing of secondary aluminium into new aluminium",
+  "i27.43": "Lead, zinc and tin production",
+  "i27.43.w": "Re-processing of secondary lead into new lead, zinc and tin",
+  "i27.44": "Copper production",
+  "i27.44.w": "Re-processing of secondary copper into new copper",
+  "i27.45": "Other non-ferrous metal production",
+  "i27.45.w": "Re-processing of secondary other non-ferrous metals into new other non-ferrous metals",
+  "i27.5": "Casting of metals",
+  "i28": "Manufacture of fabricated metal products, except machinery and equipment",
+  "i29": "Manufacture of machinery and equipment n.e.c.",
+  "i30": "Manufacture of office machinery and computers",
+  "i31": "Manufacture of electrical machinery and apparatus n.e.c.",
+  "i32": "Manufacture of radio, television and communication equipment and apparatus",
+  "i33": "Manufacture of medical, precision and optical instruments, watches and clocks",
+  "i34": "Manufacture of motor vehicles, trailers and semi-trailers",
+  "i35": "Manufacture of other transport equipment",
+  "i36": "Manufacture of furniture; manufacturing n.e.c.",
+  "i37": "Recycling of waste and scrap",
+  "i37.w.1": "Recycling of bottles by direct reuse",
+  "i40.11.a": "Production of electricity by coal",
+  "i40.11.b": "Production of electricity by gas",
+  "i40.11.c": "Production of electricity by nuclear",
+  "i40.11.d": "Production of electricity by hydro",
+  "i40.11.e": "Production of electricity by wind",
+  "i40.11.f": "Production of electricity by petroleum and other oil derivatives",
+  "i40.11.g": "Production of electricity by biomass and waste",
+  "i40.11.h": "Production of electricity by solar photovoltaic",
+  "i40.11.i": "Production of electricity by solar thermal",
+  "i40.11.j": "Production of electricity by tide, wave, ocean",
+  "i40.11.k": "Production of electricity by Geothermal",
+  "i40.11.l": "Production of electricity nec",
+  "i40.12": "Transmission of electricity",
+  "i40.13": "Distribution and trade of electricity",
+  "i40.2": "Manufacture of gas; distribution of gaseous fuels through mains",
+  "i40.3": "Steam and hot water supply",
+  "i41": "Collection, purification and distribution of water",
+  "i45": "Construction",
+  "i45.w": "Re-processing of secondary construction material into aggregates",
+  "i50.a": "Sale, maintenance, repair of motor vehicles, motor vehicles parts, motorcycles, motor cycles parts and accessoiries",
+  "i50.b": "Retail sale of automotive fuel",
+  "i51": "Wholesale trade and commission trade, except of motor vehicles and motorcycles",
+  "i52": "Retail trade, except of motor vehicles and motorcycles; repair of personal and household goods",
+  "i55": "Hotels and restaurants",
+  "i60.1": "Transport via railways",
+  "i60.2": "Other land transport",
+  "i60.3": "Transport via pipelines",
+  "i61.1": "Sea and coastal water transport",
+  "i61.2": "Inland water transport",
+  "i62": "Air transport",
+  "i63": "Supporting and auxiliary transport activities; activities of travel agencies",
+  "i64": "Post and telecommunications",
+  "i65": "Financial intermediation, except insurance and pension funding",
+  "i66": "Insurance and pension funding, except compulsory social security",
+  "i67": "Activities auxiliary to financial intermediation",
+  "i70": "Real estate activities",
+  "i71": "Renting of machinery and equipment without operator and of personal and household goods",
+  "i72": "Computer and related activities",
+  "i73": "Research and development",
+  "i74": "Other business activities",
+  "i75": "Public administration and defence; compulsory social security",
+  "i80": "Education",
+  "i85": "Health and social work",
+  "i90.1.a": "Incineration of waste: Food",
+  "i90.1.b": "Incineration of waste: Paper",
+  "i90.1.c": "Incineration of waste: Plastic",
+  "i90.1.d": "Incineration of waste: Metals and Inert materials",
+  "i90.1.e": "Incineration of waste: Textiles",
+  "i90.1.f": "Incineration of waste: Wood",
+  "i90.1.g": "Incineration of waste: Oil/Hazardous waste",
+  "i90.2.a": "Biogasification of food waste, incl. land application",
+  "i90.2.b": "Biogasification of paper, incl. land application",
+  "i90.2.c": "Biogasification of sewage slugde, incl. land application",
+  "i90.3.a": "Composting of food waste, incl. land application",
+  "i90.3.b": "Composting of paper and wood, incl. land application",
+  "i90.4.a": "Waste water treatment, food",
+  "i90.4.b": "Waste water treatment, other",
+  "i90.5.a": "Landfill of waste: Food",
+  "i90.5.b": "Landfill of waste: Paper",
+  "i90.5.c": "Landfill of waste: Plastic",
+  "i90.5.d": "Landfill of waste: Inert/metal/hazardous",
+  "i90.5.e": "Landfill of waste: Textiles",
+  "i90.5.f": "Landfill of waste: Wood",
+  "i91": "Activities of membership organisation n.e.c.",
+  "i92": "Recreational, cultural and sporting activities",
+  "i93": "Other service activities",
+  "i95": "Private households with employed persons",
+  "i99": "Extra-territorial organizations and bodies"
+ },
+ "exiobase_products": {
+  "p01.a": "Paddy rice",
+  "p01.b": "Wheat",
+  "p01.c": "Cereal grains nec",
+  "p01.d": "Vegetables, fruit, nuts",
+  "p01.e": "Oil seeds",
+  "p01.f": "Sugar cane, sugar beet",
+  "p01.g": "Plant-based fibers",
+  "p01.h": "Crops nec",
+  "p01.i": "Cattle",
+  "p01.j": "Pigs",
+  "p01.k": "Poultry",
+  "p01.l": "Meat animals nec",
+  "p01.m": "Animal products nec",
+  "p01.n": "Raw milk",
+  "p01.o": "Wool, silk-worm cocoons",
+  "p01.w.1": "Manure (conventional treatment)",
+  "p01.w.2": "Manure (biogas treatment)",
+  "p02": "Products of forestry, logging and related services",
+  "p05": "Fish and other fishing products; services incidental of fishing",
+  "p10.a": "Anthracite",
+  "p10.b": "Coking Coal",
+  "p10.c": "Other Bituminous Coal",
+  "p10.d": "Sub-Bituminous Coal",
+  "p10.e": "Patent Fuel",
+  "p10.f": "Lignite/Brown Coal",
+  "p10.g": "BKB/Peat Briquettes",
+  "p10.h": "Peat",
+  "p11.a": "Crude petroleum and services related to crude oil extraction, excluding surveying",
+  "p11.b": "Natural gas and services related to natural gas extraction, excluding surveying",
+  "p11.b.1": "Natural Gas Liquids",
+  "p11.c": "Other Hydrocarbons",
+  "p12": "Uranium and thorium ores",
+  "p13.1": "Iron ores",
+  "p13.20.11": "Copper ores and concentrates",
+  "p13.20.12": "Nickel ores and concentrates",
+  "p13.20.13": "Aluminium ores and concentrates",
+  "p13.20.14": "Precious metal ores and concentrates",
+  "p13.20.15": "Lead, zinc and tin ores and concentrates",
+  "p13.20.16": "Other non-ferrous metal ores and concentrates",
+  "p14.1": "Stone",
+  "p14.2": "Sand and clay",
+  "p14.3": "Chemical and fertilizer minerals, salt and other mining and quarrying products n.e.c.",
+  "p15.a": "Products of meat cattle",
+  "p15.b": "Products of meat pigs",
+  "p15.c": "Products of meat poultry",
+  "p15.d": "Meat products nec",
+  "p15.e": "products of Vegetable oils and fats",
+  "p15.f": "Dairy products",
+  "p15.g": "Processed rice",
+  "p15.h": "Sugar",
+  "p15.i": "Food products nec",
+  "p15.j": "Beverages",
+  "p15.k": "Fish products",
+  "p16": "Tobacco products",
+  "p17": "Textiles",
+  "p18": "Wearing apparel; furs",
+  "p19": "Leather and leather products",
+  "p20": "Wood and products of wood and cork (except furniture); articles of straw and plaiting materials",
+  "p20.w": "Wood material for treatment, Re-processing of secondary wood material into new wood material",
+  "p21.1": "Pulp",
+  "p21.w.1": "Secondary paper for treatment, Re-processing of secondary paper into new pulp",
+  "p21.2": "Paper and paper products",
+  "p22": "Printed matter and recorded media",
+  "p23.1.a": "Coke Oven Coke",
+  "p23.1.b": "Gas Coke",
+  "p23.1.c": "Coal Tar",
+  "p23.20.a": "Motor Gasoline",
+  "p23.20.b": "Aviation Gasoline",
+  "p23.20.c": "Gasoline Type Jet Fuel",
+  "p23.20.d": "Kerosene Type Jet Fuel",
+  "p23.20.e": "Kerosene",
+  "p23.20.f": "Gas/Diesel Oil",
+  "p23.20.g": "Heavy Fuel Oil",
+  "p23.20.h": "Refinery Gas",
+  "p23.20.i": "Liquefied Petroleum Gases (LPG)",
+  "p23.20.j": "Refinery Feedstocks",
+  "p23.20.k": "Ethane",
+  "p23.20.l": "Naphtha",
+  "p23.20.m": "White Spirit & SBP",
+  "p23.20.n": "Lubricants",
+  "p23.20.o": "Bitumen",
+  "p23.20.p": "Paraffin Waxes",
+  "p23.20.q": "Petroleum Coke",
+  "p23.20.r": "Non-specified Petroleum Products",
+  "p23.3": "Nuclear fuel",
+  "p24.a": "Plastics, basic",
+  "p24.a.w": "Secondary plastic for treatment, Re-processing of secondary plastic into new plastic",
+  "p24.b": "N-fertiliser",
+  "p24.c": "P- and other fertiliser",
+  "p24.d": "Chemicals nec",
+  "p24.e": "Charcoal",
+  "p24.f": "Additives/Blending Components",
+  "p24.g": "Biogasoline",
+  "p24.h": "Biodiesels",
+  "p24.i": "Other Liquid Biofuels",
+  "p25": "Rubber and plastic products",
+  "p26.a": "Glass and glass products",
+  "p26.a.w": "Secondary glass for treatment, Re-processing of secondary glass into new glass",
+  "p26.b": "Ceramic goods",
+  "p26.c": "Bricks, tiles and construction products, in baked clay",
+  "p26.d": "Cement, lime and plaster",
+  "p26.d.w": "Ash for treatment, Re-processing of ash into clinker",
+  "p26.e": "Other non-metallic mineral products",
+  "p27.a": "Basic iron and steel and of ferro-alloys and first products thereof",
+  "p27.a.w": "Secondary steel for treatment, Re-processing of secondary steel into new steel",
+  "p27.41": "Precious metals",
+  "p27.41.w": "Secondary preciuos metals for treatment, Re-processing of secondary preciuos metals into new preciuos metals",
+  "p27.42": "Aluminium and aluminium products",
+  "p27.42.w": "Secondary aluminium for treatment, Re-processing of secondary aluminium into new aluminium",
+  "p27.43": "Lead, zinc and tin and products thereof",
+  "p27.43.w": "Secondary lead for treatment, Re-processing of secondary lead into new lead",
+  "p27.44": "Copper products",
+  "p27.44.w": "Secondary copper for treatment, Re-processing of secondary copper into new copper",
+  "p27.45": "Other non-ferrous metal products",
+  "p27.45.w": "Secondary other non-ferrous metals for treatment, Re-processing of secondary other non-ferrous metals into new other non-ferrous metals",
+  "p27.5": "Foundry work services",
+  "p28": "Fabricated metal products, except machinery and equipment",
+  "p29": "Machinery and equipment n.e.c.",
+  "p30": "Office machinery and computers",
+  "p31": "Electrical machinery and apparatus n.e.c.",
+  "p32": "Radio, television and communication equipment and apparatus",
+  "p33": "Medical, precision and optical instruments, watches and clocks",
+  "p34": "Motor vehicles, trailers and semi-trailers",
+  "p35": "Other transport equipment",
+  "p36": "Furniture; other manufactured goods n.e.c.",
+  "p37": "Secondary raw materials",
+  "p37.w.1": "Bottles for treatment, Recycling of bottles by direct reuse",
+  "p40.11.a": "Electricity by coal",
+  "p40.11.b": "Electricity by gas",
+  "p40.11.c": "Electricity by nuclear",
+  "p40.11.d": "Electricity by hydro",
+  "p40.11.e": "Electricity by wind",
+  "p40.11.f": "Electricity by petroleum and other oil derivatives",
+  "p40.11.g": "Electricity by biomass and waste",
+  "p40.11.h": "Electricity by solar photovoltaic",
+  "p40.11.i": "Electricity by solar thermal",
+  "p40.11.j": "Electricity by tide, wave, ocean",
+  "p40.11.k": "Electricity by Geothermal",
+  "p40.11.l": "Electricity nec",
+  "p40.12": "Transmission services of electricity",
+  "p40.13": "Distribution and trade services of electricity",
+  "p40.2.a": "Coke oven gas",
+  "p40.2.b": "Blast Furnace Gas",
+  "p40.2.c": "Oxygen Steel Furnace Gas",
+  "p40.2.d": "Gas Works Gas",
+  "p40.2.e": "Biogas",
+  "p40.2.1": "Distribution services of gaseous fuels through mains",
+  "p40.3": "Steam and hot water supply services",
+  "p41": "Collected and purified water, distribution services of water",
+  "p45": "Construction work",
+  "p45.w": "Secondary construction material for treatment, Re-processing of secondary construction material into aggregates",
+  "p50.a": "Sale, maintenance, repair of motor vehicles, motor vehicles parts, motorcycles, motor cycles parts and accessoiries",
+  "p50.b": "Retail trade services of motor fuel",
+  "p51": "Wholesale trade and commission trade services, except of motor vehicles and motorcycles",
+  "p52": "Retail  trade services, except of motor vehicles and motorcycles; repair services of personal and household goods",
+  "p55": "Hotel and restaurant services",
+  "p60.1": "Railway transportation services",
+  "p60.2": "Other land transportation services",
+  "p60.3": "Transportation services via pipelines",
+  "p61.1": "Sea and coastal water transportation services",
+  "p61.2": "Inland water transportation services",
+  "p62": "Air transport services",
+  "p63": "Supporting and auxiliary transport services; travel agency services",
+  "p64": "Post and telecommunication services",
+  "p65": "Financial intermediation services, except insurance and pension funding services",
+  "p66": "Insurance and pension funding services, except compulsory social security services",
+  "p67": "Services auxiliary to financial intermediation",
+  "p70": "Real estate services",
+  "p71": "Renting services of machinery and equipment without operator and of personal and household goods",
+  "p72": "Computer and related services",
+  "p73": "Research and development services",
+  "p74": "Other business services",
+  "p75": "Public administration and defence services; compulsory social security services",
+  "p80": "Education services",
+  "p85": "Health and social work services",
+  "p90.1.a": "Food waste for treatment: incineration",
+  "p90.1.b": "Paper waste for treatment: incineration",
+  "p90.1.c": "Plastic waste for treatment: incineration",
+  "p90.1.d": "Intert/metal waste for treatment: incineration",
+  "p90.1.e": "Textiles waste for treatment: incineration",
+  "p90.1.f": "Wood waste for treatment: incineration",
+  "p90.1.g": "Oil/hazardous waste for treatment: incineration",
+  "p90.2.a": "Food waste for treatment: biogasification and land application",
+  "p90.2.b": "Paper waste for treatment: biogasification and land application",
+  "p90.2.c": "Sewage sludge for treatment: biogasification and land application",
+  "p90.3.a": "Food waste for treatment: composting and land application",
+  "p90.3.b": "Paper and wood waste for treatment: composting and land application",
+  "p90.4.a": "Food waste for treatment: waste water treatment",
+  "p90.4.b": "Other waste for treatment: waste water treatment",
+  "p90.5.a": "Food waste for treatment: landfill",
+  "p90.5.b": "Paper for treatment: landfill",
+  "p90.5.c": "Plastic waste for treatment: landfill",
+  "p90.5.d": "Inert/metal/hazardous waste for treatment: landfill",
+  "p90.5.e": "Textiles waste for treatment: landfill",
+  "p90.5.f": "Wood waste for treatment: landfill",
+  "p91": "Membership organisation services n.e.c.",
+  "p92": "Recreational, cultural and sporting services",
+  "p93": "Other services",
+  "p95": "Private households with employed persons",
+  "p99": "Extra-territorial organizations and bodies"
+ },
+ "industry_products": {
+  "i01.a": [
+   "p01.a"
+  ],
+  "i01.b": [
+   "p01.b"
+  ],
+  "i01.c": [
+   "p01.c"
+  ],
+  "i01.d": [
+   "p01.d"
+  ],
+  "i01.e": [
+   "p01.e"
+  ],
+  "i01.f": [
+   "p01.f"
+  ],
+  "i01.g": [
+   "p01.g"
+  ],
+  "i01.h": [
+   "p01.h"
+  ],
+  "i01.i": [
+   "p01.i"
+  ],
+  "i01.j": [
+   "p01.j"
+  ],
+  "i01.k": [
+   "p01.k"
+  ],
+  "i01.l": [
+   "p01.l"
+  ],
+  "i01.m": [
+   "p01.m"
+  ],
+  "i01.n": [
+   "p01.n"
+  ],
+  "i01.o": [
+   "p01.o"
+  ],
+  "i01.w.1": [
+   "p01.w.1"
+  ],
+  "i01.w.2": [
+   "p01.w.2"
+  ],
+  "i02": [
+   "p02"
+  ],
+  "i05": [
+   "p05"
+  ],
+  "i10": [
+   "p10.a",
+   "p10.b",
+   "p10.c",
+   "p10.d",
+   "p10.e",
+   "p10.f",
+   "p10.g",
+   "p10.h"
+  ],
+  "i11.a": [
+   "p11.a"
+  ],
+  "i11.b": [
+   "p11.b",
+   "p11.b.1"
+  ],
+  "i11.c": [
+   "p11.c"
+  ],
+  "i12": [
+   "p12"
+  ],
+  "i13.1": [
+   "p13.1"
+  ],
+  "i13.20.11": [
+   "p13.20.11"
+  ],
+  "i13.20.12": [
+   "p13.20.12"
+  ],
+  "i13.20.13": [
+   "p13.20.13"
+  ],
+  "i13.20.14": [
+   "p13.20.14"
+  ],
+  "i13.20.15": [
+   "p13.20.15"
+  ],
+  "i13.20.16": [
+   "p13.20.16"
+  ],
+  "i14.1": [
+   "p14.1"
+  ],
+  "i14.2": [
+   "p14.2"
+  ],
+  "i14.3": [
+   "p14.3"
+  ],
+  "i15.a": [
+   "p15.a"
+  ],
+  "i15.b": [
+   "p15.b"
+  ],
+  "i15.c": [
+   "p15.c"
+  ],
+  "i15.d": [
+   "p15.d"
+  ],
+  "i15.e": [
+   "p15.e"
+  ],
+  "i15.f": [
+   "p15.f"
+  ],
+  "i15.g": [
+   "p15.g"
+  ],
+  "i15.h": [
+   "p15.h"
+  ],
+  "i15.i": [
+   "p15.i"
+  ],
+  "i15.j": [
+   "p15.j"
+  ],
+  "i15.k": [
+   "p15.k"
+  ],
+  "i16": [
+   "p16"
+  ],
+  "i17": [
+   "p17"
+  ],
+  "i18": [
+   "p18"
+  ],
+  "i19": [
+   "p19"
+  ],
+  "i20": [
+   "p20"
+  ],
+  "i20.w": [
+   "p20.w"
+  ],
+  "i21.1": [
+   "p21.1"
+  ],
+  "i21.w.1": [
+   "p21.w.1"
+  ],
+  "i21.2": [
+   "p21.2"
+  ],
+  "i22": [
+   "p22"
+  ],
+  "i23.1": [
+   "p23.1.a",
+   "p23.1.b",
+   "p23.1.c"
+  ],
+  "i23.2": [
+   "p23.20.a",
+   "p23.20.b",
+   "p23.20.c",
+   "p23.20.d",
+   "p23.20.e",
+   "p23.20.f",
+   "p23.20.g",
+   "p23.20.h",
+   "p23.20.i",
+   "p23.20.j",
+   "p23.20.k",
+   "p23.20.l",
+   "p23.20.m",
+   "p23.20.n",
+   "p23.20.o",
+   "p23.20.p",
+   "p23.20.q",
+   "p23.20.r"
+  ],
+  "i23.3": [
+   "p23.3"
+  ],
+  "i24.a": [
+   "p24.a"
+  ],
+  "i24.a.w": [
+   "p24.a.w"
+  ],
+  "i24.b": [
+   "p24.b"
+  ],
+  "i24.c": [
+   "p24.c"
+  ],
+  "i24.d": [
+   "p24.d",
+   "p24.e",
+   "p24.f",
+   "p24.g",
+   "p24.h",
+   "p24.i"
+  ],
+  "i25": [
+   "p25"
+  ],
+  "i26.a": [
+   "p26.a"
+  ],
+  "i26.a.w": [
+   "p26.a.w"
+  ],
+  "i26.b": [
+   "p26.b"
+  ],
+  "i26.c": [
+   "p26.c"
+  ],
+  "i26.d": [
+   "p26.d"
+  ],
+  "i26.d.w": [
+   "p26.d.w"
+  ],
+  "i26.e": [
+   "p26.e"
+  ],
+  "i27.a": [
+   "p27.a"
+  ],
+  "i27.a.w": [
+   "p27.a.w"
+  ],
+  "i27.41": [
+   "p27.41"
+  ],
+  "i27.41.w": [
+   "p27.41.w"
+  ],
+  "i27.42": [
+   "p27.42"
+  ],
+  "i27.42.w": [
+   "p27.42.w"
+  ],
+  "i27.43": [
+   "p27.43"
+  ],
+  "i27.43.w": [
+   "p27.43.w"
+  ],
+  "i27.44": [
+   "p27.44"
+  ],
+  "i27.44.w": [
+   "p27.44.w"
+  ],
+  "i27.45": [
+   "p27.45"
+  ],
+  "i27.45.w": [
+   "p27.45.w"
+  ],
+  "i27.5": [
+   "p27.5"
+  ],
+  "i28": [
+   "p28"
+  ],
+  "i29": [
+   "p29"
+  ],
+  "i30": [
+   "p30"
+  ],
+  "i31": [
+   "p31"
+  ],
+  "i32": [
+   "p32"
+  ],
+  "i33": [
+   "p33"
+  ],
+  "i34": [
+   "p34"
+  ],
+  "i35": [
+   "p35"
+  ],
+  "i36": [
+   "p36"
+  ],
+  "i37": [
+   "p37"
+  ],
+  "i37.w.1": [
+   "p37.w.1"
+  ],
+  "i40.11.a": [
+   "p40.11.a"
+  ],
+  "i40.11.b": [
+   "p40.11.b"
+  ],
+  "i40.11.c": [
+   "p40.11.c"
+  ],
+  "i40.11.d": [
+   "p40.11.d"
+  ],
+  "i40.11.e": [
+   "p40.11.e"
+  ],
+  "i40.11.f": [
+   "p40.11.f"
+  ],
+  "i40.11.g": [
+   "p40.11.g"
+  ],
+  "i40.11.h": [
+   "p40.11.h"
+  ],
+  "i40.11.i": [
+   "p40.11.i"
+  ],
+  "i40.11.j": [
+   "p40.11.j"
+  ],
+  "i40.11.k": [
+   "p40.11.k"
+  ],
+  "i40.11.l": [
+   "p40.11.l"
+  ],
+  "i40.12": [
+   "p40.12"
+  ],
+  "i40.13": [
+   "p40.13"
+  ],
+  "i40.2": [
+   "p40.2.a",
+   "p40.2.b",
+   "p40.2.c",
+   "p40.2.d",
+   "p40.2.e",
+   "p40.2.1"
+  ],
+  "i40.3": [
+   "p40.3"
+  ],
+  "i41": [
+   "p41"
+  ],
+  "i45": [
+   "p45"
+  ],
+  "i45.w": [
+   "p45.w"
+  ],
+  "i50.a": [
+   "p50.a"
+  ],
+  "i50.b": [
+   "p50.b"
+  ],
+  "i51": [
+   "p51"
+  ],
+  "i52": [
+   "p52"
+  ],
+  "i55": [
+   "p55"
+  ],
+  "i60.1": [
+   "p60.1"
+  ],
+  "i60.2": [
+   "p60.2"
+  ],
+  "i60.3": [
+   "p60.3"
+  ],
+  "i61.1": [
+   "p61.1"
+  ],
+  "i61.2": [
+   "p61.2"
+  ],
+  "i62": [
+   "p62"
+  ],
+  "i63": [
+   "p63"
+  ],
+  "i64": [
+   "p64"
+  ],
+  "i65": [
+   "p65"
+  ],
+  "i66": [
+   "p66"
+  ],
+  "i67": [
+   "p67"
+  ],
+  "i70": [
+   "p70"
+  ],
+  "i71": [
+   "p71"
+  ],
+  "i72": [
+   "p72"
+  ],
+  "i73": [
+   "p73"
+  ],
+  "i74": [
+   "p74"
+  ],
+  "i75": [
+   "p75"
+  ],
+  "i80": [
+   "p80"
+  ],
+  "i85": [
+   "p85"
+  ],
+  "i90.1.a": [
+   "p90.1.a"
+  ],
+  "i90.1.b": [
+   "p90.1.b"
+  ],
+  "i90.1.c": [
+   "p90.1.c"
+  ],
+  "i90.1.d": [
+   "p90.1.d"
+  ],
+  "i90.1.e": [
+   "p90.1.e"
+  ],
+  "i90.1.f": [
+   "p90.1.f"
+  ],
+  "i90.1.g": [
+   "p90.1.g"
+  ],
+  "i90.2.a": [
+   "p90.2.a"
+  ],
+  "i90.2.b": [
+   "p90.2.b"
+  ],
+  "i90.2.c": [
+   "p90.2.c"
+  ],
+  "i90.3.a": [
+   "p90.3.a"
+  ],
+  "i90.3.b": [
+   "p90.3.b"
+  ],
+  "i90.4.a": [
+   "p90.4.a"
+  ],
+  "i90.4.b": [
+   "p90.4.b"
+  ],
+  "i90.5.a": [
+   "p90.5.a"
+  ],
+  "i90.5.b": [
+   "p90.5.b"
+  ],
+  "i90.5.c": [
+   "p90.5.c"
+  ],
+  "i90.5.d": [
+   "p90.5.d"
+  ],
+  "i90.5.e": [
+   "p90.5.e"
+  ],
+  "i90.5.f": [
+   "p90.5.f"
+  ],
+  "i91": [
+   "p91"
+  ],
+  "i92": [
+   "p92"
+  ],
+  "i93": [
+   "p93"
+  ],
+  "i95": [
+   "p95"
+  ],
+  "i99": [
+   "p99"
+  ]
+ },
+ "exiobase_regions": {
+  "AT": "Austria",
+  "AU": "Australia",
+  "BE": "Belgium",
+  "BG": "Bulgaria",
+  "BR": "Brazil",
+  "CA": "Canada",
+  "CH": "Switzerland",
+  "CN": "China",
+  "CY": "Cyprus",
+  "CZ": "Czech Republic",
+  "DE": "Germany",
+  "DK": "Denmark",
+  "EE": "Estonia",
+  "ES": "Spain",
+  "FI": "Finland",
+  "FR": "France",
+  "GB": "United Kingdom",
+  "GR": "Greece",
+  "HU": "Hungary",
+  "ID": "Indonesia",
+  "IE": "Ireland",
+  "IN": "India",
+  "IT": "Italy",
+  "JP": "Japan",
+  "KR": "South Korea",
+  "LT": "Lithuania",
+  "LU": "Luxembourg",
+  "LV": "Latvia",
+  "MT": "Malta",
+  "MX": "Mexico",
+  "NL": "Netherlands",
+  "NO": "Norway",
+  "PL": "Poland",
+  "PT": "Portugal",
+  "RO": "Romania",
+  "RU": "Russian Federation",
+  "SE": "Sweden",
+  "SI": "Slovenia",
+  "SK": "Slovak Republic",
+  "TR": "Turkey",
+  "TW": "Taiwan",
+  "US": "United States",
+  "WA": "RoW Asia and Pacific",
+  "WE": "RoW Europe",
+  "WF": "RoW Africa",
+  "WL": "RoW America",
+  "WM": "RoW Middle East",
+  "ZA": "South Africa"
+ },
+ "location_to_regions": {
+  "AE": [
+   "WM"
+  ],
+  "AL": [
+   "WE"
+  ],
+  "AM": [
+   "WE"
+  ],
+  "AO": [
+   "WF"
+  ],
+  "AR": [
+   "WL"
+  ],
+  "AT": [
+   "AT"
+  ],
+  "AU": [
+   "AU"
+  ],
+  "AZ": [
+   "WE"
+  ],
+  "BA": [
+   "WE"
+  ],
+  "BD": [
+   "WA"
+  ],
+  "BE": [
+   "BE"
+  ],
+  "BG": [
+   "BG"
+  ],
+  "BH": [
+   "WM"
+  ],
+  "BJ": [
+   "WF"
+  ],
+  "BN": [
+   "WA"
+  ],
+  "BO": [
+   "WL"
+  ],
+  "BR": [
+   "BR"
+  ],
+  "BR-AC": [
+   "BR"
+  ],
+  "BR-AL": [
+   "BR"
+  ],
+  "BR-AM": [
+   "BR"
+  ],
+  "BR-AP": [
+   "BR"
+  ],
+  "BR-BA": [
+   "BR"
+  ],
+  "BR-CE": [
+   "BR"
+  ],
+  "BR-DF": [
+   "BR"
+  ],
+  "BR-ES": [
+   "BR"
+  ],
+  "BR-GO": [
+   "BR"
+  ],
+  "BR-MA": [
+   "BR"
+  ],
+  "BR-MG": [
+   "BR"
+  ],
+  "BR-MS": [
+   "BR"
+  ],
+  "BR-MT": [
+   "BR"
+  ],
+  "BR-Mid-western grid": [
+   "BR"
+  ],
+  "BR-North-eastern grid": [
+   "BR"
+  ],
+  "BR-Northern grid": [
+   "BR"
+  ],
+  "BR-PA": [
+   "BR"
+  ],
+  "BR-PB": [
+   "BR"
+  ],
+  "BR-PE": [
+   "BR"
+  ],
+  "BR-PI": [
+   "BR"
+  ],
+  "BR-PR": [
+   "BR"
+  ],
+  "BR-RJ": [
+   "BR"
+  ],
+  "BR-RN": [
+   "BR"
+  ],
+  "BR-RO": [
+   "BR"
+  ],
+  "BR-RR": [
+   "BR"
+  ],
+  "BR-RS": [
+   "BR"
+  ],
+  "BR-SC": [
+   "BR"
+  ],
+  "BR-SE": [
+   "BR"
+  ],
+  "BR-SP": [
+   "BR"
+  ],
+  "BR-South-eastern grid": [
+   "BR"
+  ],
+  "BR-Southern grid": [
+   "BR"
+  ],
+  "BR-TO": [
+   "BR"
+  ],
+  "BW": [
+   "WF"
+  ],
+  "BY": [
+   "WE"
+  ],
+  "CA": [
+   "CA"
+  ],
+  "CA-AB": [
+   "CA"
+  ],
+  "CA-BC": [
+   "CA"
+  ],
+  "CA-MB": [
+   "CA"
+  ],
+  "CA-NB": [
+   "CA"
+  ],
+  "CA-NF": [
+   "CA"
+  ],
+  "CA-NS": [
+   "CA"
+  ],
+  "CA-NT": [
+   "CA"
+  ],
+  "CA-NU": [
+   "CA"
+  ],
+  "CA-ON": [
+   "CA"
+  ],
+  "CA-PE": [
+   "CA"
+  ],
+  "CA-QC": [
+   "CA"
+  ],
+  "CA-SK": [
+   "CA"
+  ],
+  "CA-YK": [
+   "CA"
+  ],
+  "CD": [
+   "WF"
+  ],
+  "CENTREL": [
+   "CZ",
+   "HU",
+   "PL",
+   "SK"
+  ],
+  "CG": [
+   "WF"
+  ],
+  "CH": [
+   "CH"
+  ],
+  "CI": [
+   "WF"
+  ],
+  "CL": [
+   "WL"
+  ],
+  "CM": [
+   "WF"
+  ],
+  "CN": [
+   "CN"
+  ],
+  "CN-AH": [
+   "CN"
+  ],
+  "CN-BJ": [
+   "CN"
+  ],
+  "CN-CQ": [
+   "CN"
+  ],
+  "CN-CSG": [
+   "CN"
+  ],
+  "CN-FJ": [
+   "CN"
+  ],
+  "CN-GD": [
+   "CN"
+  ],
+  "CN-GS": [
+   "CN"
+  ],
+  "CN-GX": [
+   "CN"
+  ],
+  "CN-GZ": [
+   "CN"
+  ],
+  "CN-HA": [
+   "CN"
+  ],
+  "CN-HB": [
+   "CN"
+  ],
+  "CN-HE": [
+   "CN"
+  ],
+  "CN-HL": [
+   "CN"
+  ],
+  "CN-HN": [
+   "CN"
+  ],
+  "CN-HU": [
+   "CN"
+  ],
+  "CN-JL": [
+   "CN"
+  ],
+  "CN-JS": [
+   "CN"
+  ],
+  "CN-JX": [
+   "CN"
+  ],
+  "CN-LN": [
+   "CN"
+  ],
+  "CN-NM": [
+   "CN"
+  ],
+  "CN-NX": [
+   "CN"
+  ],
+  "CN-QH": [
+   "CN"
+  ],
+  "CN-SA": [
+   "CN"
+  ],
+  "CN-SC": [
+   "CN"
+  ],
+  "CN-SD": [
+   "CN"
+  ],
+  "CN-SGCC": [
+   "CN"
+  ],
+  "CN-SH": [
+   "CN"
+  ],
+  "CN-SX": [
+   "CN"
+  ],
+  "CN-TJ": [
+   "CN"
+  ],
+  "CN-XJ": [
+   "CN"
+  ],
+  "CN-XZ": [
+   "CN"
+  ],
+  "CN-YN": [
+   "CN"
+  ],
+  "CN-ZJ": [
+   "CN"
+  ],
+  "CO": [
+   "WL"
+  ],
+  "CR": [
+   "WL"
+  ],
+  "CU": [
+   "WL"
+  ],
+  "CW": [
+   "WL"
+  ],
+  "CY": [
+   "CY"
+  ],
+  "CZ": [
+   "CZ"
+  ],
+  "Canada without Quebec": [
+   "CA"
+  ],
+  "DE": [
+   "DE"
+  ],
+  "DK": [
+   "DK"
+  ],
+  "DO": [
+   "WL"
+  ],
+  "DZ": [
+   "WF"
+  ],
+  "EC": [
+   "WL"
+  ],
+  "EE": [
+   "EE"
+  ],
+  "EG": [
+   "WM"
+  ],
+  "ER": [
+   "WF"
+  ],
+  "ES": [
+   "ES"
+  ],
+  "ET": [
+   "WF"
+  ],
+  "Europe without Austria": [
+   "BE",
+   "BG",
+   "CH",
+   "CZ",
+   "DE",
+   "DK",
+   "EE",
+   "ES",
+   "FI",
+   "FR",
+   "GB",
+   "GR",
+   "HR",
+   "HU",
+   "IE",
+   "IT",
+   "LT",
+   "LU",
+   "LV",
+   "MT",
+   "NL",
+   "NO",
+   "PL",
+   "PT",
+   "RO",
+   "SE",
+   "SI",
+   "SK"
+  ],
+  "Europe without Switzerland": [
+   "AT",
+   "BE",
+   "BG",
+   "CZ",
+   "DE",
+   "DK",
+   "EE",
+   "ES",
+   "FI",
+   "FR",
+   "GB",
+   "GR",
+   "HR",
+   "HU",
+   "IE",
+   "IT",
+   "LT",
+   "LU",
+   "LV",
+   "MT",
+   "NL",
+   "NO",
+   "PL",
+   "PT",
+   "RO",
+   "SE",
+   "SI",
+   "SK"
+  ],
+  "Europe without Switzerland and Austria": [
+   "BE",
+   "BG",
+   "CZ",
+   "DE",
+   "DK",
+   "EE",
+   "ES",
+   "FI",
+   "FR",
+   "GB",
+   "GR",
+   "HR",
+   "HU",
+   "IE",
+   "IT",
+   "LT",
+   "LU",
+   "LV",
+   "MT",
+   "NL",
+   "NO",
+   "PL",
+   "PT",
+   "RO",
+   "SE",
+   "SI",
+   "SK"
+  ],
+  "Europe, without Russia and Turkey": [
+   "AT",
+   "BE",
+   "BG",
+   "CH",
+   "CZ",
+   "DE",
+   "DK",
+   "EE",
+   "ES",
+   "FI",
+   "FR",
+   "GB",
+   "GR",
+   "HR",
+   "HU",
+   "IE",
+   "IT",
+   "LT",
+   "LU",
+   "LV",
+   "MT",
+   "NL",
+   "NO",
+   "PL",
+   "PT",
+   "RO",
+   "SE",
+   "SI",
+   "SK"
+  ],
+  "FI": [
+   "FI"
+  ],
+  "FR": [
+   "FR"
+  ],
+  "GA": [
+   "WF"
+  ],
+  "GB": [
+   "GB"
+  ],
+  "GE": [
+   "WE"
+  ],
+  "GH": [
+   "WF"
+  ],
+  "GI": [
+   "WE"
+  ],
+  "GLO": [
+   "AT",
+   "AU",
+   "BE",
+   "BG",
+   "BR",
+   "CA",
+   "CH",
+   "CN",
+   "CY",
+   "CZ",
+   "DE",
+   "DK",
+   "EE",
+   "ES",
+   "FI",
+   "FR",
+   "GB",
+   "GR",
+   "HR",
+   "HU",
+   "ID",
+   "IE",
+   "IN",
+   "IT",
+   "JP",
+   "KR",
+   "LT",
+   "LU",
+   "LV",
+   "MT",
+   "MX",
+   "NL",
+   "NO",
+   "PL",
+   "PT",
+   "RO",
+   "RU",
+   "SE",
+   "SI",
+   "SK",
+   "TR",
+   "TW",
+   "US",
+   "ZA"
+  ],
+  "GR": [
+   "GR"
+  ],
+  "GT": [
+   "WL"
+  ],
+  "HK": [
+   "WA"
+  ],
+  "HN": [
+   "WL"
+  ],
+  "HR": [
+   "HR"
+  ],
+  "HT": [
+   "WL"
+  ],
+  "HU": [
+   "HU"
+  ],
+  "IAI Area, Africa": [
+   "ZA"
+  ],
+  "IAI Area, Asia, without China and GCC": [
+   "ID",
+   "IN",
+   "JP",
+   "TR"
+  ],
+  "IAI Area, EU27 & EFTA": [
+   "DE",
+   "ES",
+   "FR",
+   "GB",
+   "GR",
+   "IT",
+   "NL",
+   "NO",
+   "RO",
+   "SE",
+   "SI",
+   "SK"
+  ],
+  "IAI Area, North America": [
+   "CA",
+   "US"
+  ],
+  "IAI Area, Russia & RER w/o EU27 & EFTA": [
+   "RU"
+  ],
+  "IAI Area, South America": [
+   "BR"
+  ],
+  "ID": [
+   "ID"
+  ],
+  "IE": [
+   "IE"
+  ],
+  "IL": [
+   "WM"
+  ],
+  "IN": [
+   "IN"
+  ],
+  "IN-AP": [
+   "IN"
+  ],
+  "IN-AR": [
+   "IN"
+  ],
+  "IN-AS": [
+   "IN"
+  ],
+  "IN-BR": [
+   "IN"
+  ],
+  "IN-CT": [
+   "IN"
+  ],
+  "IN-DL": [
+   "IN"
+  ],
+  "IN-Eastern grid": [
+   "IN"
+  ],
+  "IN-GA": [
+   "IN"
+  ],
+  "IN-GJ": [
+   "IN"
+  ],
+  "IN-HP": [
+   "IN"
+  ],
+  "IN-HR": [
+   "IN"
+  ],
+  "IN-JH": [
+   "IN"
+  ],
+  "IN-JK": [
+   "IN"
+  ],
+  "IN-KA": [
+   "IN"
+  ],
+  "IN-KL": [
+   "IN"
+  ],
+  "IN-MH": [
+   "IN"
+  ],
+  "IN-ML": [
+   "IN"
+  ],
+  "IN-MN": [
+   "IN"
+  ],
+  "IN-MP": [
+   "IN"
+  ],
+  "IN-NL": [
+   "IN"
+  ],
+  "IN-North-eastern grid": [
+   "IN"
+  ],
+  "IN-Northern grid": [
+   "IN"
+  ],
+  "IN-OR": [
+   "IN"
+  ],
+  "IN-PB": [
+   "IN"
+  ],
+  "IN-PY": [
+   "IN"
+  ],
+  "IN-RJ": [
+   "IN"
+  ],
+  "IN-SK": [
+   "IN"
+  ],
+  "IN-Southern grid": [
+   "IN"
+  ],
+  "IN-TN": [
+   "IN"
+  ],
+  "IN-TR": [
+   "IN"
+  ],
+  "IN-UP": [
+   "IN"
+  ],
+  "IN-UT": [
+   "IN"
+  ],
+  "IN-WB": [
+   "IN"
+  ],
+  "IN-Western grid": [
+   "IN"
+  ],
+  "IQ": [
+   "WM"
+  ],
+  "IR": [
+   "WM"
+  ],
+  "IS": [
+   "WE"
+  ],
+  "IT": [
+   "IT"
+  ],
+  "JM": [
+   "WL"
+  ],
+  "JO": [
+   "WM"
+  ],
+  "JP": [
+   "JP"
+  ],
+  "KE": [
+   "WF"
+  ],
+  "KG": [
+   "WA"
+  ],
+  "KH": [
+   "WA"
+  ],
+  "KP": [
+   "WA"
+  ],
+  "KR": [
+   "KR"
+  ],
+  "KW": [
+   "WM"
+  ],
+  "KZ": [
+   "WE"
+  ],
+  "LB": [
+   "WM"
+  ],
+  "LK": [
+   "WA"
+  ],
+  "LT": [
+   "LT"
+  ],
+  "LU": [
+   "LU"
+  ],
+  "LV": [
+   "LV"
+  ],
+  "LY": [
+   "WF"
+  ],
+  "MA": [
+   "WF"
+  ],
+  "MD": [
+   "WE"
+  ],
+  "ME": [
+   "WE"
+  ],
+  "MG": [
+   "WF"
+  ],
+  "MK": [
+   "WE"
+  ],
+  "MM": [
+   "WA"
+  ],
+  "MN": [
+   "WA"
+  ],
+  "MT": [
+   "MT"
+  ],
+  "MU": [
+   "WF"
+  ],
+  "MX": [
+   "MX"
+  ],
+  "MY": [
+   "WA"
+  ],
+  "MZ": [
+   "WF"
+  ],
+  "NE": [
+   "WF"
+  ],
+  "NG": [
+   "WF"
+  ],
+  "NI": [
+   "WL"
+  ],
+  "NL": [
+   "NL"
+  ],
+  "NO": [
+   "NO"
+  ],
+  "NORDEL": [
+   "FI",
+   "NO",
+   "SE"
+  ],
+  "NP": [
+   "WA"
+  ],
+  "NZ": [
+   "WA"
+  ],
+  "North America without Quebec": [
+   "US"
+  ],
+  "OM": [
+   "WM"
+  ],
+  "PA": [
+   "WL"
+  ],
+  "PE": [
+   "WL"
+  ],
+  "PG": [
+   "WA"
+  ],
+  "PH": [
+   "WA"
+  ],
+  "PK": [
+   "WA"
+  ],
+  "PL": [
+   "PL"
+  ],
+  "PT": [
+   "PT"
+  ],
+  "PY": [
+   "WL"
+  ],
+  "QA": [
+   "WM"
+  ],
+  "RAF": [
+   "ZA"
+  ],
+  "RER": [
+   "AT",
+   "BE",
+   "BG",
+   "CH",
+   "CZ",
+   "DE",
+   "DK",
+   "EE",
+   "ES",
+   "FI",
+   "FR",
+   "GB",
+   "GR",
+   "HR",
+   "HU",
+   "IE",
+   "IT",
+   "LT",
+   "LU",
+   "LV",
+   "MT",
+   "NL",
+   "NO",
+   "PL",
+   "PT",
+   "RO",
+   "SE",
+   "SI",
+   "SK"
+  ],
+  "RER w/o CH+DE": [
+   "AT",
+   "BE",
+   "BG",
+   "CZ",
+   "DK",
+   "EE",
+   "ES",
+   "FI",
+   "FR",
+   "GB",
+   "GR",
+   "HR",
+   "HU",
+   "IE",
+   "IT",
+   "LT",
+   "LU",
+   "LV",
+   "MT",
+   "NL",
+   "NO",
+   "PL",
+   "PT",
+   "RO",
+   "SE",
+   "SI",
+   "SK"
+  ],
+  "RER w/o DE+NL+RU": [
+   "AT",
+   "BE",
+   "BG",
+   "CH",
+   "CZ",
+   "DK",
+   "EE",
+   "ES",
+   "FI",
+   "FR",
+   "GB",
+   "GR",
+   "HR",
+   "HU",
+   "IE",
+   "IT",
+   "LT",
+   "LU",
+   "LV",
+   "MT",
+   "NO",
+   "PL",
+   "PT",
+   "RO",
+   "SE",
+   "SI",
+   "SK"
+  ],
+  "RER w/o RU": [
+   "AT",
+   "BE",
+   "BG",
+   "CH",
+   "CZ",
+   "DE",
+   "DK",
+   "EE",
+   "ES",
+   "FI",
+   "FR",
+   "GB",
+   "GR",
+   "HR",
+   "HU",
+   "IE",
+   "IT",
+   "LT",
+   "LU",
+   "LV",
+   "MT",
+   "NL",
+   "NO",
+   "PL",
+   "PT",
+   "RO",
+   "SE",
+   "SI",
+   "SK"
+  ],
+  "RLA": [
+   "BR",
+   "MX"
+  ],
+  "RNA": [
+   "CA",
+   "US"
+  ],
+  "RO": [
+   "RO"
+  ],
+  "RS": [
+   "WE"
+  ],
+  "RU": [
+   "RU"
+  ],
+  "RoW": [
+   "AT",
+   "AU",
+   "BE",
+   "BG",
+   "BR",
+   "CA",
+   "CH",
+   "CN",
+   "CY",
+   "CZ",
+   "DE",
+   "DK",
+   "EE",
+   "ES",
+   "FI",
+   "FR",
+   "GB",
+   "GR",
+   "HR",
+   "HU",
+   "ID",
+   "IE",
+   "IN",
+   "IT",
+   "JP",
+   "KR",
+   "LT",
+   "LU",
+   "LV",
+   "MT",
+   "MX",
+   "NL",
+   "NO",
+   "PL",
+   "PT",
+   "RO",
+   "RU",
+   "SE",
+   "SI",
+   "SK",
+   "TR",
+   "TW",
+   "US",
+   "ZA"
+  ],
+  "SA": [
+   "WM"
+  ],
+  "SAS": [
+   "IN"
+  ],
+  "SD": [
+   "WF"
+  ],
+  "SE": [
+   "SE"
+  ],
+  "SG": [
+   "WA"
+  ],
+  "SI": [
+   "SI"
+  ],
+  "SK": [
+   "SK"
+  ],
+  "SN": [
+   "WF"
+  ],
+  "SS": [
+   "WF"
+  ],
+  "SV": [
+   "WL"
+  ],
+  "SY": [
+   "WM"
+  ],
+  "TG": [
+   "WF"
+  ],
+  "TH": [
+   "WA"
+  ],
+  "TJ": [
+   "WA"
+  ],
+  "TM": [
+   "WA"
+  ],
+  "TN": [
+   "WF"
+  ],
+  "TR": [
+   "TR"
+  ],
+  "TT": [
+   "WL"
+  ],
+  "TW": [
+   "TW"
+  ],
+  "TZ": [
+   "WF"
+  ],
+  "UA": [
+   "WE"
+  ],
+  "UCTE": [
+   "AT",
+   "BE",
+   "BG",
+   "CH",
+   "CZ",
+   "DE",
+   "ES",
+   "FR",
+   "GR",
+   "HR",
+   "HU",
+   "IT",
+   "LU",
+   "NL",
+   "PL",
+   "PT",
+   "RO",
+   "SI",
+   "SK"
+  ],
+  "UCTE without Germany": [
+   "AT",
+   "BE",
+   "BG",
+   "CH",
+   "CZ",
+   "ES",
+   "FR",
+   "GR",
+   "HR",
+   "HU",
+   "IT",
+   "LU",
+   "NL",
+   "PL",
+   "PT",
+   "RO",
+   "SI",
+   "SK"
+  ],
+  "UN-OCEANIA": [
+   "AU"
+  ],
+  "UN-SEASIA": [
+   "ID"
+  ],
+  "US": [
+   "US"
+  ],
+  "US-ASCC": [
+   "US"
+  ],
+  "US-FRCC": [
+   "US"
+  ],
+  "US-HICC": [
+   "US"
+  ],
+  "US-MRO": [
+   "US"
+  ],
+  "US-NPCC": [
+   "US"
+  ],
+  "US-RFC": [
+   "US"
+  ],
+  "US-SERC": [
+   "US"
+  ],
+  "US-TRE": [
+   "US"
+  ],
+  "US-WECC": [
+   "US"
+  ],
+  "UY": [
+   "WL"
+  ],
+  "UZ": [
+   "WA"
+  ],
+  "VE": [
+   "WL"
+  ],
+  "VN": [
+   "WA"
+  ],
+  "WEU": [
+   "AT",
+   "BE",
+   "CH",
+   "DE",
+   "FR",
+   "LU",
+   "NL"
+  ],
+  "XK": [
+   "WE"
+  ],
+  "YE": [
+   "WM"
+  ],
+  "ZA": [
+   "ZA"
+  ],
+  "ZM": [
+   "WF"
+  ],
+  "ZW": [
+   "WF"
+  ]
+ }
+}
