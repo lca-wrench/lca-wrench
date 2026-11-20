@@ -193,6 +193,7 @@ def remove_background(name: str) -> dict:
     if users:
         raise ValueError(_("«{name}» wird noch von {n} Prozess(en) in anderen Datenbanken verwendet.", name=name, n=len(users)))
     project = bd.projects.current
+    engine.forget(project)  # the cached calculations keep its processed file open (Windows cannot delete it then)
     if own_bio:
         _strip_methods(bio)
     for db in ([name, bio] if own_bio else [name]):
@@ -204,7 +205,7 @@ def remove_background(name: str) -> dict:
         if db in bd.databases:
             raise ValueError(_("«{name}» liess sich nicht löschen. Einzelheiten in lca-wrench.log.", name=db))
         if processed:
-            Path(processed).unlink(missing_ok=True)  # Brightway leaves the matrix file (EXIOBASE: several hundred MB)
+            remove_file(Path(processed))  # Brightway leaves the matrix file (EXIOBASE: several hundred MB)
     backgrounds.forget(name)
     engine.bump_background(project)
     return state()
@@ -389,11 +390,20 @@ def _folder_taken(name: str, full_hash: bool) -> bool:
 
 def remove_folder(folder: Path | None) -> None:
     """shutil.rmtree, retried while Windows still reports files of it as open."""
+    _retry(folder, shutil.rmtree)
+
+
+def remove_file(path: Path) -> None:
+    """Path.unlink, retried while Windows still reports the file as open."""
+    _retry(path, Path.unlink)
+
+
+def _retry(path: Path | None, remove) -> None:
     for wait in (0.2, 0.5, 1.0, 2.0, None):
-        if folder is None or not Path(folder).exists():
+        if path is None or not Path(path).exists():
             return
         try:
-            shutil.rmtree(folder)
+            remove(Path(path))
             return
         except OSError:
             if wait is None:

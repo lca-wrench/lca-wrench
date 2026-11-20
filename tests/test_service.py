@@ -110,6 +110,7 @@ def test_working_copy_edit_undo_and_compare():
         after = s.unit_score(aid, s.CLIMATE_METHOD)
         assert after == pytest.approx(lca.score, rel=1e-6)
         assert after < before
+        del lca  # its datapackages keep the copy's files open; on Windows the copy could not be deleted below
 
         cmp = s.compare([{"project": PROJECT, "id": aid, "amount": 1}, {"project": name, "id": aid, "amount": 1}],
                         s.CLIMATE_METHOD)
