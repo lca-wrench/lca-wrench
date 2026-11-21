@@ -77,6 +77,9 @@ Tolerances in `tests/` against plain bw2calc (relative unless noted):
 | Monte Carlo iterations against a bw2calc loop with the same seed | `tests/test_montecarlo.py` | 1e-8 |
 | Contributions add up to the score | `tests/test_service.py`, `tests/test_engine.py` | 1e-9 |
 | Completed factors: cross-check in both modes | `tests/test_completion.py` | 1e-8 of the gross impact |
+| Factors by location against an independent calculation from bw2calc's inventory | `tests/test_regional.py` | 1e-9 of the gross impact |
+| Factors by location in Monte Carlo against a bw2calc loop with the same seed | `tests/test_regional.py` | 1e-8 |
+| Methods without factors by location: switch on and off | `tests/test_regional.py` | identical |
 
 **Why BAFU 2026 has two tolerances.** bw2calc solves once (scipy's SuperLU with the pinned packages) and without iterative
 refinement. The BAFU 2026 technosphere matrix is ill-conditioned, so a single solve is accurate to about

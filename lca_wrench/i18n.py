@@ -304,4 +304,13 @@ EN = {
     "Schätzung, falls gleich bewertet": "Estimate if assessed alike",
     "Ergänzte Faktoren": "Completed factors",
     "Übernommen von": "Taken from",
+    # factors by location (regional.py)
+    "Beiträge nach Ort": "Contributions by location",
+    "Land": "Country",
+    "davon Faktoren nach Ort": "of which factors by location",
+    "Prozesse": "Activities",
+    "Faktor des Orts": "Factor of the location",
+    "Faktor des Landes": "Factor of the country",
+    "Mittel der Länder": "Average of the countries",
+    "normaler Faktor": "normal factor",
 }

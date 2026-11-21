@@ -67,8 +67,12 @@ def _side(node_id: int, amount: float, method: tuple) -> dict:
     c = bg.cvec(method)
     s = bg.unit_scores(method)
     used = np.unique(B[:, cols].tocoo().row)
-    return {"ids": ids, "A": A[rows][:, cols].tocsc(), "B": B[used][:, cols].tocsc(), "bio": bg.bio_ids[used],
-            "c": c[used], "s": s[rows], "x": x[cols], "h": float(c @ (B @ x)), "node": node_id,
+    # factors by location (regional.py): R = (factor at the dataset's place - c) x B, zero without
+    part = bg.regional(method)
+    R = part.R[used][:, cols].tocsc() if part is not None else sparse.csc_matrix((len(used), len(cols)))
+    h = float(c @ (B @ x)) + (float((part.R @ x).sum()) if part is not None else 0.0)
+    return {"ids": ids, "A": A[rows][:, cols].tocsc(), "B": B[used][:, cols].tocsc(), "R": R, "bio": bg.bio_ids[used],
+            "c": c[used], "s": s[rows], "x": x[cols], "h": h, "node": node_id,
             "project": bd.projects.current}
 
 
@@ -189,14 +193,20 @@ def compare(node_id: int, amount: float, method: tuple, project: str, database: 
     B0 = pad(v0["B"], (F, U))
     b1 = v1["B"].tocoo()
     B1 = sparse.csc_matrix((b1.data, (bidx1[b1.row], idx1[b1.col])), shape=(F, U))
+    # the parts by location (regional.py) of both versions; with them the characterized B is diag(c) B + R
+    R0 = pad(v0["R"], (F, U))
+    r1 = v1["R"].tocoo()
+    R1 = sparse.csc_matrix((r1.data, (bidx1[r1.row], idx1[r1.col])), shape=(F, U))
     c0 = np.concatenate([v0["c"], np.zeros(len(new_flows))])
     c1 = np.zeros(F)
     c1[bidx1] = v1["c"]
     s0 = np.concatenate([v0["s"], np.zeros(len(new_ids))])
     x1 = np.zeros(U)
     x1[idx1] = v1["x"]
-    dA, dB, dc = (A1 - A0).tocsc(), (B1 - B0).tocsc(), c1 - c0
-    per_act = (dB.T @ c0 - dA.T @ s0) * x1
+    dA, dB, dc, dR = (A1 - A0).tocsc(), (B1 - B0).tocsc(), c1 - c0, (R1 - R0).tocsc()
+    # h1 - h0 = (dB^T c0 + 1^T dR - dA^T s0) x1 + dc . B1 x1 (+ the demand term): a dataset's part holds its changed
+    # exchanges and a changed factor by location (another place), the flows' part the changed normal factors
+    per_act = (dB.T @ c0 + np.asarray(dR.sum(axis=0)).ravel() - dA.T @ s0) * x1
     g1 = B1 @ x1
     per_flow = dc * g1
     a0, a1_ = pos0[node_id], int(idx1[list(v1["ids"]).index(node1)])
@@ -231,7 +241,7 @@ def compare(node_id: int, amount: float, method: tuple, project: str, database: 
     changed_sets = int(np.count_nonzero(per_act))
     _last.clear()
     _last.update({"key": (node_id, amount, method, project, database), "dA": dA, "dB": dB, "A0": A0, "A1": A1, "B0": B0, "B1": B1,
-                  "s0": s0, "c0": c0, "x1": x1, "name_of": name_of, "n0": n0, "nb0": nb0, "bio0": v0["bio"], "binfo0": binfo0,
+                  "dR": dR, "s0": s0, "c0": c0, "x1": x1, "name_of": name_of, "n0": n0, "nb0": nb0, "bio0": v0["bio"], "binfo0": binfo0,
                   "binfo1": binfo1, "new_flows": new_flows, "diff": diff})
     p0 = info0[node_id]
     return {"product": {"id": str(node_id), "name": p0["name"], "location": p0["location"], "unit": short_unit(p0["unit"]),
@@ -262,10 +272,11 @@ def detail(k: int) -> dict:
         rows.append({"kind": kind, "name": d["name"], "location": d["location"], "unit": short_unit(d["unit"]),
                      "old": float(old), "new": float(new), "contribution": float(-L["s0"][i] * L["dA"][i, k] * x)})
     b0, b1 = L["B0"][:, k].toarray().ravel(), L["B1"][:, k].toarray().ravel()
-    for f in L["dB"][:, k].nonzero()[0]:
+    dr = L["dR"][:, k].toarray().ravel()  # factors by location (regional.py): also where the dataset changed its place
+    for f in sorted(set(L["dB"][:, k].nonzero()[0]) | set(np.flatnonzero(dr))):
         d = L["binfo0"][int(L["bio0"][f])] if f < L["nb0"] else L["binfo1"][L["new_flows"][f - L["nb0"]]]
         rows.append({"kind": "emission", "name": d["name"], "location": " / ".join(d["categories"]), "unit": short_unit(d["unit"]),
-                     "old": float(b0[f]), "new": float(b1[f]), "contribution": float(L["c0"][f] * L["dB"][f, k] * x)})
+                     "old": float(b0[f]), "new": float(b1[f]), "contribution": float((L["c0"][f] * L["dB"][f, k] + dr[f]) * x)})
     rows.sort(key=lambda r: -abs(r["contribution"]))
     d = L["name_of"](k)
     return {"name": d["name"], "location": d["location"], "used": float(x), "rows": rows[:200], "more": max(0, len(rows) - 200),

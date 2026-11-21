@@ -8,6 +8,7 @@ each activity, so it comes last, as the generic fallback. A code this table does
 
 from __future__ import annotations
 
+import functools
 import re
 
 # code: (English name, German name, continent region)
@@ -99,6 +100,139 @@ def chain(code: str | None) -> list[str]:
 def label(code: str | None) -> str:
     c = COUNTRIES.get(code or "")
     return f"{code} ({c[0]})" if c else (code or "")
+
+
+def name(code: str | None) -> str | None:
+    """The country's name in the reader's language; None for codes this table does not name."""
+    from . import i18n
+
+    c = COUNTRIES.get(code or "")
+    return (c[1] if i18n.LANG.get() == "de" else c[0]) if c else None
+
+
+# ---------- the countries of a region (location-dependent characterization factors, regional.py) ----------
+
+# UN M49 geographic regions (UN Statistics Division, "Standard country or area codes for statistical use"): sovereign
+# states, plus Taiwan, Hong Kong, Macao and Kosovo, which have data of their own. Dependent territories are left out:
+# in an equal-weighted average over a region they would count as much as a large country.
+_M49 = {
+    "Northern Africa": "DZ EG LY MA SD TN",
+    "Eastern Africa": "BI KM DJ ER ET KE MG MW MU MZ RW SC SO SS UG TZ ZM ZW",
+    "Middle Africa": "AO CM CF TD CG CD GQ GA ST",
+    "Southern Africa": "BW SZ LS NA ZA",
+    "Western Africa": "BJ BF CV CI GM GH GN GW LR ML MR NE NG SN SL TG",
+    "Caribbean": "AG BS BB CU DM DO GD HT JM KN LC VC TT",
+    "Central America": "BZ CR SV GT HN MX NI PA",
+    "South America": "AR BO BR CL CO EC GY PY PE SR UY VE",
+    "Northern America": "CA US",
+    "Central Asia": "KZ KG TJ TM UZ",
+    "Eastern Asia": "CN JP KP KR MN TW HK MO",
+    "South-eastern Asia": "BN KH ID LA MY MM PH SG TH TL VN",
+    "Southern Asia": "AF BD BT IN IR MV NP PK LK",
+    "Western Asia": "AM AZ BH CY GE IQ IL JO KW LB OM QA SA PS SY TR AE YE",
+    "Eastern Europe": "BY BG CZ HU PL MD RO RU SK UA",
+    "Northern Europe": "DK EE FI IS IE LV LT NO SE GB",
+    "Southern Europe": "AL AD BA HR GR IT MT ME MK PT SM RS SI ES VA XK",
+    "Western Europe": "AT BE FR DE LI LU MC NL CH",
+    "Australia and New Zealand": "AU NZ",
+    "Melanesia": "FJ PG SB VU",
+    "Micronesia": "KI MH FM NR PW",
+    "Polynesia": "WS TO TV",
+}
+
+
+def _m49(*names: str) -> frozenset[str]:
+    return frozenset(c for n in names for c in _M49[n].split())
+
+
+_AFRICA = _m49("Northern Africa", "Eastern Africa", "Middle Africa", "Southern Africa", "Western Africa")
+_LATIN_AMERICA = _m49("Caribbean", "Central America", "South America")
+_ASIA = _m49("Central Asia", "Eastern Asia", "South-eastern Asia", "Southern Asia", "Western Asia")
+_EUROPE = _m49("Eastern Europe", "Northern Europe", "Southern Europe", "Western Europe")
+_OCEANIA = _m49("Australia and New Zealand", "Melanesia", "Micronesia", "Polynesia")
+_EU27 = frozenset("AT BE BG HR CY CZ DK EE FI FR DE GR HU IE IT LV LT LU MT NL PL PT RO SK SI ES SE".split())
+_EFTA = frozenset("CH IS LI NO".split())
+_GCC = frozenset("BH KW OM QA SA AE".split())
+# ecoinvent's Europe also holds Cyprus and Turkey (it has a region "Europe, without Russia and Turkey")
+_RER = _EUROPE | {"CY", "TR"}
+# electricity grids: ENTSO-E members (as in ecoinvent 3), the former continental UCTE area, the Nordic and central
+# European grids; the North American NERC regions by the country that holds most of them
+_ENTSOE = frozenset("AL AT BA BE BG CH CY CZ DE DK EE ES FI FR GB GR HR HU IE IS IT LT LU LV ME MK NL NO PL PT RO RS SE "
+                    "SI SK".split())
+_UCTE = frozenset("AL AT BA BE BG CH CZ DE ES FR GR HR HU IT LU ME MK NL PL PT RO RS SI SK".split())
+_NERC = {"ASCC": "US", "ERCOT": "US", "FRCC": "US", "HICC": "US", "MRO": "US", "NPCC": "US CA", "RFC": "US",
+         "SERC": "US", "SPP": "US", "TRE": "US", "WECC": "US"}
+
+MEMBERS: dict[str, frozenset[str]] = {
+    "RER": _RER, "RAS": _ASIA, "RAF": _AFRICA, "RLA": _LATIN_AMERICA, "RNA": _m49("Northern America"),
+    "RME": frozenset("BH IR IQ IL JO KW LB OM PS QA SA SY AE YE".split()),
+    "SAS": _m49("Southern Asia"), "WEU": _m49("Western Europe"), "EEU": _m49("Eastern Europe"),
+    "APAC": _m49("Eastern Asia", "South-eastern Asia", "Southern Asia", "Australia and New Zealand", "Melanesia",
+                 "Micronesia", "Polynesia"),
+    "CPA": frozenset("CN HK KH KP LA MN MO VN".split()),  # Centrally Planned Asia (IEA, IIASA)
+    "ENTSO-E": _ENTSOE, "ENTSO": _ENTSOE, "UCTE": _UCTE, "NORDEL": frozenset("DK FI IS NO SE".split()),
+    "CENTREL": frozenset("CZ HU PL SK".split()), "NAFTA": frozenset("CA MX US".split()),
+    "UN-AFRICA": _AFRICA, "UN-AMERICAS": _LATIN_AMERICA | _m49("Northern America"), "UN-ASIA": _ASIA,
+    "UN-EUROPE": _EUROPE, "UN-OCEANIA": _OCEANIA,
+    **{"UN-" + k: _m49(v) for k, v in {
+        "NAFRICA": "Northern Africa", "EAFRICA": "Eastern Africa", "MAFRICA": "Middle Africa", "SAFRICA": "Southern Africa",
+        "WAFRICA": "Western Africa", "CARIBBEAN": "Caribbean", "CAMERICA": "Central America", "SAMERICA": "South America",
+        "NAMERICA": "Northern America", "CASIA": "Central Asia", "EASIA": "Eastern Asia", "SEASIA": "South-eastern Asia",
+        "SASIA": "Southern Asia", "WASIA": "Western Asia", "EEUROPE": "Eastern Europe", "NEUROPE": "Northern Europe",
+        "SEUROPE": "Southern Europe", "WEUROPE": "Western Europe", "AUSTRALIANZ": "Australia and New Zealand",
+        "MELANESIA": "Melanesia", "MICRONESIA": "Micronesia", "POLYNESIA": "Polynesia"}.items()},
+    "RoE": _RER,  # rest of Europe: specific to each dataset, like RoW; taken as Europe
+    "Asia without China": _ASIA - {"CN"}, "Russia (Asia)": frozenset({"RU"}),
+    "IAI Area, Africa": _AFRICA, "IAI Area, North America": _m49("Northern America"),
+    "IAI Area, South America": _m49("South America"), "IAI Area, EU27 & EFTA": _EU27 | _EFTA,
+    "IAI Area, Gulf Cooperation Council": _GCC, "IAI Area, Asia, without China and GCC": _ASIA - {"CN"} - _GCC,
+    "IAI Area, Russia & RER w/o EU27 & EFTA": (_RER - _EU27 - _EFTA) | {"RU"},
+    "IAI Area, Russia and Eastern Europe": frozenset("BY MD RU UA".split()),
+    "IAI Area, Western and Central Europe": _RER - {"BY", "MD", "RU", "UA"},
+    "Canada without Quebec": frozenset({"CA"}), "North America without Quebec": _m49("Northern America"),
+    **{k: frozenset(v.split()) for k, v in _NERC.items()},
+}
+# "Europe without Switzerland", "RER w/o CH+DE", "UCTE without Germany", "Europe, without Russia and Turkey" …
+_WITHOUT = re.compile(r"^(Europe|RER|UCTE|ENTSO-E),?\s+(?:without|w/o)\s+(.+)$")
+_SUBNATIONAL = re.compile(r"^([A-Z]{2})-.+$")  # CA-QC, US-WECC, CN-SGCC, BR-Mid-western grid
+
+
+def is_country(code: str | None) -> bool:
+    """A country code (ISO 3166 alpha-2, also old ones such as CS and AN)."""
+    return bool(code) and len(code) == 2 and code.isalpha() and code.isupper()
+
+
+def country_of(code: str | None) -> str | None:
+    """The country of a sub-national location (CA-QC → CA, US-WECC → US); None for anything else."""
+    m = _SUBNATIONAL.match(code or "")
+    return m.group(1) if m and not (code or "").startswith("UN-") else None
+
+
+@functools.lru_cache(maxsize=4096)
+def members(code: str | None) -> frozenset[str] | None:
+    """The countries of a region code (RER, ENTSO-E, "Europe without Switzerland" …); None for a country, a part of
+    one, GLO, RoW and codes this table does not know. BAFU uses OCE for the oceans (ships), so it is not Oceania."""
+    if not code:
+        return None
+    if code in MEMBERS:
+        return MEMBERS[code]
+    m = _WITHOUT.match(code)
+    if m:
+        base = MEMBERS.get("RER" if m.group(1) == "Europe" else m.group(1))
+        out = set(base or ())
+        for part in re.split(r"\s*(?:,|\+|&|\band\b)\s*", m.group(2)):
+            part = re.sub(r"\s*\(.*\)$", "", part).strip()  # "NORDEL (NCPA)"
+            if not part:
+                continue
+            if part in MEMBERS:
+                out -= MEMBERS[part]
+                continue
+            c = resolve(part)
+            if not is_country(c):
+                return None
+            out.discard(c)
+        return frozenset(out) if out else None
+    return None
 
 
 def find_in_query(q: str) -> tuple[str, str | None]:

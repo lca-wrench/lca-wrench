@@ -1,0 +1,120 @@
+# Factors by location (regionalized impact assessment)
+
+Some impacts depend on where an emission or a resource use happens. A cubic metre of water taken in Spain deprives
+other users more than one taken in Switzerland (EF 3.1 water use, AWARE: 77.7 against 1.34 m³ world eq. per m³), and a
+kilogram of ammonia acidifies differently in each European country. A method with such factors gives each activity the
+factor of its own location. LCA Wrench applies them in its engine; plain bw2calc uses only the global factors of a
+method. Code: `lca_wrench/regional.py`, region lists in `lca_wrench/regions.py`.
+
+## Where the factors come from
+
+Nothing is bundled. LCA Wrench reads the factors the method itself carries, in two forms:
+
+1. **Rows with a location**, Brightway's own convention: a method row `(flow, factor, location)`, for example
+   `(water_flow, 1.34, "CH")`. bw2data stores such rows; bw2calc filters them out and keeps the rows of the global
+   location `GLO` (`consistent_global_index`), and bw2regional uses the others. The same format as bw2regional,
+   so a method written for one works in the other.
+2. **Country copies of a flow**: a flow with a `location` of its own whose generic flow has a factor in the same method,
+   matched by code (`<code of the generic flow>_<location>`) or by name (`<name of the generic flow>, <location>`),
+   with the same compartment and unit. Projects prepared for the EF 3.1 PEF method carry the JRC country factors of water
+   use this way (flows "Water, AT", "Ground Water, CH", …). LCA Wrench turns them into a table (generic flow, country) →
+   factor, so the generic water flows of every dataset get the factor of the dataset's country, also in data that never
+   used the copies. A flow counts as a copy only if it has a location of its own: the BAFU 2025 flow list names water
+   flows by country ("Water, unspecified natural origin, IE") without a location field, and they stay as they are.
+
+A row with a location wins over a country copy for the same flow and place. Rows with a spatial unit of a
+geocollection (`("ecoregions", "PA0101")`, bw2regional) need the spatial data and are not used.
+
+The EF 3.1 country factors of the JRC (water use for 209 countries, land use for 212, acidification and terrestrial
+eutrophication for 36 European countries) are not bundled: the licence of the EF reference package for redistribution
+is not stated on the JRC pages. Use them from your own copy of the EF 3.1 package.
+
+## Which factor an activity gets
+
+For each flow with factors by location, the activity's location decides; the first rule that applies wins:
+
+1. **The location's own factor.** Codes that changed are read both ways: RS and ME read CS (EF 3.1 still uses Serbia
+   and Montenegro), XK reads RS or CS, CW, SX and BQ read AN, UK reads GB and EL reads GR.
+2. **A part of a country** (CA-QC, US-WECC, CN-SGCC, IN-Western grid): the factor of the country.
+3. **A region** (RER, RAS, RLA, ENTSO-E, UCTE, NORDEL, "Europe without Switzerland", "RER w/o CH+DE" …) without a
+   factor of its own: the average over its countries, **weighted by production volume**: the production volumes of
+   the datasets with the same name and product in those countries, as ecoinvent and premise record them on the
+   reference product exchange. Where there are none, the countries are weighted equally. BAFU records no production
+   volumes, and ecoinvent avoids datasets that overlap a region (a country with its own dataset is cut out of the
+   region: "Europe without Switzerland"), so few ecoinvent region datasets have national datasets of the same product
+   inside their region; the others are averaged equally. A country of the region without a factor of its own counts
+   with the method's normal factor.
+4. **GLO, RoW and unknown locations** keep the method's **normal factor**: the result without factors by location.
+   For RoW this is the world average; BAFU uses OCE for the oceans (ships), so OCE is not taken as Oceania.
+
+The normal factor is the one the calculation uses anyway: the method's global factor, together with the flow mapping
+and the completed factors where those apply. Factors by location apply to the flows they are given for; a flow that
+gets its factor through the flow mapping or the completion keeps that normal factor everywhere.
+
+### Countries of a region
+
+`regions.members` lists the countries of the regions ecoinvent and BAFU use, from the UN M49 geographic regions
+(UN Statistics Division), sovereign states plus Taiwan, Hong Kong, Macao and Kosovo; dependent territories are left
+out so that they do not weigh like countries in an equal average.
+
+| Code | Countries |
+|---|---|
+| RER | M49 Europe, plus Cyprus and Turkey (ecoinvent has "Europe, without Russia and Turkey") |
+| RAS, RAF, RLA, RNA | M49 Asia, Africa, Latin America and the Caribbean, Northern America (US, CA) |
+| RME | Middle East: BH IR IQ IL JO KW LB OM PS QA SA SY AE YE |
+| SAS, WEU, EEU | M49 Southern Asia, Western Europe, Eastern Europe |
+| APAC | M49 Eastern, South-eastern and Southern Asia, and Oceania |
+| CPA | Centrally Planned Asia (IEA, IIASA): CN HK KH KP LA MN MO VN |
+| ENTSO-E, UCTE, NORDEL, CENTREL | Members of the grids (ENTSO-E as in ecoinvent 3, UCTE the continental area) |
+| NAFTA | CA MX US |
+| ASCC, ERCOT, FRCC, HICC, MRO, RFC, SERC, SPP, TRE, WECC; NPCC | US; US and CA (NERC regions) |
+| UN-AFRICA, UN-AMERICAS, UN-ASIA, UN-EUROPE, UN-OCEANIA; UN-EASIA, UN-SEASIA, UN-SAMERICA … | The M49 regions and sub-regions |
+| RoE | Rest of Europe, specific to each dataset like RoW: taken as Europe (RER) |
+| IAI areas (aluminium) | Africa, North America, South America, EU27 & EFTA, Gulf Cooperation Council, Asia without China and GCC, Russia & RER w/o EU27 & EFTA; Russia and Eastern Europe (BY MD RU UA); Western and Central Europe (RER without those) |
+| "Europe without …", "RER w/o …", "UCTE without …", "ENTSO-E without …"; "Asia without China" | The base region without the named countries or regions |
+
+A code that is not in the table is "unknown" and keeps the normal factor.
+
+## Where it applies
+
+Everywhere the engine calculates: scores, unit scores, contributions by activity and by flow, the supply chain tree
+and Sankey, the comparison of products, calculation setups, the data sheet of an activity (its emissions with the
+factors of its location), "Why different?", the comparison of versions (a dataset that moved to another place shows
+the change of its factor as part of its contribution), "Other database" (on this side the factor each flow gets on
+average over the model's processes; the model's own emissions on the other side still use the normal factors of the
+method there), the cross-check with bw2calc and Monte Carlo. In Monte Carlo the factors by location are fixed values;
+elsewhere the method's sampled factor applies.
+
+The engine keeps a matrix R of the shape of the biosphere matrix B, R = (factor at the activity's place − normal
+factor) × B, so the characterized biosphere matrix is diag(c) B + R and the direct impacts are Bᵀc + 1ᵀR. A method
+without factors by location has no R, and every number stays exactly what it was before.
+
+## In the interface
+
+- **Result, Contributions, by location**: the impact by the location of the activities that cause it (their direct
+  emissions and resource uses), with share, number of activities, and with factors by location what they change there
+  and how the factor was found (factor of the location, of the country, average of the countries by production volume
+  or weighted equally, normal factor). The rows add up to the score. Also in the Excel and CSV export.
+- **Switch**: "Apply factors by location" above the result, shown when the method has such factors. On by default;
+  it applies to all calculations (registry key `regional`).
+- **Chip** "with factors by location" next to the score: how many activities use the factor of their location and by
+  how much this changes the result.
+- **Result, Inventory**: "Factors by location as CSV" lists every factor by location of the method: flow, location,
+  factor, normal factor and whether it comes from a row with a location or a country copy.
+
+## Validation
+
+`tests/test_regional.py` checks on the BAFU 2025 data, against an independent calculation from bw2calc's inventory
+(supply and biosphere matrix, each entry with the factor of its activity's location by the rules above written out a
+second time): the scores of two products to 1e-9 of the gross impact, the production volume weights on a small
+database, country copies, an own model process, the data sheet, Monte Carlo draws against bw2calc with the same seed
+(1e-8), the cross-check with bw2calc, and that methods without factors by location give bit-identical results with
+the switch on and off and agree with bw2calc. Contributions by activity, by flow and by location add up to the score,
+and the parts by location add up to the difference the factors by location make.
+
+## Not yet
+
+- A map of the result by location (the location picker for activities is designed separately).
+- More factor tables: reading the JRC EF 3.1 file (water use, land use, acidification, terrestrial eutrophication)
+  and AWARE 2.0 basin factors with a point for each activity.
+- RoW as the countries the sibling datasets leave out, instead of the world average.

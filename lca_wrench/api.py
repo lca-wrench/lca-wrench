@@ -723,6 +723,18 @@ def post_completion_factors(body: MethodIn):
     return run(s.completed_factors, tuple(body.method))
 
 
+@app.post("/api/regional")
+def post_regional(body: FlowmapIn):
+    """Factors that depend on the location of the activity (regional.py): on or off."""
+    return run(s.set_regional, body.enabled)
+
+
+@app.post("/api/regional/factors")
+def post_regional_factors(body: MethodIn):
+    """Every factor by location of a method: flow, location, factor, normal factor, source."""
+    return run(s.regional_factors, tuple(body.method))
+
+
 @app.post("/api/compare")
 def post_compare(body: CompareIn):
     return run(s.compare, [i.model_dump() for i in body.items], tuple(body.method))

@@ -248,3 +248,18 @@ takes the factor of the flow with the same name, the same top-level compartment,
 unit. Existing factors, including explicit zeros, are never overwritten; long-term sub-compartments are never completed;
 stored methods are not modified. The completion is on by default, visibly marked in the result, and can be switched off.
 The list of added factors is shown and can be exported. Details: [completed-factors.md](completed-factors.md).
+
+## Factors by location (regionalized impact assessment)
+
+A characterization factor can depend on where the emitting activity is: EF 3.1 water use has a factor per country
+(Switzerland 1.34, Spain 77.7 m³ world eq. per m³). LCA Wrench reads such factors from the method itself, in Brightway's
+convention (rows `(flow, factor, location)`, which bw2calc leaves out) or as country copies of a flow (a flow with a
+location of its own, "Water, AT", whose generic flow is in the same method). Each activity gets the factor of its
+location; a part of a country (CA-QC) the country's; a region (RER, ENTSO-E …) the average of its countries, weighted
+by the production volumes of the same datasets there (equally where there are none, as in BAFU); GLO, RoW and unknown
+locations keep the normal factor. Nothing is bundled and the stored methods are not changed. On by default, can be
+switched off above the result; a method without such factors gives exactly the result it gave before.
+
+**Result by location**: Result, Contributions, "by location" lists the impact by the location of the activities that
+cause it, with what the factors by location change there and how each factor was found; also in the export. Details:
+[regional-factors.md](regional-factors.md).

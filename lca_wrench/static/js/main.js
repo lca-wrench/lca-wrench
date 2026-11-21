@@ -509,6 +509,12 @@ const A = {
     const d = await api('/api/completion/factors', { method: S.method });
     csvDownload(`${t('Ergänzte Faktoren')} ${S.method.join(' - ')}.csv`, [[t('Stoff'), t('Kompartiment'), t('Einheit'), t('Faktor'), t('Übernommen von')], ...d.rows.map(r => [r.name, r.categories, r.unit, r.factor, r.source])]);
   },
+  async 'csv-regional'() {
+    const d = await api('/api/regional/factors', { method: S.method });
+    csvDownload(`${t('Faktoren nach Ort')} ${S.method.join(' - ')}.csv`, [[t('Stoff'), t('Kompartiment'), t('Einheit'), t('Ort'), t('Faktor'), t('Normaler Faktor'), t('Herkunft')],
+      ...d.rows.map(r => [r.name, r.categories, r.unit, r.location, r.factor, r.normal, r.source === 'copy' ? t('Länderkopie «{name}»', { name: r.copy || '' }) : t('Zeile mit Ort')])]);
+  },
+  'contrib-loc'() { S.tab = 'beitraege'; S.contrib = 'loc'; render(); },
   async 'inv-filter'(k) { S.tab = 'inventar'; S.invF = k; S.invQ = ''; render(); await loadErgebnis(); render(); document.getElementById('invTbl')?.scrollIntoView({ block: 'nearest' }); },
 
   // opening a project: one that Brightway would convert on opening (older Brightway 2.5, e.g. from the Activity Browser 3)
@@ -768,6 +774,10 @@ document.addEventListener('change', ev => {
     else if (el.id === 'complChk') {
       S.st.completion = await api('/api/completion', { enabled: el.checked });
       if (S.invF === 'completed') S.invF = '';
+      resetErgebnis(); S.setupRes = null; await loadView(); render();
+    }
+    else if (el.id === 'regChk') {
+      S.st.regional = await api('/api/regional', { enabled: el.checked });
       resetErgebnis(); S.setupRes = null; await loadView(); render();
     }
     else if (el.id === 'invF') { S.invF = el.value; render(); }

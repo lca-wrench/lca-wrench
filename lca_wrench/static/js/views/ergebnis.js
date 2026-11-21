@@ -48,14 +48,16 @@ export async function loadCats() {
   }
 }
 
-const key = () => JSON.stringify([S.fu.id, S.fu.amount, S.method, S.st.journal.length, S.st.changes.length, S.st.completion?.enabled, S.st.flowmap?.enabled]);
+const key = () => JSON.stringify([S.fu.id, S.fu.amount, S.method, S.st.journal.length, S.st.changes.length, S.st.completion?.enabled, S.st.flowmap?.enabled, S.st.regional?.enabled]);
 export function resetErgebnis() { S.cats.res = null; S.calc = S.sankey = S.graph = S.inv = S.why = null; S.gsel = S.sksel = null; S.fuVerify = null; S.ver = { ...S.ver, res: null, detail: null, k: null, error: null }; S.cw = { ...S.cw, res: null, error: null, open: null, hits: null, trace: {} }; }
 
 // what the method does not assess: inventory flows without a factor, and the switch for completed factors
 function factorNotice(r) {
   const f = r.factors;
   const sw = f.completable ? `<label class="row" style="gap:6px;font-size:13.5px" title="${t('Die Methode hat für manche Stoffe nur einen Faktor auf dem Fluss ohne Subkompartiment. Ein Fluss ohne Faktor bekommt dann den Faktor des gleichnamigen Flusses ohne Subkompartiment im selben Kompartiment. Eigene Faktoren der Methode (auch 0) bleiben, Langzeit-Emissionen werden nie ergänzt. Gilt für alle Rechnungen.')}"><input type="checkbox" id="complChk" ${f.completion ? 'checked' : ''}> ${t('Fehlende Faktoren für Subkompartimente ergänzen ({n} in dieser Methode)', { n: nf(f.completable) })}</label>` : '';
-  if (!f.uncharacterized && !sw) return '';
+  const g = r.regional || {};
+  const rsw = g.available ? `<label class="row" style="gap:6px;font-size:13.5px" title="${t('Die Methode hat Faktoren, die vom Ort abhängen (Zeilen mit Ort oder Länderkopien von Flüssen). Ein Prozess bekommt den Faktor seines Orts, ein Teil eines Landes den des Landes, eine Region das Mittel ihrer Länder (nach Produktionsmenge der gleichen Datensätze dort, sonst gleich gewichtet). GLO, RoW und unbekannte Orte behalten den normalen Faktor. Gilt für alle Rechnungen.')}"><input type="checkbox" id="regChk" ${g.enabled ? 'checked' : ''}> ${t('Faktoren nach Ort anwenden ({k} Ort(e) in dieser Methode)', { k: nf(g.locations) })}</label>` : '';
+  if (!f.uncharacterized && !sw && !rsw) return '';
   // loud only where it matters: the namesakes would add more than 0.1 % of the result. Most flows of an inventory
   // have no factor in any one method (a climate method assesses a few dozen of some thousand), which is normal.
   const loud = f.namesakes > 0 && Math.abs(f.estimate) > 1e-3 * Math.abs(r.score || 0);
@@ -64,7 +66,29 @@ function factorNotice(r) {
     : loud ? `<b>${t('{k} von {n} Flüssen haben keinen Faktor; {s} tragen denselben Namen wie ein bewerteter Fluss.', { k: nf(f.uncharacterized), n: nf(f.flows), s: nf(f.namesakes) })}</b>${est}`
       : t('{k} von {n} Flüssen des Inventars haben in dieser Methode keinen Faktor.', { k: nf(f.uncharacterized), n: nf(f.flows) });
   const link = f.uncharacterized ? ` <button class="linkbtn" data-act="inv-filter" data-k="none">${t('Liste zeigen')}</button>` : '';
-  return `<div id="factorNotice" class="${loud ? 'warnbox' : 'row muted'}" style="${loud ? 'flex-direction:column;gap:6px' : 'font-size:13.5px;justify-content:space-between'}"><span>${txt}${link}</span>${sw}</div>`;
+  return `<div id="factorNotice" class="${loud ? 'warnbox' : 'row muted'}" style="${loud ? 'flex-direction:column;gap:6px' : 'font-size:13.5px;justify-content:space-between'}"><span>${txt}${link}</span>${sw}${rsw}</div>`;
+}
+
+// impact by the location of the processes that cause it; with factors by location, what they change and how found
+function locTable(r) {
+  const rows = r.by_location || [], g = r.regional || {}, u = esc(r.method_unit);
+  const withReg = g.available && g.enabled;
+  const max = Math.max(...rows.map(x => Math.abs(x.value)), 1e-300);
+  const sign = v => v > 0 ? '+' : v < 0 ? '−' : '';
+  const num = v => Math.abs(v) >= 1e-4 || !v ? nf(v) : v.toExponential(2).replace('e', ' e');  // tiny changes readable
+  const weighting = { volume: t('nach Produktionsmenge'), equal: t('gleich gewichtet'), mixed: t('nach Produktionsmenge oder gleich gewichtet') };
+  const how = x => x.how === 'own' ? t('Faktor des Orts') : x.how === 'country' ? t('Faktor des Landes')
+    : x.how === 'region' ? t('Mittel der Länder, {w}', { w: weighting[x.weighting] || weighting.equal })
+      : x.kind === 'rest' || x.kind === 'global' ? t('normaler Faktor (Weltmittel)') : t('normaler Faktor');
+  if (!rows.length) return `<p class="empty">${t('Kein Prozess trägt direkt zum Ergebnis bei.')}</p>`;
+  return `<div class="tblwrap"><table class="tbl" id="locTbl"><thead><tr><th>${t('Ort')}</th><th style="text-align:right">${t('Wirkung')} (${u})</th><th>${t('Anteil')}</th>
+    ${withReg ? `<th style="text-align:right" title="${t('Was die Faktoren nach Ort an diesem Ort gegenüber den normalen Faktoren ändern.')}">${t('davon Faktoren nach Ort')}</th><th>${t('Faktor')}</th>` : ''}<th style="text-align:right">${t('Anzahl Prozesse')}</th></tr></thead><tbody>
+    ${rows.map(x => `<tr><td><b>${esc(x.location || '–')}</b>${x.name ? ` <span class="muted">${esc(x.name)}</span>` : ''}</td>
+      <td class="num nw" style="text-align:right">${nf(x.value)}</td>
+      <td style="width:22%"><div class="share"><div class="t"><i class="${x.value < 0 ? 'neg' : r.score && x.value / r.score >= 0.25 ? 'hot' : ''}" style="width:${Math.abs(x.value) / max * 100}%"></i></div><span>${pct(r.score ? x.value / r.score : 0)}</span></div></td>
+      ${withReg ? `<td class="num nw" style="text-align:right">${x.regional ? sign(x.regional) + num(Math.abs(x.regional)) : ''}</td><td class="muted" style="font-size:13px">${how(x)}</td>` : ''}
+      <td class="num" style="text-align:right">${nf(x.processes)}</td></tr>`).join('')}
+  </tbody></table></div>`;
 }
 
 const busy = () => `<p class="busy">${t('Rechne …')}</p>`;
@@ -87,7 +111,7 @@ export function vErgebnis() {
     </div>
     ${r ? `<div class="row" style="justify-content:space-between;align-items:flex-end">
       <div><span class="eyebrow">${esc(methodLabel(methodInfo()))}</span><div class="kpi"><span class="big">${nf(r.score)}</span><span class="u">${esc(r.method_unit)}</span></div></div>
-      <div class="row">${check}<span class="chip" title="${t('Zeit für Rechnung und Auswertung')}">${t('{ms} ms · {n} Produkte', { ms: nf(r.seconds * 1000), n: nf(r.matrix_size) })}</span>${r.factors.completed ? `<button class="chip acc" id="complChip" data-act="inv-filter" data-k="completed" title="${t('{n} Flüsse dieses Inventars haben keinen eigenen Faktor in der Methode und rechnen mit dem Faktor des gleichnamigen Flusses ohne Subkompartiment. Das sind {v} {u} des Ergebnisses. Klick zeigt die Liste.', { n: nf(r.factors.completed), v: nf(r.factors.completed_value), u: esc(r.method_unit) })}">${t('mit {n} ergänzten Faktoren', { n: nf(r.factors.completed) })}</button>` : ''}${r.model ? `<span class="chip acc">${t('eigenes Modell, live')}</span>` : ''}${r.counterpart ? `<span class="chip hot" title="${esc(r.counterpart.name)} · ${esc(r.counterpart.location || '')}">${t('gerechnet als {db}', { db: esc(r.counterpart.database) })}</span>` : ''}${S.st.background && S.st.background.options.length > 1 ? `<span class="chip" title="${t('Hintergrunddaten dieser Rechnung (unter Start wählen)')}">${esc(r.background.join(' + '))}</span>` : ''}</div>
+      <div class="row">${check}<span class="chip" title="${t('Zeit für Rechnung und Auswertung')}">${t('{ms} ms · {n} Produkte', { ms: nf(r.seconds * 1000), n: nf(r.matrix_size) })}</span>${r.factors.completed ? `<button class="chip acc" id="complChip" data-act="inv-filter" data-k="completed" title="${t('{n} Flüsse dieses Inventars haben keinen eigenen Faktor in der Methode und rechnen mit dem Faktor des gleichnamigen Flusses ohne Subkompartiment. Das sind {v} {u} des Ergebnisses. Klick zeigt die Liste.', { n: nf(r.factors.completed), v: nf(r.factors.completed_value), u: esc(r.method_unit) })}">${t('mit {n} ergänzten Faktoren', { n: nf(r.factors.completed) })}</button>` : ''}${r.regional?.enabled && r.regional.processes ? `<button class="chip acc" id="regChip" data-act="contrib-loc" title="${t('{n} Prozesse rechnen mit dem Faktor ihres Orts statt dem normalen Faktor. Das ändert das Ergebnis um {v} {u}. Klick zeigt das Ergebnis nach Ort.', { n: nf(r.regional.processes), v: (r.regional.effect > 0 ? '+' : '') + nf(r.regional.effect), u: esc(r.method_unit) })}">${t('mit Faktoren nach Ort')}</button>` : ''}${r.model ? `<span class="chip acc">${t('eigenes Modell, live')}</span>` : ''}${r.counterpart ? `<span class="chip hot" title="${esc(r.counterpart.name)} · ${esc(r.counterpart.location || '')}">${t('gerechnet als {db}', { db: esc(r.counterpart.database) })}</span>` : ''}${S.st.background && S.st.background.options.length > 1 ? `<span class="chip" title="${t('Hintergrunddaten dieser Rechnung (unter Start wählen)')}">${esc(r.background.join(' + '))}</span>` : ''}</div>
     </div>${factorNotice(r)}` : busy()}
     ${setupIndex() >= 0 && S.setupRes.fus.length > 1 ? `<label class="f">${t('Produkt aus der Rechnung «{name}»', { name: esc(S.setup?.name || '') })}<select id="fuSetup">${S.setupRes.fus.map((f, i) => `<option value="${i}" ${i === setupIndex() ? 'selected' : ''}>${esc(f.name)} ${esc(f.location || '')} · ${nf(f.amount)} ${esc(f.unit || '')}</option>`).join('')}</select></label>` : ''}
     <div class="row"><button class="btn small" data-act="add-setup" data-k="${S.fu.id}">${t('Zur Rechnung')}</button><button class="btn small" data-act="add-cmp-fu">${t('Zum Vergleich')}</button><button class="btn small" data-act="open" data-k="${S.fu.id}" data-db="${esc(S.fu.database || '')}">${t('Datenblatt')}</button>
@@ -100,11 +124,11 @@ export function vErgebnis() {
 
 function tBeitraege() {
   const r = S.calc, mode = S.contrib;
-  return `${explain(t('<b>Wo</b> entsteht die Wirkung? Nach Prozess: direkte Emissionen jedes Prozesses in der ganzen Lieferkette. Nach Stoff: welche Emissionen oder Ressourcen dahinterstecken. Klick auf einen Prozess öffnet sein Datenblatt.'))}
+  return `${explain(t('<b>Wo</b> entsteht die Wirkung? Nach Prozess: direkte Emissionen jedes Prozesses in der ganzen Lieferkette. Nach Stoff: welche Emissionen oder Ressourcen dahinterstecken. Nach Ort: an welchen Orten die Prozesse liegen, die ausstossen oder Ressourcen nutzen. Klick auf einen Prozess öffnet sein Datenblatt.'))}
   <section class="card" style="display:flex;flex-direction:column;gap:12px">
     <div class="row" style="justify-content:space-between"><h3>${t('Wo entsteht die Wirkung?')}</h3>
-      <div class="seg" role="group" aria-label="${t('Beiträge nach')}"><button data-act="contrib" data-k="act" aria-pressed="${mode === 'act'}">${t('nach Prozess')}</button><button data-act="contrib" data-k="flow" aria-pressed="${mode === 'flow'}">${t('nach Stoff')}</button></div></div>
-    <div class="bars">${mode === 'act' ? bars(r.by_activity, r.by_activity_rest, r.score, 'open') : bars(r.by_flow, r.by_flow_rest, r.score, null)}</div>
+      <div class="seg" role="group" aria-label="${t('Beiträge nach')}"><button data-act="contrib" data-k="act" aria-pressed="${mode === 'act'}">${t('nach Prozess')}</button><button data-act="contrib" data-k="flow" aria-pressed="${mode === 'flow'}">${t('nach Stoff')}</button><button data-act="contrib" data-k="loc" aria-pressed="${mode === 'loc'}">${t('nach Ort')}</button></div></div>
+    ${mode === 'loc' ? locTable(r) : `<div class="bars">${mode === 'act' ? bars(r.by_activity, r.by_activity_rest, r.score, 'open') : bars(r.by_flow, r.by_flow_rest, r.score, null)}</div>`}
   </section>`;
 }
 
@@ -212,7 +236,7 @@ function tInventar() {
   <section class="card" style="display:flex;flex-direction:column;gap:10px">
     <div class="row" style="justify-content:space-between"><h3>${t('Inventar · {n} Stoffflüsse', { n: nf(inv.length) })}</h3>
       <div class="row"><select id="invF" aria-label="${t('Nach Bewertung filtern')}"><option value="">${t('alle Flüsse')}</option><option value="none" ${f === 'none' ? 'selected' : ''}>${t('nur nicht bewertete ({n})', { n: nf(n('none')) })}</option>${n('completed') ? `<option value="completed" ${f === 'completed' ? 'selected' : ''}>${t('nur ergänzte ({n})', { n: nf(n('completed')) })}</option>` : ''}</select>
-        <input type="search" id="invQ" placeholder="${t('Filtern, z.B. carbon dioxide')}" value="${esc(S.invQ)}" aria-label="${t('Inventar filtern')}"><button class="btn small" data-act="csv-inv">${t('Als CSV')}</button>${S.calc.factors.completable ? `<button class="btn small" data-act="csv-completed" title="${t('Alle Faktoren, die die Ergänzung dieser Methode gibt: Fluss, Kompartiment, Faktor, Herkunft')}">${t('Ergänzte Faktoren als CSV')}</button>` : ''}</div></div>
+        <input type="search" id="invQ" placeholder="${t('Filtern, z.B. carbon dioxide')}" value="${esc(S.invQ)}" aria-label="${t('Inventar filtern')}"><button class="btn small" data-act="csv-inv">${t('Als CSV')}</button>${S.calc.factors.completable ? `<button class="btn small" data-act="csv-completed" title="${t('Alle Faktoren, die die Ergänzung dieser Methode gibt: Fluss, Kompartiment, Faktor, Herkunft')}">${t('Ergänzte Faktoren als CSV')}</button>` : ''}${S.calc.regional?.available ? `<button class="btn small" data-act="csv-regional" title="${t('Alle Faktoren nach Ort dieser Methode: Fluss, Ort, Faktor, normaler Faktor, Herkunft')}">${t('Faktoren nach Ort als CSV')}</button>` : ''}</div></div>
     ${f === 'none' ? `<p class="muted" style="font-size:13px">${t('Zuoberst die Flüsse, deren Name in einem anderen Subkompartiment desselben Kompartiments einen Faktor hat. Die Schätzung ist Menge mal dieser Faktor: ein Hinweis, wo die Methode eine Lücke haben könnte, kein Ergebnis.')}</p>` : ''}
     <div class="tblwrap"><table class="tbl" id="invTbl"><thead><tr><th>${t('Stoff')}</th><th>${t('Kompartiment')}</th><th style="text-align:right">${t('Menge')}</th><th>${t('Einheit')}</th><th>${t('Methode')}</th>${extraHead}</tr></thead><tbody>
       ${shown.map(r => `<tr data-status="${r.status}"><td>${esc(r.name)}</td><td class="muted">${esc(r.categories)}</td><td class="num nw" style="text-align:right">${sci(r.amount)}</td><td class="muted">${esc(r.unit)}</td><td><span class="chip ${r.status === 'none' ? ('estimate' in r ? 'hot' : '') : r.status === 'own' ? '' : 'acc'}">${lab[r.status]}</span></td>${extra(r)}</tr>`).join('')}
