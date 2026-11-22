@@ -63,6 +63,7 @@ const EN = {
   'Übernehmen': 'Apply',
   'Anlegen': 'Create',
   'Löschen': 'Delete',
+  'Rechnung löschen': 'Delete setup',
   'Entfernen': 'Remove',
   'Name': 'Name',
   'Ort': 'Location',

@@ -224,9 +224,13 @@ function renderTop() {
   const eb = $('explainBtn'); eb.setAttribute('aria-pressed', S.explain); eb.textContent = S.explain ? t('Erklärungen an') : t('Erklärungen aus');
   const rail = $('rail');
   rail.innerHTML = views().map(([k, l]) => `<button class="nav" data-act="view" data-k="${k}" ${S.view === k ? 'aria-current="page"' : ''}>${icon(k)}<span>${l}</span></button>`).join('');
-  // on a narrow screen the views are a row that scrolls sideways: keep the open one in sight
-  const cur = rail.querySelector('[aria-current]');
-  if (cur && rail.scrollWidth > rail.clientWidth) rail.scrollLeft += cur.getBoundingClientRect().left - rail.getBoundingClientRect().left - (rail.clientWidth - cur.offsetWidth) / 2;
+  keepInSight(rail, '[aria-current]');
+}
+// on a narrow screen the views and the result tabs are rows that scroll sideways: keep the open one in sight
+// (only sideways: the page itself must not move)
+function keepInSight(row, sel) {
+  const cur = row?.querySelector(sel);
+  if (cur && row.scrollWidth > row.clientWidth) row.scrollLeft += cur.getBoundingClientRect().left - row.getBoundingClientRect().left - (row.clientWidth - cur.offsetWidth) / 2;
 }
 function projectTag(p) {
   return p.copy ? ' ' + t('(Arbeitskopie)') : p.testcopy ? ' ' + t('(Testkopie)') : p.legacy ? ' ' + t('(Activity Browser 2, nur als Kopie)')
@@ -243,6 +247,7 @@ function render() {
   const el = typing && $(typing.id);
   if (el) { el.value = typing.value; el.focus(); el.setSelectionRange(typing.start, typing.end); }
   // the Sankey grows to the left; start at the product on the right
+  keepInSight(document.querySelector('.tabs'), '[aria-selected="true"]');
   const sk = document.querySelector('.gwrap.sankey');
   if (sk) sk.scrollLeft = sk.scrollWidth;
   const ph = $('pedHint');

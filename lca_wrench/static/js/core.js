@@ -124,9 +124,10 @@ export function shareBar(v, total) {
 
 export function bars(items, rest, total, act) {
   const all = items.map(x => ({ ...x }));
-  if (Math.abs(rest) > 1e-15) all.push({ name: t('Übrige'), value: rest });
+  // the rest: many small items together, not a hotspot, so never in the warning colour
+  if (Math.abs(rest) > 1e-15) all.push({ name: t('Übrige'), value: rest, rest: true });
   const max = Math.max(...all.map(x => Math.abs(x.value)), 1e-15);
-  return all.map(x => `<button class="bar" ${act && x.id ? `data-act="${act}" data-k="${x.id}"` : 'tabindex="-1"'} title="${esc(x.name)}"><span>${esc(x.name)}${x.location ? ` <span class="muted">${esc(x.location)}</span>` : ''}${x.categories ? ` <span class="muted">${esc(x.categories)}</span>` : ''}${x.database && isModelDb(x.database) ? ` <span class="chip acc">${t('Modell')}</span>` : ''}</span><span class="t"><i class="${x.value < 0 ? 'neg' : total && x.value / total >= 0.25 ? 'hot' : ''}" style="width:${Math.abs(x.value) / max * 100}%"></i></span><span class="v"><span>${nf(x.value)}</span><span class="p">${pct(total ? x.value / total : 0)}</span></span></button>`).join('');
+  return all.map(x => `<button class="bar" ${act && x.id ? `data-act="${act}" data-k="${x.id}"` : 'tabindex="-1"'} title="${esc(x.name)}"><span>${esc(x.name)}${x.location ? ` <span class="muted">${esc(x.location)}</span>` : ''}${x.categories ? ` <span class="muted">${esc(x.categories)}</span>` : ''}${x.database && isModelDb(x.database) ? ` <span class="chip acc">${t('Modell')}</span>` : ''}</span><span class="t"><i class="${x.rest ? 'rest' : x.value < 0 ? 'neg' : total && x.value / total >= 0.25 ? 'hot' : ''}" style="width:${Math.abs(x.value) / max * 100}%"></i></span><span class="v"><span>${nf(x.value)}</span><span class="p">${pct(total ? x.value / total : 0)}</span></span></button>`).join('');
 }
 
 // a file the server makes (CSV, Excel): POST the request, save the answer under the name the server gives
