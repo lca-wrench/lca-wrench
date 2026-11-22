@@ -350,10 +350,15 @@ const A = {
   'new-db-cancel'() { S.newDb = false; render(); },
   'new-proc'() { S.newProc = true; render(); $('npName')?.focus(); },
   'new-proc-cancel'() { S.newProc = false; render(); },
-  async 'del-db'(k) {
-    if (!confirm(t('Modell «{name}» mit allen Prozessen löschen? Das lässt sich nicht rückgängig machen.', { name: k }))) return;
-    await loadState(await api('/api/models/db/delete', { name: k }));
-    S.msel = null; S.mact = null; await loadView(); render(); toast(t('«{name}» gelöscht.', { name: k }));
+  'del-db'(k) {
+    openConfirm({
+      title: t('Modell löschen'), ok: t('Löschen'), danger: true, busy: t('Wird gelöscht …'),
+      text: t('Modell «{name}» mit allen Prozessen löschen? Das lässt sich nicht rückgängig machen.', { name: esc(k) }),
+      run: async () => {
+        await loadState(await api('/api/models/db/delete', { name: k }));
+        S.msel = null; S.mact = null; await loadView(); render(); toast(t('«{name}» gelöscht.', { name: k }));
+      },
+    });
   },
   async 'copy-to-model'(k) {
     const dbs = S.st.databases.filter(d => d.role === 'model');
@@ -412,9 +417,13 @@ const A = {
     S.setup = await api(`/api/setups/get?name=${encodeURIComponent(k)}`); if (!same) S.setupRes = null; S.setupVerify = null;
     S.view = 'rechnen'; render(); showDetail(); if (S.setup.fus.length && S.setup.methods.length) { await runSetup(); render(); } else { S.setupRes = null; render(); }
   },
-  async 'del-setup'() {
-    if (!confirm(t('Rechnung «{name}» löschen?', { name: S.setup.name }))) return;
-    await loadState(await api('/api/setups/delete', { name: S.setup.name })); S.setup = null; S.setupRes = null; render();
+  'del-setup'() {
+    const name = S.setup.name;
+    openConfirm({
+      title: t('Rechnung löschen'), ok: t('Löschen'), danger: true, busy: t('Wird gelöscht …'),
+      text: t('Rechnung «{name}» löschen?', { name: esc(name) }),
+      run: async () => { await loadState(await api('/api/setups/delete', { name })); S.setup = null; S.setupRes = null; render(); },
+    });
   },
   async 'run-setup'() { await runSetup(); render(); },
   async 'mc-start'() {
@@ -567,11 +576,16 @@ const A = {
     S.sopts = null; resetErgebnis(); S.setupRes = null; await loadView(); render();
     toast(t('Hintergrund: {list}', { list: S.st.background.used.join(', ') }));
   },
-  async 'bg-remove'(k) {
-    if (!confirm(t('Datenbank «{name}» aus dem Projekt entfernen? Das lässt sich nicht rückgängig machen; sie lässt sich aber neu importieren.', { name: k }))) return;
-    await loadState(await api('/api/background/remove', { name: k })); S.bgForm = null;
-    S.cmp = S.cmp.filter(c => !(c.background || []).includes(k));
-    S.sopts = null; resetErgebnis(); S.setupRes = null; await loadView(); render(); toast(t('«{name}» entfernt.', { name: k }));
+  'bg-remove'(k) {
+    openConfirm({
+      title: t('Datenbank entfernen'), ok: t('Entfernen'), danger: true, busy: t('Wird entfernt …'),
+      text: t('Datenbank «{name}» aus dem Projekt entfernen? Das lässt sich nicht rückgängig machen; sie lässt sich aber neu importieren.', { name: esc(k) }),
+      run: async () => {
+        await loadState(await api('/api/background/remove', { name: k })); S.bgForm = null;
+        S.cmp = S.cmp.filter(c => !(c.background || []).includes(k));
+        S.sopts = null; resetErgebnis(); S.setupRes = null; await loadView(); render(); toast(t('«{name}» entfernt.', { name: k }));
+      },
+    });
   },
   async 'cmp-each-bg'() {  // the last product in the comparison, once with every process or scenario database
     const last = S.cmp[S.cmp.length - 1]; if (!last) return;

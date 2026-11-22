@@ -85,7 +85,9 @@ def page(server):
         errors = []
         pg.on("pageerror", lambda e: errors.append(str(e)))
         pg.errors = errors
-        pg.on("dialog", lambda d: d.accept())
+        # questions use the app's own dialog; a native one (confirm, alert) would be a regression
+        native = []
+        pg.on("dialog", lambda d: (native.append(d.message), d.dismiss()))
         pg.goto(server)
         # the tests read the German texts; English is the default (test_11)
         pg.evaluate("localStorage.setItem('wb-lang', 'de')")
@@ -94,6 +96,7 @@ def page(server):
         ctx.close()
         browser.close()
     assert not errors, f"JavaScript-Fehler im Browser: {errors}"
+    assert not native, f"Browser-Dialog statt eigenem Dialog: {native}"
 
 
 def test_01_start_and_tour(page):
@@ -363,6 +366,7 @@ def test_09_cleanup_example(page):
     expect(page.locator("[data-act=del-db]").first).to_be_visible()
     while page.locator("[data-act=del-db]").count():
         page.locator("[data-act=del-db]").first.click()
+        page.click("#dlg [data-act=confirm-ok]")
         page.wait_for_timeout(1500)
         page.click("#rail [data-k=start]")
         page.click("#rail [data-k=modell]")
@@ -445,6 +449,7 @@ def test_11_english_and_back(page):
     expect(page.locator("#toast")).to_contain_text("A database “Sprachtest” already exists.")
     page.click("[data-act=new-db-cancel]")
     page.click("[data-act=del-db]")
+    page.click("#dlg [data-act=confirm-ok]")
     expect(page.locator("#mdbSel option", has_text="Sprachtest")).to_have_count(0)
     page.click("#langBtn")
     expect(page.locator("#rail")).to_contain_text("Rechnen")
