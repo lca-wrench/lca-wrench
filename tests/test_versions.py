@@ -27,7 +27,7 @@ def bw_score(project, node_id, method):
 def two_versions():
     bd.projects.set_current(TEST_PROJECT)
     if V2 in bd.projects:
-        bd.projects.delete_project(V2, delete_dir=True)
+        s.remove_project(V2)
     hit = [h for h in s.search("electricity low voltage", "CH") if h["unit"] == "kWh"][0]
     pid = int(hit["id"])
     bd.projects.copy_project(V2, switch=True)
@@ -60,7 +60,7 @@ def two_versions():
     bd.projects.set_current(TEST_PROJECT)
     yield {"pid": pid, "up": up["name"], "removed": removed_name}
     bd.projects.set_current(TEST_PROJECT)
-    bd.projects.delete_project(V2, delete_dir=True)
+    s.remove_project(V2)
 
 
 def test_parts_add_up_to_the_difference_of_two_bw2calc_results(two_versions):
@@ -123,7 +123,7 @@ def test_api(two_versions):
     from lca_wrench.api import app
 
     bd.projects.set_current(TEST_PROJECT)
-    with TestClient(app, base_url="http://127.0.0.1") as c:
+    with TestClient(app, base_url="http://127.0.0.1", headers={"X-LCA-Wrench": "1"}) as c:
         assert [t["name"] for t in c.get("/api/versions/targets", params={"project": V2}).json()] == [BG]
         body = {"id": str(two_versions["pid"]), "amount": 2, "method": list(s.CLIMATE_METHOD), "project": V2, "database": BG}
         r = c.post("/api/versions", json=body)

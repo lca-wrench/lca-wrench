@@ -18,7 +18,7 @@ DB = "Test Region"
 @pytest.fixture(scope="module")
 def client():
     bd.projects.set_current(TEST_PROJECT)
-    with TestClient(app, base_url="http://127.0.0.1") as c:
+    with TestClient(app, base_url="http://127.0.0.1", headers={"X-LCA-Wrench": "1"}) as c:
         yield c
 
 

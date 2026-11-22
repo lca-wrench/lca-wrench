@@ -110,6 +110,7 @@ def test_working_copy_edit_undo_and_compare():
         after = s.unit_score(aid, s.CLIMATE_METHOD)
         assert after == pytest.approx(lca.score, rel=1e-6)
         assert after < before
+        del lca  # its datapackages keep the copy's files open; on Windows the copy could not be deleted below
 
         cmp = s.compare([{"project": PROJECT, "id": aid, "amount": 1}, {"project": name, "id": aid, "amount": 1}],
                         s.CLIMATE_METHOD)
@@ -121,7 +122,7 @@ def test_working_copy_edit_undo_and_compare():
         assert s.state()["changes"] == []
     finally:
         bd.projects.set_current(PROJECT)
-        bd.projects.delete_project(name, delete_dir=True)
+        s.remove_project(name)
         reg = registry.load()
         reg["copies"].pop(name, None)
         registry.save(reg)
@@ -137,3 +138,44 @@ def test_test_projects_hidden_and_source_protected():
     with pytest.raises(RuntimeError):
         bd.projects.set_current("bafu-2025")
     assert bd.projects.current == PROJECT
+
+
+def test_removing_a_copy_closes_its_files_and_frees_the_name():
+    """Windows cannot delete open files (WinError 32): a copy the engine has calculated in keeps its processed
+    datapackages open until engine.forget. remove_project closes them and leaves no folder; a folder left over by
+    an earlier failed deletion does not block the next copy."""
+    from bw2data.project import ProjectDataset
+
+    from lca_wrench import engine
+
+    aid = s.examples()[0]["id"]
+    name = s.make_working_copy()
+    try:
+        s.unit_score(aid, s.CLIMATE_METHOD)  # builds and caches the copy's background
+        bgs = [bg for (p, _v, _d), bg in engine._backgrounds.items() if p == name]
+        assert bgs and bgs[0].lca.packages
+        zips = [dp.fs.zip for dp in bgs[0].lca.packages if hasattr(getattr(dp, "fs", None), "zip")]
+        assert zips and all(z.fp is not None for z in zips)
+        folder = bd.projects._project_dir(ProjectDataset.get(ProjectDataset.name == name))
+        bd.projects.set_current(PROJECT)
+        s.remove_project(name)
+        assert all(z.fp is None for z in zips)  # closed
+        assert not any(p == name for (p, _v, _d) in engine._backgrounds)
+        assert name not in bd.projects and not folder.exists()
+
+        folder.mkdir(parents=True)  # what a failed deletion left behind
+        try:
+            again = s.make_working_copy()
+            assert again != name and bd.projects.current == again
+            bd.projects.set_current(PROJECT)
+            s.remove_project(again)
+        finally:
+            s.remove_folder(folder)
+    finally:
+        bd.projects.set_current(PROJECT)
+        if name in bd.projects:
+            s.remove_project(name)
+        reg = registry.load()
+        for n in [n for n in reg["copies"] if n.startswith(name)]:
+            reg["copies"].pop(n, None)
+        registry.save(reg)
