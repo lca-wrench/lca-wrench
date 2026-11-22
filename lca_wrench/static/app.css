@@ -381,3 +381,23 @@ label.row > input[type=checkbox],label.row > input[type=radio]{flex:none;margin-
 .bar:not([data-act]):hover{background:transparent}
 /* the tabs of the result: one row that scrolls sideways on a phone, like the views */
 @media (max-width:760px){.tabs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:thin}.tabs button{flex:none;padding:8px 11px}}
+
+/* header on wider screens: name and selectors on the left, buttons on the right.
+   From 1200 px one row (the selectors give way before anything wraps); between phone and 1200 px two
+   deliberate rows: name and buttons, then the selectors in equal columns */
+@media (min-width:761px){
+  .brand{margin-right:0}
+  .topbtns{margin-left:auto;flex:none}
+  .top label.f{flex:1 1 150px;min-width:130px;max-width:260px}
+  .top select{width:100%;max-width:none}
+}
+@media (min-width:761px) and (max-width:1399px){.brand .chip{display:none}}
+@media (min-width:761px) and (max-width:1199px){
+  .top{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px 14px}
+  .top:has(#bgBox:not([hidden])){grid-template-columns:repeat(4,minmax(0,1fr))}
+  .brand{grid-column:1;grid-row:1}
+  .topbtns{grid-column:2/-1;grid-row:1;justify-self:end}
+  .top label.f{min-width:0;max-width:none}
+  #copyChip{grid-column:1/-1;justify-self:start}
+  #copyChip:empty{display:none}
+}
