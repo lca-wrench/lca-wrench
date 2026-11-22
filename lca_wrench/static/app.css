@@ -353,3 +353,6 @@ label.row:has(> input[type=checkbox]),label.row:has(> input[type=radio]){flex-wr
 label.row > input[type=checkbox],label.row > input[type=radio]{flex:none;margin-top:4px}
 /* long dataset names on buttons wrap instead of widening a narrow page */
 @media (max-width:760px){.btn{white-space:normal;text-align:left;max-width:100%}}
+/* the working area next to a list (Data, Model, Parameters, Calculate) */
+.detail{display:flex;flex-direction:column;gap:18px;min-width:0}
+@media (max-width:760px){.detail{scroll-margin-top:72px}}

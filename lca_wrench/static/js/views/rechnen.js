@@ -14,7 +14,7 @@ export function vRechnen() {
       ${newForm}
       <div class="reslist">${list}</div>
     </aside>
-    <div style="display:flex;flex-direction:column;gap:18px;min-width:0">${S.setup ? editor(S.setup) + results() + mcSection() + (S.setup.fus.length && S.setup.methods.length ? sensSection() : '') : `<section class="card"><p class="empty">${t('Wähle links eine Rechnung oder lege eine neue an.')}</p></section>`}</div>
+    <div class="detail">${S.setup ? editor(S.setup) + results() + mcSection() + (S.setup.fus.length && S.setup.methods.length ? sensSection() : '') : `<section class="card"><p class="empty">${t('Wähle eine Rechnung aus der Liste oder lege eine neue an.')}</p></section>`}</div>
   </div>`;
 }
 

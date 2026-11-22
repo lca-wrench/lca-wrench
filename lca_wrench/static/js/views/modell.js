@@ -45,7 +45,7 @@ export function vModell() {
   const j = S.st.journal || [];
   const journal = `<details class="haube journal" ${j.length ? '' : 'hidden'}><summary>${t('Verlauf · {n}', { n: j.length })}</summary>
     <ol class="jlist">${j.map(e => `<li><span>${esc(e.label)}</span><button class="btn small" data-act="undo-to" data-k="${e.n}" title="${t('Diesen und alle späteren Schritte zurücknehmen')}">${t('zurück bis hier')}</button></li>`).join('')}</ol></details>`;
-  const editor = S.mact ? sheet(S.mact, S) : `<section class="card"><p class="empty">${S.mprocs.length ? t('Wähle links einen Prozess oder lege einen neuen an.') : t('Lege links den ersten Prozess an.')}</p></section>`;
+  const editor = S.mact ? sheet(S.mact, S) : `<section class="card"><p class="empty">${S.mprocs.length ? t('Wähle einen Prozess aus der Liste oder lege einen neuen an.') : t('Lege mit «+ Prozess» den ersten Prozess an.')}</p></section>`;
   return `${explain(t('Deine Prozesse verwenden Hintergrunddaten als Inputs. Jede Änderung wird <b>sofort</b> gerechnet: Die Zahl oben zeigt die Wirkung mit der ganzen Lieferkette, der Balken neben jedem Input seinen Anteil. Mit «Rückgängig» oder ⌘Z / Ctrl+Z nimmst du Schritte zurück.'))}
   ${(S.st.model_errors || []).length ? `<div class="warnbox"><b>${t('Modell nicht lösbar')}</b><span>${S.st.model_errors.map(esc).join(' ')}</span></div>` : ''}
   <div class="dataview">
@@ -59,7 +59,7 @@ export function vModell() {
       <div class="reslist" style="margin-top:6px">${procs}</div>
       ${journal}
     </aside>
-    <div style="display:flex;flex-direction:column;gap:18px;min-width:0">${editor}</div>
+    <div class="detail">${editor}</div>
   </div>`;
 }
 

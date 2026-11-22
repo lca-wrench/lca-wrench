@@ -250,6 +250,11 @@ function render() {
   positionTour();
 }
 
+// on a narrow screen the list stands above the detail: after choosing, go down to it
+function showDetail() {
+  if (window.matchMedia('(max-width:760px)').matches) document.querySelector('.dataview > .detail')?.scrollIntoView({ block: 'start' });
+}
+
 // the tour moves through the views and makes sure each one shows something
 const tourHooks = {
   go,
@@ -306,8 +311,8 @@ const A = {
   },
   async tour() { if (!S.st.project || S.st.load_error) { toast(t('Bitte zuerst oben ein Projekt wählen.')); return; } await startTour(tourHooks); },
   async open(k, el) { await openNode(k, el.dataset.db); },
-  async 'open-here'(k) { S.sel = k; S.showAllTech = S.showAllBio = false; S.act = await sheetFor(k); render(); },
-  async 'open-proc'(k) { S.msel = k; S.uncFor = null; S.prevScore = null; S.showAllTech = S.showAllBio = false; S.mact = await sheetFor(k); render(); },
+  async 'open-here'(k) { S.sel = k; S.showAllTech = S.showAllBio = false; S.act = await sheetFor(k); render(); showDetail(); },
+  async 'open-proc'(k) { S.msel = k; S.uncFor = null; S.prevScore = null; S.showAllTech = S.showAllBio = false; S.mact = await sheetFor(k); render(); showDetail(); },
   async 'open-db'(k) { S.mdb = k; S.msel = null; S.mact = null; await go('modell'); },
   'all-tech'() { S.showAllTech = !S.showAllTech; render(); },
   'all-bio'() { S.showAllBio = !S.showAllBio; render(); },
@@ -400,7 +405,7 @@ const A = {
     if (!S.setup || S.setup.name !== k) { S.mc = { ...S.mc, job: null, res: null, error: null }; S.sens = { j: 0, job: null, res: null, error: null }; }
     const same = S.setup && S.setup.name === k;  // the same setup again: keep its numbers until the new ones are there
     S.setup = await api(`/api/setups/get?name=${encodeURIComponent(k)}`); if (!same) S.setupRes = null; S.setupVerify = null;
-    S.view = 'rechnen'; render(); if (S.setup.fus.length && S.setup.methods.length) { await runSetup(); render(); } else { S.setupRes = null; render(); }
+    S.view = 'rechnen'; render(); showDetail(); if (S.setup.fus.length && S.setup.methods.length) { await runSetup(); render(); } else { S.setupRes = null; render(); }
   },
   async 'del-setup'() {
     if (!confirm(t('Rechnung «{name}» löschen?', { name: S.setup.name }))) return;

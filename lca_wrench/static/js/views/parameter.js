@@ -54,7 +54,7 @@ export function vParameter() {
         <label class="f">${t('Modell')}<select id="parDb">${models.map(m => `<option value="${esc(m.name)}" ${m.name === S.mdb ? 'selected' : ''}>${esc(m.name)}</option>`).join('')}</select></label>
         ${help}
       </aside>
-      <div style="display:flex;flex-direction:column;gap:18px;min-width:0">${proj}${modelCard}${procCard}</div>
+      <div class="detail">${proj}${modelCard}${procCard}</div>
     </div>`;
 }
 
