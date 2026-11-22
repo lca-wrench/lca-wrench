@@ -2,7 +2,8 @@
 
 The server runs in the test project `lca-wrench-test` with its own registry file.
 Skip with LCA_WRENCH_SKIP_BROWSER=1 (check.sh --no-browser).
-Uses the installed Google Chrome (no separate browser download).
+Uses the installed Google Chrome (no separate browser download); other browsers and the files kept when a test
+fails: see browser_support.py.
 """
 
 import os
@@ -18,6 +19,7 @@ import pytest
 pytest.importorskip("playwright")
 from playwright.sync_api import expect, sync_playwright  # noqa: E402
 
+import browser_support  # noqa: E402
 from conftest import TEST_PROJECT  # noqa: E402
 
 pytestmark = pytest.mark.skipif(os.environ.get("LCA_WRENCH_SKIP_BROWSER") == "1", reason="browser tests skipped (LCA_WRENCH_SKIP_BROWSER=1)")
@@ -70,12 +72,11 @@ def server():
 
 
 @pytest.fixture(scope="module")
-def page(server):
+def page(server, request):
+    failed_before = request.session.testsfailed
     with sync_playwright() as p:
-        # the installed Google Chrome; LCA_WRENCH_CHROME=<path> uses another Chromium (e.g. on Linux)
-        chrome = os.environ.get("LCA_WRENCH_CHROME")
-        browser = p.chromium.launch(executable_path=chrome) if chrome else p.chromium.launch(channel="chrome")
-        ctx = browser.new_context(viewport={"width": 1440, "height": 900})
+        browser = browser_support.launch(p)
+        ctx = browser_support.new_context(browser, "test_browser", viewport={"width": 1440, "height": 900})
         pg = ctx.new_page()
         # the app is local: every request the page makes must go to its own server (checked in the last test)
         external = []
@@ -93,7 +94,7 @@ def page(server):
         pg.evaluate("localStorage.setItem('wb-lang', 'de')")
         pg.reload()
         yield pg
-        ctx.close()
+        browser_support.finish(ctx, request.session.testsfailed > failed_before)
         browser.close()
     assert not errors, f"JavaScript-Fehler im Browser: {errors}"
     assert not native, f"Browser-Dialog statt eigenem Dialog: {native}"

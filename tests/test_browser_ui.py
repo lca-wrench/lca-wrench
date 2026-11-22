@@ -14,6 +14,7 @@ import pytest
 pytest.importorskip("playwright")
 from playwright.sync_api import expect, sync_playwright  # noqa: E402
 
+import browser_support  # noqa: E402
 from test_browser import URL, server  # noqa: E402, F401  (the server fixture of the other browser tests)
 
 pytestmark = pytest.mark.skipif(os.environ.get("LCA_WRENCH_SKIP_BROWSER") == "1", reason="browser tests skipped (LCA_WRENCH_SKIP_BROWSER=1)")
@@ -41,20 +42,22 @@ def example(server):  # noqa: F811
 @pytest.fixture(scope="module")
 def browser():
     with sync_playwright() as p:
-        chrome = os.environ.get("LCA_WRENCH_CHROME")
-        b = p.chromium.launch(executable_path=chrome) if chrome else p.chromium.launch(channel="chrome")
+        b = browser_support.launch(p)
         b.devices = p.devices
         yield b
         b.close()
 
 
 @pytest.fixture
-def open_page(browser, example):
+def open_page(browser, example, request):
     """open_page(width) or open_page(device="iPhone 13"): the app in German, without the tour, no JavaScript errors."""
     made = []
+    failed_before = request.session.testsfailed
 
     def make(width=1440, height=900, device=None):
-        ctx = browser.new_context(**browser.devices[device]) if device else browser.new_context(viewport={"width": width, "height": height})
+        name = f"{request.node.name}-{device or width}"
+        options = dict(browser.devices[device]) if device else {"viewport": {"width": width, "height": height}}
+        ctx = browser_support.new_context(browser, name, **options)
         pg = ctx.new_page()
         pg.errors, pg.native = [], []
         pg.on("pageerror", lambda e: pg.errors.append(str(e)))
@@ -70,7 +73,7 @@ def open_page(browser, example):
     yield make
     for ctx, pg in made:
         errors, native = pg.errors, pg.native
-        ctx.close()
+        browser_support.finish(ctx, request.session.testsfailed > failed_before)
         assert not errors, f"JavaScript-Fehler im Browser: {errors}"
         assert not native, f"Browser-Dialog statt eigenem Dialog: {native}"
 
@@ -107,7 +110,10 @@ def test_phone_no_sideways_scrolling(open_page, example, width):
     assert page_width(pg) <= width
     open_result(pg, example["setup"])
     assert page_width(pg) <= width
-    assert pg.evaluate("document.querySelector('.top').offsetHeight") < 200
+    # the header is compact: its buttons in one row (a long label may wrap inside its button)
+    tops = pg.evaluate("[...document.querySelectorAll('.topbtns .btn')].filter(b => !b.hidden).map(b => Math.round(b.getBoundingClientRect().top))")
+    assert len(set(tops)) == 1, tops
+    assert pg.evaluate("document.querySelector('.top').offsetHeight") < 220
     # the open view is in sight in its row, and the row stays at the top of the screen
     rail = pg.evaluate("""() => { const r = document.getElementById('rail').getBoundingClientRect(), c = document.querySelector('#rail [aria-current]').getBoundingClientRect();
         return { inside: c.left >= r.left - 1 && c.right <= r.right + 1 }; }""")
