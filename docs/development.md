@@ -10,8 +10,9 @@ Setup and contribution rules: [../CONTRIBUTING.md](../CONTRIBUTING.md).
 ./check.sh --no-browser    # without the browser tests
 ```
 
-Without the script: `python -m ruff check . && python -m pytest -q`. The GitHub workflow `.github/workflows/check.yml`
-runs the same on Linux, Windows and macOS for every pull request and push to main.
+Without the script: `python -m ruff check . && python -m pytest -q`. The GitHub workflow `.github/workflows/test.yml`
+runs the same on Linux, Windows and macOS for every pull request and push to main, on an installation from the release
+package, and checks a known result and the update from the last release ([ci.md](ci.md)).
 
 On Windows a file that is still open cannot be deleted (WinError 32). The engine's cached calculations keep a
 project's processed datapackages open, so a project is removed with `service.remove_project` (it calls
