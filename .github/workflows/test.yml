@@ -183,17 +183,18 @@ jobs:
         if: runner.os == 'macOS'
         run: zsh pack_mac.sh && mkdir -p new && mv dist/LCA-Wrench-Mac.zip new/
       - name: Package of the last release
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
-          TAG=$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName)
+          # the public release pages, as a user downloads it: no token, no API
+          RELEASES="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases"
+          TAG=$(curl -fsSI "$RELEASES/latest" | tr -d '\r' | sed -n 's|^[Ll]ocation: .*/releases/tag/||p')
+          [ -n "$TAG" ] || { echo "No published release found at $RELEASES"; exit 1; }
           echo "TAG=$TAG" >> "$GITHUB_ENV"
           case "$RUNNER_OS" in
             Linux) PKG=LCA-Wrench-Linux.tar.gz ;; Windows) PKG=LCA-Wrench-Windows.zip ;; macOS) PKG=LCA-Wrench-Mac.zip ;;
           esac
           echo "PKG=$PKG" >> "$GITHUB_ENV"
           mkdir -p old
-          if ! gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern "$PKG" --dir old; then
+          if ! curl -fsSL --retry 3 -o "old/$PKG" "$RELEASES/download/$TAG/$PKG"; then
             # v0.1.0 had no Linux package: its app with today's Linux scripts
             [ "$RUNNER_OS" = Linux ] || exit 1
             LCA_WRENCH_SCRIPTS_REF=HEAD bash pack_linux.sh "$TAG" && mv "dist/$PKG" old/
