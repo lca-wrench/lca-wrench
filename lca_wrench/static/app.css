@@ -401,3 +401,10 @@ label.row > input[type=checkbox],label.row > input[type=radio]{flex:none;margin-
   #copyChip{grid-column:1/-1;justify-self:start}
   #copyChip:empty{display:none}
 }
+
+/* touch screens: iPhone Safari zooms into any field with text below 16 px when it is tapped (and stays zoomed).
+   16 px there; zooming by hand stays possible (the viewport does not forbid it). :is/:where keep the specificity low,
+   so larger fields (the name in the editor, 18 px) stay as they are */
+@media (hover:none) and (pointer:coarse){
+  :root :is(input:where(:not([type=checkbox],[type=radio],[type=range],[type=file])),select,textarea){font-size:16px}
+}
