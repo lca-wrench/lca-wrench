@@ -28,7 +28,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - run: sudo apt-get install -y --no-install-recommends zsh  # pack_windows.sh is a zsh script
+      - run: sudo apt-get update -q && sudo apt-get install -y -q --no-install-recommends zsh  # pack_windows.sh is a zsh script
       - run: bash pack_linux.sh && zsh pack_windows.sh
       - uses: actions/upload-artifact@v4
         with:
