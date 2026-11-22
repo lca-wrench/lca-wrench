@@ -31,6 +31,14 @@ The installer sets up its own Python and the packages inside the LCA Wrench fold
 needed, 3 to 5 minutes). The Windows and Linux packages are less tested than the macOS one. Details:
 [docs/install.md](docs/install.md).
 
+**Updating** (e.g. from 0.1.0). Close LCA Wrench, then install the new package over the old folder: on macOS open the
+new **Install LCA Wrench** and choose the same folder; on Windows and Linux delete the folder `lca_wrench` inside the
+LCA Wrench folder (the old program code), unpack the new package over the folder and run the installer again. Your
+projects, models, calculation setups and settings stay: they are in the Brightway folder, not in the LCA Wrench
+folder. The Python and the packages stay too. The file `VERSION` in the folder then shows the new version. Step by
+step: "Updating to a newer version" in the `README.txt` of each package. The automatic tests do the same update from
+the last release on all three systems ([docs/ci.md](docs/ci.md)).
+
 **Which data with which installation.** With the release package, a project with BAFU 2026 (EF 3.1 methods) is
 created in the app under "New project", and ecoinvent can be imported there with your own licence. BAFU 2025 with the
 Ecological Scarcity 2021 methods and the example model, as in the screenshots, needs a Brightway project made from the

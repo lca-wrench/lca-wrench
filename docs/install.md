@@ -74,6 +74,25 @@ Files are in `linux/`.
 - Tested with a fresh installation and an update on Ubuntu 26.04 (x86_64), and a fresh installation on Debian 12,
   Ubuntu 22.04, Fedora 41 and Arch Linux (containers). aarch64 has not been tested.
 
+### Updating
+
+The same on all three systems: LCA Wrench is closed, the program code of the old version (the folder `lca_wrench`)
+is removed, the new package goes over the folder, and the installer runs again. It keeps `.venv` and `.tools` (uv
+venv `--allow-existing`) and brings the packages to the versions of the new `requirements-lock.txt`, so an update
+takes a fraction of the first installation. The Brightway projects, the settings file `lca-wrench.json` next to them
+and the log are outside `lca_wrench` and stay.
+
+- **macOS:** the new **Install LCA Wrench.app**, same folder: `bootstrap.sh` recognises an LCA Wrench folder (it has
+  `VERSION`), deletes `lca_wrench` and copies the package over it. Without a signature by hand, as in `README.txt`.
+- **Windows:** delete `lca_wrench`, "Extract All" with the folder that contains `LCA-Wrench` as the destination,
+  "Replace the files", then **Install LCA Wrench**.
+- **Linux:** `rm -rf ~/LCA-Wrench/lca_wrench`, `tar -xzf LCA-Wrench-Linux.tar.gz -C ~`, `./install.sh`.
+
+If a file of the package is missing afterwards (`FILES.txt`), the installer stops and says so. `VERSION` in the folder
+names the installed version, and `lca-wrench.log` writes it at every start ("Start, version …"). The `README.txt` of
+each package has the steps for users, in English and German. The CI's update job (`scripts/ci_package.py install`)
+does exactly these steps from the last release to the commit under test.
+
 ### Building the packages
 
 ```bash

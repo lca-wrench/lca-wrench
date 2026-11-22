@@ -11,8 +11,9 @@ Standard library only: it runs with any Python 3.10+, before and next to the ins
   python scripts/ci_package.py stop <folder> [--port N]
   python scripts/ci_package.py reference [--port N]         the known result of the BAFU 2025 data (see below)
 
-How each package is installed (as in its README.txt):
-- Linux: unpack LCA-Wrench-Linux.tar.gz next to the folder (an update unpacks over it), run install.sh.
+How each package is installed and updated (as its README.txt says, "Updating to a newer version"):
+- Linux: unpack LCA-Wrench-Linux.tar.gz next to the folder, run install.sh. An update first deletes the folder's
+  lca_wrench (the old program code, no user data), then unpacks over it.
 - Windows: the same with LCA-Wrench-Windows.zip and install.ps1.
 - macOS: the signed package holds "Install LCA Wrench.app", whose bootstrap.sh copies the folder to the place chosen
   (here LCA_WRENCH_INSTALL_DIR, without the dialogs) and replaces the app code on an update; then "Install LCA
@@ -97,6 +98,8 @@ def install(package: Path, folder: Path) -> None:
     else:
         if folder.name != FOLDER:
             sys.exit(f"The folder must be called {FOLDER} (the name inside the package): {folder}")
+        if update:  # the old program code goes first, so no file of the older version stays behind
+            shutil.rmtree(folder / "lca_wrench", ignore_errors=True)
         _unpack(package, folder.parent)  # over the folder on an update, as the README says
         cmd = (["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(folder / "install.ps1")]
                if WINDOWS else ["bash", str(folder / "install.sh")])
