@@ -6,6 +6,7 @@ Standard library only: it runs with any Python 3.10+, before and next to the ins
   python scripts/ci_package.py install <package> <folder>   fresh, or an update when <folder> holds an installation
   python scripts/ci_package.py python <folder>              the Python of the installation
   python scripts/ci_package.py data <folder> [--script F]   the free BAFU 2025 project, set up by the installed version
+  python scripts/ci_package.py dev <folder>                 the test tools (requirements-dev.txt) into the installation
   python scripts/ci_package.py start <folder> [--port N]    with the package's own start script, until it answers
   python scripts/ci_package.py stop <folder> [--port N]
   python scripts/ci_package.py reference [--port N]         the known result of the BAFU 2025 data (see below)
@@ -119,6 +120,15 @@ def data(folder: Path, script: Path) -> None:
     subprocess.run([str(venv_python(folder)), "setup_daten.py"], cwd=folder, check=True, stdin=subprocess.DEVNULL)
 
 
+def dev(folder: Path) -> None:
+    """pytest, ruff and playwright into the installed environment, with the uv the installer left in .tools: the tests
+    then run on exactly the packages a user gets. UV_CACHE_DIR (if set) keeps the downloads for the next run."""
+    folder = folder.resolve()
+    uv = folder / ".tools" / ("uv.exe" if WINDOWS else "uv")
+    subprocess.run([str(uv), "pip", "install", "--quiet", "--python", str(venv_python(folder)), "-r", str(ROOT / "requirements-dev.txt")],
+                   check=True)
+
+
 # ---------- start / stop ----------
 
 def _get(url: str, timeout: float = 30):
@@ -219,6 +229,8 @@ def main() -> None:
     a.add_argument("folder", type=Path)
     a = sub.add_parser("python")
     a.add_argument("folder", type=Path)
+    a = sub.add_parser("dev")
+    a.add_argument("folder", type=Path)
     a = sub.add_parser("data")
     a.add_argument("folder", type=Path)
     a.add_argument("--script", type=Path, default=ROOT / "setup_daten.py")
@@ -238,6 +250,8 @@ def main() -> None:
         print(venv_python(args.folder.resolve()).as_posix())  # forward slashes: Git Bash on Windows runs it too
     elif args.cmd == "data":
         data(args.folder, args.script)
+    elif args.cmd == "dev":
+        dev(args.folder)
     elif args.cmd == "start":
         start(args.folder, args.port, args.wait)
     elif args.cmd == "stop":
