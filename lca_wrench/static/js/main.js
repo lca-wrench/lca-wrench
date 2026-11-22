@@ -1,6 +1,6 @@
 // LCA Wrench UI: plain JS modules, talks to the local FastAPI service.
 'use strict';
-import { S, $, esc, nf, mKey, methodInfo, methodLabel, familyLabel, api, toast, guard, renderBusy, icon, views, loadPrefs, savePref, csvDownload, download, isModelDb, langHeader, t, LANG } from './core.js';
+import { S, $, esc, nf, mKey, methodInfo, methodLabel, familyLabel, api, request, toast, guard, renderBusy, icon, views, loadPrefs, savePref, csvDownload, download, isModelDb, langHeader, t, LANG } from './core.js';
 import { setLang } from './i18n.js';
 import { vStart } from './views/start.js';
 import { vDaten } from './views/daten.js';
@@ -44,10 +44,10 @@ async function followImport(job) {
     while (job.state === 'läuft') {
       if (S.newp) { S.newp.job = job; renderDialog(); }
       await new Promise(r => setTimeout(r, 1500));
-      job = (await (await fetch(`/api/import/status?id=${job.id}`, { headers: langHeader() })).json()).job || { ...job, state: 'fehler', error: '?' };
+      job = (await (await request(`/api/import/status?id=${job.id}`, { headers: langHeader() })).json()).job || { ...job, state: 'fehler', error: '?' };
     }
   } finally { S.importing = false; }
-  if (job.state === 'fehler') { if (S.newp) { S.newp.job = job; renderDialog(); } else toast(t('Fehlgeschlagen: {error}', { error: job.error })); await loadState(); render(); return; }
+  if (job.state === 'fehler') { if (S.newp) { S.newp.job = job; renderDialog(); } else toast(t('Fehlgeschlagen: {error}', { error: job.error }), null, true); await loadState(); render(); return; }
   if (job.source === 'premise-setup') {  // set up: on to the scenario itself
     toast(t('premise {v} ist eingerichtet.', { v: job.result?.premise || '' }));
     if (S.newp) { closeDialog(); await newProject({ source: 'premise', target: S.st.project, add: true }); }
@@ -89,7 +89,7 @@ async function submitNewProject() {
 async function afterProjectChange() {
   S.sopts = null; S.move = null; S.bgForm = null; S.cats = { a: null, b: '', topic: '', res: null };
   resetErgebnis(); S.setup = null; S.setupRes = null; S.msel = null; S.mact = null; S.mc = { ...S.mc, job: null, res: null, error: null }; S.sens = { j: 0, job: null, res: null, error: null };
-  try { await loadView(); } catch (e) { S.act = S.sel = S.fu = null; toast(t('Der gewählte Prozess existiert in diesem Projekt nicht.')); }
+  try { await loadView(); } catch (e) { S.act = S.sel = S.fu = null; toast(t('Der gewählte Prozess existiert in diesem Projekt nicht.'), null, true); }
   render();
 }
 
@@ -102,7 +102,7 @@ async function loadState(st) {
 }
 async function sheetFor(id) {
   try { return await api('/api/activity', { id, method: S.method }); }
-  catch (e) { toast(e.message); return null; }
+  catch (e) { toast(e.message, null, true); return null; }
 }
 async function loadView() {
   if (['daten', 'modell', 'rechnen', 'ergebnis'].includes(S.view) && !S.sopts && S.st.databases.length) S.sopts = await api('/api/search/options');
@@ -278,7 +278,7 @@ async function followJob(store, job, onDone) {
   try {
     while (store.job === job && job.state === 'läuft') {
       await new Promise(r => setTimeout(r, 700));
-      const st = await (await fetch(`/api/mc/status?id=${job.id}`, { headers: langHeader() })).json();
+      const st = await (await request(`/api/mc/status?id=${job.id}`, { headers: langHeader() })).json();
       if (!st.state) throw new Error(typeof st.detail === 'string' ? st.detail : t('Der Hintergrundauftrag ist nicht mehr erreichbar.'));
       Object.assign(job, st);
       if (S.view === 'rechnen' && store.job === job) render();
@@ -678,6 +678,7 @@ const A = {
 
   // dialogs
   'dlg-close'() { closeDialog(); },
+  'toast-close'() { /* the click on the toast hides it */ },
   async 'pk-pick'(k) { const amt = parseFloat($('pkAmt')?.value ?? '1'); await picked(S.picker.results[+k], isFinite(amt) ? amt : 1); },
   async 'ch-pick'(k) { await chosen(k, false); },
   'mp-all'(k, el, ev) {
@@ -782,7 +783,7 @@ document.addEventListener('change', ev => {
       await A['open-project'](name);
     }
     else if (el.dataset.ex) {
-      const v = parseFloat(el.value); if (!isFinite(v)) { toast(t('Bitte eine Zahl eingeben.')); render(); return; }
+      const v = parseFloat(el.value); if (!isFinite(v)) { toast(t('Bitte eine Zahl eingeben.'), null, true); render(); return; }
       const a = currentSheet(); if (a) S.prevScore = { id: a.id, v: a.score };
       await loadState(await api('/api/edit', { exchange: el.dataset.ex, amount: v }));
       await refreshSheet(); render();
@@ -798,7 +799,7 @@ document.addEventListener('change', ev => {
     else if (el.id === 'xlsxIn') {
       const f = el.files[0]; el.value = ''; if (!f) return;
       toast(t('Lese «{name}» …', { name: f.name }));
-      const r = await fetch('/api/models/import', { method: 'POST', headers: { 'Content-Type': 'application/octet-stream', ...langHeader() }, body: await f.arrayBuffer() });
+      const r = await request('/api/models/import', { method: 'POST', headers: { 'Content-Type': 'application/octet-stream', ...langHeader() }, body: await f.arrayBuffer() });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(typeof d.detail === 'string' ? d.detail : t('Der Import ist fehlgeschlagen.'));
       await loadState(d.state); S.mdb = d.database; S.msel = null; S.mact = null; S.view = 'modell'; await loadView(); render();
@@ -831,7 +832,7 @@ document.addEventListener('change', ev => {
     else if (el.id === 'cwFile') {
       const f = el.files[0]; el.value = ''; if (!f || !S.cw.res) return;
       const src = S.cw.res.rows[0]?.database || S.fu.database;
-      const r = await fetch(`/api/crosswalk/import?source_database=${encodeURIComponent(src)}&target_database=${encodeURIComponent(S.cw.database)}`, { method: 'POST', headers: { 'Content-Type': 'application/octet-stream', ...langHeader() }, body: await f.arrayBuffer() });
+      const r = await request(`/api/crosswalk/import?source_database=${encodeURIComponent(src)}&target_database=${encodeURIComponent(S.cw.database)}`, { method: 'POST', headers: { 'Content-Type': 'application/octet-stream', ...langHeader() }, body: await f.arrayBuffer() });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(typeof d.detail === 'string' ? d.detail : t('Der Import ist fehlgeschlagen.'));
       toast(t('{n} Zuordnungen aus «{name}» geladen.', { n: d.saved, name: f.name }));

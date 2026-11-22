@@ -57,26 +57,38 @@ export const isModelDb = name => S.st.databases.some(d => d.name === name && d.r
 // X-LCA-Wrench: the server accepts changes only with it (protection against other websites, see api.local_only)
 export const langHeader = () => ({ 'X-Lang': LANG, 'X-LCA-Wrench': '1' });
 
+// fetch, with a message a person understands when the server does not answer at all (stopped, computer asleep)
+export async function request(path, init) {
+  try { return await fetch(path, init); }
+  catch (_) { throw new Error(t('LCA Wrench antwortet nicht. Läuft das Programm noch? Sonst neu starten und die Seite neu laden.')); }
+}
+// the error text of a failed answer: the server's own message, else the HTTP status
+export function failure(r, data) {
+  const d = data?.detail;
+  return new Error(typeof d === 'string' ? d : Array.isArray(d) ? t('Eingabe ungültig: {list}', { list: d.map(x => x.msg).join(', ') }) : t('Die Anfrage ist fehlgeschlagen (Fehler {status}).', { status: r.status }));
+}
+
 export async function api(path, body) {
   S.busy++; renderBusy();
   try {
-    const r = await fetch(path, body === undefined ? { headers: langHeader() } : { method: 'POST', headers: { 'Content-Type': 'application/json', ...langHeader() }, body: JSON.stringify(body) });
+    const r = await request(path, body === undefined ? { headers: langHeader() } : { method: 'POST', headers: { 'Content-Type': 'application/json', ...langHeader() }, body: JSON.stringify(body) });
     const data = await r.json().catch(() => ({}));
-    if (!r.ok) {
-      const d = data.detail;
-      throw new Error(typeof d === 'string' ? d : Array.isArray(d) ? t('Eingabe ungültig: {list}', { list: d.map(x => x.msg).join(', ') }) : t('Die Anfrage ist fehlgeschlagen.'));
-    }
+    if (!r.ok) throw failure(r, data);
     return data;
   } finally { S.busy--; renderBusy(); }
 }
 
+// a short note at the bottom; errors look different, are read out at once and stay until read (10 s or closed)
 let toastT;
-export function toast(msg, action) {
-  const t = $('toast');
-  t.innerHTML = esc(msg) + (action ? ` <button class="linkbtn tlink" data-act="${action.act}" ${action.k !== undefined ? `data-k="${esc(action.k)}"` : ''}>${esc(action.label)}</button>` : '');
-  t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, action ? 8000 : 5000);
+export function toast(msg, action, error = false) {
+  const el = $('toast');
+  el.classList.toggle('err', error);
+  el.setAttribute('role', error ? 'alert' : 'status');
+  el.innerHTML = `<span>${esc(msg)}</span>` + (action ? ` <button class="linkbtn tlink" data-act="${action.act}" ${action.k !== undefined ? `data-k="${esc(action.k)}"` : ''}>${esc(action.label)}</button>` : '')
+    + `<button class="tclose" data-act="toast-close" aria-label="${t('Schliessen')}" title="${t('Schliessen')}">×</button>`;
+  el.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => el.hidden = true, error ? 10000 : action ? 8000 : 5000);
 }
-export async function guard(fn) { try { await fn(); } catch (e) { toast(e.message); console.error(e); } }
+export async function guard(fn) { try { await fn(); } catch (e) { toast(e.message, null, true); console.error(e); } }
 // "Rechne …" only for requests that take noticeably long: on fast ones it would just flash for a few milliseconds
 let busyTimer = null;
 export function renderBusy() {
@@ -121,11 +133,8 @@ export function bars(items, rest, total, act) {
 export async function download(path, body) {
   S.busy++; renderBusy();
   try {
-    const r = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json', ...langHeader() }, body: JSON.stringify(body) });
-    if (!r.ok) {
-      const d = (await r.json().catch(() => ({}))).detail;
-      throw new Error(typeof d === 'string' ? d : t('Die Anfrage ist fehlgeschlagen.'));
-    }
+    const r = await request(path, { method: 'POST', headers: { 'Content-Type': 'application/json', ...langHeader() }, body: JSON.stringify(body) });
+    if (!r.ok) throw failure(r, await r.json().catch(() => ({})));
     const m = /filename\*=UTF-8''([^;]+)/.exec(r.headers.get('Content-Disposition') || '');
     const a = document.createElement('a'); a.href = URL.createObjectURL(await r.blob());
     a.download = m ? decodeURIComponent(m[1]) : 'LCA Wrench'; a.click();

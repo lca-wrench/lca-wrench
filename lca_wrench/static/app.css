@@ -356,3 +356,11 @@ label.row > input[type=checkbox],label.row > input[type=radio]{flex:none;margin-
 /* the working area next to a list (Data, Model, Parameters, Calculate) */
 .detail{display:flex;flex-direction:column;gap:18px;min-width:0}
 @media (max-width:760px){.detail{scroll-margin-top:72px}}
+/* notes at the bottom: errors in the warning colour, every note can be closed */
+.toast{display:flex;align-items:flex-start;gap:6px 10px;flex-wrap:wrap}
+.toast[hidden]{display:none}
+.toast > span{flex:1 1 auto;min-width:0}
+.toast.err{background:var(--hot);color:var(--on-accent)}
+.toast.err .tlink{color:inherit}
+.toast .tclose{border:0;background:transparent;color:inherit;opacity:.75;cursor:pointer;font-size:18px;line-height:1;padding:0 2px;margin-left:auto}
+.toast .tclose:hover{opacity:1}
