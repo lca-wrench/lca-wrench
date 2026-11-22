@@ -187,7 +187,7 @@ function renderTop() {
   text('methLabel', t('Wirkungskategorie'));
   $('railNav')?.setAttribute('aria-label', t('Ansichten'));
   text('tourBtn', t('Rundgang'));
-  text('undoBtn', '↶ ' + t('Rückgängig'));
+  text('undoBtn', '↶\u00a0' + t('Rückgängig'));  // the arrow stays with the word when the text wraps
   const lb = $('langBtn');
   if (lb) { lb.textContent = LANG === 'en' ? 'Deutsch' : 'English'; lb.lang = LANG === 'en' ? 'de' : 'en'; lb.title = LANG === 'en' ? 'Oberfläche auf Deutsch' : 'Switch the interface to English'; }
   $('projSel').innerHTML = (S.st.project ? '' : `<option value="" selected disabled>${t('– Projekt wählen –')}</option>`)
