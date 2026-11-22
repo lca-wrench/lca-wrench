@@ -99,7 +99,7 @@ geändert hat.
    Programmcode der alten Version, keine eigenen Daten.
 3. Das neue LCA-Wrench-Windows.zip über den alten Ordner entpacken: Rechtsklick → «Alle extrahieren», und als Ziel
    den Ordner eintragen, in dem «LCA-Wrench» liegt (z.B. C:\Users\<Name>), statt des vorgeschlagenen. Fragt
-   Windows nach, «Dateien im Ziel ersetzen» wählen.
+   Windows nach, «Die Dateien im Ziel ersetzen» wählen.
 4. Doppelklick auf «Install LCA Wrench» in «LCA-Wrench» (wie beim ersten Mal freigeben). Das geht schneller als die
    erste Installation.
 5. Prüfen: Die Datei «VERSION» in «LCA-Wrench» beginnt mit der neuen Versionsnummer. LCA Wrench starten: Die
