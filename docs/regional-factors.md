@@ -8,7 +8,8 @@ method. Code: `lca_wrench/regional.py`, region lists in `lca_wrench/regions.py`.
 
 ## Where the factors come from
 
-Nothing is bundled. LCA Wrench reads the factors the method itself carries, in two forms:
+Nothing is bundled. LCA Wrench reads the factors the method itself carries, in two forms, and a file you load can add
+more (3.):
 
 1. **Rows with a location**, Brightway's own convention: a method row `(flow, factor, location)`, for example
    `(water_flow, 1.34, "CH")`. bw2data stores such rows; bw2calc filters them out and keeps the rows of the global
@@ -22,12 +23,32 @@ Nothing is bundled. LCA Wrench reads the factors the method itself carries, in t
    used the copies. A flow counts as a copy only if it has a location of its own: the BAFU 2025 flow list names water
    flows by country ("Water, unspecified natural origin, IE") without a location field, and they stay as they are.
 
-A row with a location wins over a country copy for the same flow and place. Rows with a spatial unit of a
-geocollection (`("ecoregions", "PA0101")`, bw2regional) need the spatial data and are not used.
+3. **The JRC's EF 3.1 workbook**, loaded once from your own copy (see below).
 
-The EF 3.1 country factors of the JRC (water use for 209 countries, land use for 212, acidification and terrestrial
-eutrophication for 36 European countries) are not bundled: the licence of the EF reference package for redistribution
-is not stated on the JRC pages. Use them from your own copy of the EF 3.1 package.
+A row with a location wins over a country copy for the same flow and place, and both win over a loaded file, which
+only adds the places the method has no factor for. Rows with a spatial unit of a geocollection
+(`("ecoregions", "PA0101")`, bw2regional) need the spatial data and are not used.
+
+## Loading the EF 3.1 country factors of the JRC
+
+The JRC publishes the EF 3.1 characterization factors as an Excel workbook, `EF-LCIAMethod_CF(EF-v3.1).xlsx`, in the
+EF reference package 3.1 (EPLCA, European Platform on LCA). Its sheet `lciamethods_CF` has a factor per location for
+four categories: water use (AWARE, 209 countries), land use (212 locations), acidification and terrestrial
+eutrophication (36 European countries); a blank location is the default. Brightway implementations of EF 3.1 carry only
+the defaults. The JRC pages do not state whether the package may be redistributed, so LCA Wrench bundles none of it.
+
+In Result, for a method on water, land use, acidification or eutrophication, **Load country factors from the EF 3.1
+file …** reads your copy (about half a minute). LCA Wrench keeps only the flows whose factor differs between locations,
+in a file next to `lca-wrench.json` on this computer (`lca-wrench-regional/ef3.1.json.gz`), never in a project, and
+they apply in every project. Loading a file of the same version again replaces it; **remove** next to the file's name
+takes it out. Code: `lca_wrench/factor_files.py`.
+
+A loaded table applies to a method when the method's factors on the table's flows, matched by flow UUID (the code of
+the EF 3.1 flow list, as in sentier's BAFU 2026 and EF 3.1 PEF projects), equal the table's defaults (relative
+tolerance 1e-3; at least 90 % of the shared flows). That picks the category the table was made for and leaves every
+other method alone. A method on another flow list (ecoinvent's biosphere3) does not match; the result then says so.
+Projects that carry country copies of the water flows for only the countries their data use get the other countries
+from the file, so region averages no longer count missing countries with the default.
 
 ## Which factor an activity gets
 
@@ -100,7 +121,9 @@ without factors by location has no R, and every number stays exactly what it was
 - **Chip** "with factors by location" next to the score: how many activities use the factor of their location and by
   how much this changes the result.
 - **Result, Inventory**: "Factors by location as CSV" lists every factor by location of the method: flow, location,
-  factor, normal factor and whether it comes from a row with a location or a country copy.
+  factor, normal factor and whether it comes from a row with a location, a country copy or a loaded file.
+- **Load country factors from the EF 3.1 file …** above the result of a method on water, land use, acidification or
+  eutrophication; once loaded, the result names the file the method uses, with **remove**.
 
 ## Validation
 
@@ -109,12 +132,14 @@ without factors by location has no R, and every number stays exactly what it was
 second time): the scores of two products to 1e-9 of the gross impact, the production volume weights on a small
 database, country copies, an own model process, the data sheet, Monte Carlo draws against bw2calc with the same seed
 (1e-8), the cross-check with bw2calc, and that methods without factors by location give bit-identical results with
-the switch on and off and agree with bw2calc. Contributions by activity, by flow and by location add up to the score,
+the switch on and off and agree with bw2calc. A small workbook in the form of the JRC's checks reading, matching by
+the defaults (a method with other factors gets nothing), the precedence of the method's own rows, the result against
+the same independent calculation, removing the file and the API. Contributions by activity, by flow and by location add up to the score,
 and the parts by location add up to the difference the factors by location make.
 
 ## Not yet
 
 - A map of the result by location (the location picker for activities is designed separately).
-- More factor tables: reading the JRC EF 3.1 file (water use, land use, acidification, terrestrial eutrophication)
-  and AWARE 2.0 basin factors with a point for each activity.
+- The JRC factors for methods on ecoinvent's flow list (through the flow mapping), and AWARE 2.0 basin factors with
+  a point for each activity.
 - RoW as the countries the sibling datasets leave out, instead of the world average.

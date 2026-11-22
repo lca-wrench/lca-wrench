@@ -258,7 +258,9 @@ location of its own, "Water, AT", whose generic flow is in the same method). Eac
 location; a part of a country (CA-QC) the country's; a region (RER, ENTSO-E …) the average of its countries, weighted
 by the production volumes of the same datasets there (equally where there are none, as in BAFU); GLO, RoW and unknown
 locations keep the normal factor. Nothing is bundled and the stored methods are not changed. On by default, can be
-switched off above the result; a method without such factors gives exactly the result it gave before.
+switched off above the result; a method without such factors gives exactly the result it gave before. The country
+factors of the JRC's EF 3.1 workbook (water use, land use, acidification, terrestrial eutrophication) are loaded once
+from your own copy and apply to the matching EF 3.1 methods in all projects.
 
 **Result by location**: Result, Contributions, "by location" lists the impact by the location of the activities that
 cause it, with what the factors by location change there and how each factor was found; also in the export. Details:

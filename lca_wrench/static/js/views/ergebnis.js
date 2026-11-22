@@ -56,7 +56,8 @@ function factorNotice(r) {
   const f = r.factors;
   const sw = f.completable ? `<label class="row" style="gap:6px;font-size:13.5px" title="${t('Die Methode hat für manche Stoffe nur einen Faktor auf dem Fluss ohne Subkompartiment. Ein Fluss ohne Faktor bekommt dann den Faktor des gleichnamigen Flusses ohne Subkompartiment im selben Kompartiment. Eigene Faktoren der Methode (auch 0) bleiben, Langzeit-Emissionen werden nie ergänzt. Gilt für alle Rechnungen.')}"><input type="checkbox" id="complChk" ${f.completion ? 'checked' : ''}> ${t('Fehlende Faktoren für Subkompartimente ergänzen ({n} in dieser Methode)', { n: nf(f.completable) })}</label>` : '';
   const g = r.regional || {};
-  const rsw = g.available ? `<label class="row" style="gap:6px;font-size:13.5px" title="${t('Die Methode hat Faktoren, die vom Ort abhängen (Zeilen mit Ort oder Länderkopien von Flüssen). Ein Prozess bekommt den Faktor seines Orts, ein Teil eines Landes den des Landes, eine Region das Mittel ihrer Länder (nach Produktionsmenge der gleichen Datensätze dort, sonst gleich gewichtet). GLO, RoW und unbekannte Orte behalten den normalen Faktor. Gilt für alle Rechnungen.')}"><input type="checkbox" id="regChk" ${g.enabled ? 'checked' : ''}> ${t('Faktoren nach Ort anwenden ({k} Ort(e) in dieser Methode)', { k: nf(g.locations) })}</label>` : '';
+  let rsw = g.available ? `<label class="row" style="gap:6px;font-size:13.5px" title="${t('Die Methode hat Faktoren, die vom Ort abhängen (Zeilen mit Ort oder Länderkopien von Flüssen). Ein Prozess bekommt den Faktor seines Orts, ein Teil eines Landes den des Landes, eine Region das Mittel ihrer Länder (nach Produktionsmenge der gleichen Datensätze dort, sonst gleich gewichtet). GLO, RoW und unbekannte Orte behalten den normalen Faktor. Gilt für alle Rechnungen.')}"><input type="checkbox" id="regChk" ${g.enabled ? 'checked' : ''}> ${t('Faktoren nach Ort anwenden ({k} Ort(e) in dieser Methode)', { k: nf(g.locations) })}</label>` : '';
+  rsw += regFiles(g);
   if (!f.uncharacterized && !sw && !rsw) return '';
   // loud only where it matters: the namesakes would add more than 0.1 % of the result. Most flows of an inventory
   // have no factor in any one method (a climate method assesses a few dozen of some thousand), which is normal.
@@ -67,6 +68,20 @@ function factorNotice(r) {
       : t('{k} von {n} Flüssen des Inventars haben in dieser Methode keinen Faktor.', { k: nf(f.uncharacterized), n: nf(f.flows) });
   const link = f.uncharacterized ? ` <button class="linkbtn" data-act="inv-filter" data-k="none">${t('Liste zeigen')}</button>` : '';
   return `<div id="factorNotice" class="${loud ? 'warnbox' : 'row muted'}" style="${loud ? 'flex-direction:column;gap:6px' : 'font-size:13.5px;justify-content:space-between'}"><span>${txt}${link}</span>${sw}${rsw}</div>`;
+}
+
+// the JRC's EF 3.1 workbook with factors by country: which loaded file this method uses, else a button to load one
+function regFiles(g) {
+  const used = g.files || [], loaded = g.loaded_files || [];
+  if (used.length) {
+    return used.map(x => `<span class="row" style="gap:6px;font-size:13px">${t('Länderfaktoren aus «{file}», geladen am {date}', { file: esc(x.file), date: esc(x.loaded) })}<button class="linkbtn" data-act="reg-unload" data-k="${esc(x.id)}">${t('entfernen')}</button></span>`).join('');
+  }
+  if (!g.loadable) return '';
+  const tip = t('Die JRC veröffentlicht die Faktoren von EF 3.1 als Excel-Datei («EF-LCIAMethod_CF», im EF reference package 3.1). LCA Wrench liest daraus die Faktoren nach Land für Wassernutzung, Landnutzung, Versauerung und terrestrische Eutrophierung und behält sie auf diesem Computer. Sie gelten für die EF-3.1-Methoden auf der EF-Flussliste in allen Projekten. Lesen dauert etwa eine halbe Minute.');
+  if (loaded.length) {
+    return `<span class="muted" style="font-size:13px">${t('Die geladenen Länderfaktoren ({files}) passen nicht zu dieser Methode: Sie gelten für Methoden auf der EF-3.1-Flussliste mit denselben Standardfaktoren.', { files: esc(loaded.map(x => x.file).join(', ')) })} ${loaded.map(x => `<button class="linkbtn" data-act="reg-unload" data-k="${esc(x.id)}">${t('«{file}» entfernen', { file: esc(x.file) })}</button>`).join(' ')}</span>`;
+  }
+  return `<label class="btn small" style="cursor:pointer" title="${tip}">${t('Länderfaktoren aus der EF-3.1-Datei laden …')}<input type="file" id="regFile" accept=".xlsx" hidden></label>`;
 }
 
 // impact by the location of the processes that cause it; with factors by location, what they change and how found

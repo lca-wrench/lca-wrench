@@ -2,7 +2,8 @@
 
 Some impacts depend on where an emission or a resource use happens: a cubic metre of water taken in Spain deprives
 more than one taken in Switzerland (EF 3.1 water use: 77.7 against 1.34 m³ world eq.), and a kilogram of ammonia
-acidifies differently in each country. A method can carry such factors in two ways, both read here:
+acidifies differently in each country. A method can carry such factors in two ways, both read here, and a file the
+user loads can add more (factor_files.py: the JRC's EF 3.1 workbook):
 
 - Rows with a location: Brightway's convention ``(flow, factor, location)``. bw2data stores them; bw2calc uses only
   the rows of the global location GLO (``consistent_global_index``), bw2regional the others.
@@ -10,6 +11,8 @@ acidifies differently in each country. A method can carry such factors in two wa
   (same code before ``_<location>``, or same name before ``, <location>``, with the same compartment and unit). EF 3.1
   water use with the JRC country factors on country flows ("Water, AT") is such a case. With it, the generic water
   flows of every dataset get the factor of the dataset's country, also in data that never used the copies.
+
+A method's own rows win over its country copies, and both over a loaded file.
 
 The factor of a flow for an activity follows the activity's location; the first that applies wins:
 
@@ -63,7 +66,9 @@ def set_enabled(on: bool) -> None:
 
 
 def info() -> dict:
-    return {"enabled": enabled()}
+    from . import factor_files
+
+    return {"enabled": enabled(), "files": factor_files.files()}
 
 
 # ---------- the factors of a method ----------
@@ -72,7 +77,9 @@ def info() -> dict:
 class Table:
     """The location-dependent factors of one method."""
     factors: dict[int, dict[str, float]]  # flow id -> {location code: factor}
-    source: dict[tuple[int, str], int | None]  # (flow, location) -> the country flow it was read from; None: a row
+    # (flow, location) -> where it comes from: None a row with a location, an int the country copy (flow id), a str
+    # the id of a loaded file (factor_files.py)
+    source: dict[tuple[int, str], int | str | None]
     skipped: int = 0  # rows with a spatial unit this module cannot place (a geocollection's feature, e.g. ecoregions)
 
     def lookup(self, flow: int, code: str | None) -> float | None:
@@ -104,6 +111,12 @@ def table(method: tuple) -> Table | None:
     return t
 
 
+def forget() -> None:
+    """Read every method again (a file with factors by location was loaded or removed)."""
+    with _lock:
+        _tables.clear()
+
+
 def active(method: tuple) -> Table | None:
     """The table when switched on, else None: the calculation then uses the normal factors only."""
     return table(method) if enabled() else None
@@ -130,7 +143,7 @@ def _build(method: tuple) -> Table | None:
     import bw2data as bd
 
     factors: dict[int, dict[str, float]] = {}
-    source: dict[tuple[int, str], int | None] = {}
+    source: dict[tuple[int, str], int | str | None] = {}
     normal: dict[int, float] = {}
     skipped = 0
     ids: dict = {}  # a flow key resolved once: rows by location repeat the same flow for every place
@@ -154,6 +167,13 @@ def _build(method: tuple) -> Table | None:
             continue  # a row with a location wins over a country copy
         factors.setdefault(generic, {})[loc] = cf
         source[(generic, loc)] = copy
+    from . import factor_files
+
+    for fid, loc, cf, file_id in factor_files.factors_for(normal):
+        if loc in factors.get(fid, {}):
+            continue  # the method's own factors win over a loaded file
+        factors.setdefault(fid, {})[loc] = cf
+        source[(fid, loc)] = file_id
     return Table(factors, source, skipped) if factors else None
 
 
@@ -437,24 +457,39 @@ def table_rows(method: tuple) -> list[dict]:
     T = table(method)
     if T is None:
         return []
+    from . import factor_files
+
     cf = engine.method_cfs(tuple(method))
-    ids = set(T.factors) | {s for s in T.source.values() if s is not None}
+    ids = set(T.factors) | {s for s in T.source.values() if isinstance(s, int)}
     info = analysis.node_info(ids)
+    names = {e["id"]: e["file"] for e in factor_files.files()}
     out = []
     for f, locs in T.factors.items():
         n = info.get(f, {})
         for loc, v in sorted(locs.items()):
             src = T.source.get((f, loc))
+            kind = "row" if src is None else "file" if isinstance(src, str) else "copy"
             out.append({"id": str(f), "name": n.get("name", ""), "categories": n.get("categories", ""), "unit": n.get("unit", ""),
                         "location": loc, "place": regions.name(loc), "factor": v, "normal": cf.get(f, 0.0),
-                        "source": "copy" if src is not None else "row",
-                        "copy": info.get(src, {}).get("name") if src is not None else None})
+                        "source": kind, "copy": info.get(src, {}).get("name") if kind == "copy" else None,
+                        "file": names.get(src, src) if kind == "file" else None})
     out.sort(key=lambda r: (r["name"], r["categories"], r["location"]))
     return out
 
 
+# kinds of impact the JRC's EF 3.1 workbook has factors by country for: there the result offers to load it
+LOADABLE = {"water", "land", "acidification", "eutrophication"}
+
+
 def summary(method: tuple) -> dict:
-    """For the result: does the method have factors by location, is it on, how many flows and places."""
+    """For the result: does the method have factors by location, is it on, how many flows and places, which loaded
+    files it uses, and whether loading the EF 3.1 workbook could add some."""
+    from . import factor_files, overview
+
     T = table(method)
+    used = {s for s in T.source.values() if isinstance(s, str)} if T else set()
+    files = [{k: e[k] for k in ("id", "file", "loaded")} for e in factor_files.files()]
     return {"enabled": enabled(), "available": T is not None, "flows": len(T.factors) if T else 0,
-            "locations": len(T.locations()) if T else 0, "skipped": T.skipped if T else 0}
+            "locations": len(T.locations()) if T else 0, "skipped": T.skipped if T else 0,
+            "files": [f for f in files if f["id"] in used], "loaded_files": files,
+            "loadable": overview.topic(tuple(method)) in LOADABLE}

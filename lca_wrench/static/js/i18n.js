@@ -852,4 +852,15 @@ const EN = {
   'Länderkopie «{name}»': 'Country copy “{name}”',
   'Zeile mit Ort': 'Row with a location',
   'Anzahl Prozesse': 'Activities',
+  // factors by country from the JRC's EF 3.1 workbook (factor_files.py)
+  'Länderfaktoren aus «{file}», geladen am {date}': 'Country factors from “{file}”, loaded on {date}',
+  'entfernen': 'remove',
+  'Die JRC veröffentlicht die Faktoren von EF 3.1 als Excel-Datei («EF-LCIAMethod_CF», im EF reference package 3.1). LCA Wrench liest daraus die Faktoren nach Land für Wassernutzung, Landnutzung, Versauerung und terrestrische Eutrophierung und behält sie auf diesem Computer. Sie gelten für die EF-3.1-Methoden auf der EF-Flussliste in allen Projekten. Lesen dauert etwa eine halbe Minute.': 'The JRC publishes the EF 3.1 factors as an Excel file (“EF-LCIAMethod_CF”, in the EF reference package 3.1). LCA Wrench reads the factors by country for water use, land use, acidification and terrestrial eutrophication from it and keeps them on this computer. They apply to the EF 3.1 methods on the EF flow list in all projects. Reading takes about half a minute.',
+  'Die geladenen Länderfaktoren ({files}) passen nicht zu dieser Methode: Sie gelten für Methoden auf der EF-3.1-Flussliste mit denselben Standardfaktoren.': 'The loaded country factors ({files}) do not fit this method: they apply to methods on the EF 3.1 flow list with the same default factors.',
+  '«{file}» entfernen': 'remove “{file}”',
+  'Länderfaktoren aus der EF-3.1-Datei laden …': 'Load country factors from the EF 3.1 file …',
+  'Lese «{name}» … (etwa eine halbe Minute)': 'Reading “{name}” … (about half a minute)',
+  'Länderfaktoren geladen: {list}.': 'Country factors loaded: {list}.',
+  '{name} ({k} Orte)': '{name} ({k} locations)',
+  'Datei «{name}»': 'File “{name}”',
 };

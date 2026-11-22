@@ -33,8 +33,8 @@ from bw2data.backends.schema import ExchangeDataset
 from bw2data.project import ProjectDataset
 from bw_processing import safe_filename
 
-from . import (analysis, backgrounds, bafu2026, beispiel, completion, engine, flowmap, models, montecarlo, overview, regional,
-               regions, registry, repair, setups)
+from . import (analysis, backgrounds, bafu2026, beispiel, completion, engine, factor_files, flowmap, models, montecarlo,
+               overview, regional, regions, registry, repair, setups)
 from .analysis import short_unit
 from .i18n import _
 from .models import ReadOnlyError
@@ -911,6 +911,12 @@ def regional_factors(method: tuple) -> dict:
         raise KeyError(_("Methode fehlt in diesem Projekt"))
     return {**regional.summary(method), "method": list(method), "unit": short_unit(bd.methods[method].get("unit")),
             "rows": regional.table_rows(method)}
+
+
+def unload_factor_file(fid: str) -> dict:
+    """Remove a loaded file with factors by location (factor_files.py)."""
+    factor_files.unload(fid)
+    return regional.info()
 
 
 def completed_factors(method: tuple) -> dict:

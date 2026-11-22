@@ -356,3 +356,105 @@ def test_api(methods, co2, switch):
         r2 = client.post("/api/calc", json={"id": str(el), "amount": 1, "method": list(M_ROWS)}).json()
         assert r2["regional"]["effect"] == 0.0 and r2["score"] == pytest.approx(r["score"] - g["effect"], rel=1e-9)
         assert client.get("/api/state").json()["regional"]["enabled"] is False
+
+
+# ---------- factors by country from the JRC's EF 3.1 workbook (factor_files.py) ----------
+
+M_FILE = ("zz Regional Test", "CO2 as in the file")
+M_FIVE = ("zz Regional Test", "CO2 with another default")
+FILE_TABLE = {"CH": 2.0, "DE": 3.0, "ES": 4.0}
+HEADER = ["FLOW_uuid", "FLOW_name", "LCIAMethod_uuid EF3.1", "LCIAMethod_name", "CF EF3.1", "LCIAMethod_location",
+          "FLOW_class0", "FLOW_class1", "FLOW_class2", "LCIAMethod_derivation", "LCIAMethod_direction"]
+
+
+def ef_workbook(co2) -> bytes:
+    """A workbook in the form of the JRC's EF-LCIAMethod_CF: a blank location is the default; the codes of the BAFU CO2
+    flows stand in for EF flow UUIDs."""
+    import io
+
+    import openpyxl
+
+    wb = openpyxl.Workbook()
+    wb.active.title = "hints"
+    ws = wb.create_sheet("lciamethods_CF")
+    ws.append(HEADER)
+    for f in co2:
+        code = bd.get_node(id=f)["code"]
+        ws.append([code, "Carbon dioxide, fossil", "m-uuid", "CO2 test", 1.0, None, "Emissions", "Emissions to air", ""])
+        for loc, v in FILE_TABLE.items():
+            ws.append([code, "Carbon dioxide, fossil", "m-uuid", "CO2 test", v, loc, "Emissions", "Emissions to air", ""])
+    # a flow of no project, and a category with the same factor everywhere (both of no effect)
+    ws.append(["no-such-flow", "x", "m-uuid", "CO2 test", 1.0, None])
+    ws.append(["no-such-flow", "x", "m-uuid", "CO2 test", 9.0, "CH"])
+    ws.append([bd.get_node(id=co2[0])["code"], "x", "n-uuid", "Flat", 7.0, None])
+    ws.append([bd.get_node(id=co2[0])["code"], "x", "n-uuid", "Flat", 7.0, "CH"])
+    out = io.BytesIO()
+    wb.save(out)
+    return out.getvalue()
+
+
+@pytest.fixture
+def file_methods(co2):
+    bd.projects.set_current(TEST_PROJECT)
+    for mt, v in ((M_FILE, 1.0), (M_FIVE, 5.0)):
+        bd.Method(mt).register(unit="kg CO2")
+        bd.Method(mt).write([(f, v) for f in co2])
+    yield
+    from lca_wrench import factor_files
+
+    for e in factor_files.files():
+        factor_files.unload(e["id"])
+    bd.projects.set_current(TEST_PROJECT)
+    for mt in (M_FILE, M_FIVE):
+        bd.Method(mt).deregister()
+
+
+def test_ef_workbook_read_matched_and_removed(methods, co2, file_methods):
+    from lca_wrench import factor_files
+
+    data = ef_workbook(co2)
+    table = factor_files.read_ef(data)
+    assert table["version"] == "EF3.1" and set(table["methods"]) == {"CO2 test"}  # "Flat" varies nowhere: left out
+    assert len(table["methods"]["CO2 test"]["flows"]) == len(co2) + 1
+    with pytest.raises(ValueError):
+        factor_files.read_ef(b"not a workbook")
+    entry = factor_files.load(data, "EF-LCIAMethod_CF(test).xlsx")
+    assert entry["id"] == "ef3.1" and entry["methods"]["CO2 test"] == {"flows": len(co2) + 1, "locations": 3}
+    assert (factor_files.folder() / entry["stored"]).exists()
+    # the method whose defaults are the file's gets its factors by country; one with other factors does not
+    T = regional.table(M_FILE)
+    assert all(T.factors[f] == FILE_TABLE for f in co2) and all(T.source[(f, "ES")] == "ef3.1" for f in co2)
+    assert regional.table(M_FIVE) is None
+    # the method's own rows with a location win; the file adds the countries they do not have
+    R = regional.table(M_ROWS)
+    assert all(R.factors[f] == {**TABLE, "ES": 4.0} for f in co2)
+    assert R.source[(co2[0], "CH")] is None and R.source[(co2[0], "ES")] == "ef3.1"
+    rows = regional.table_rows(M_FILE)
+    assert {r["source"] for r in rows} == {"file"} and rows[0]["file"] == "EF-LCIAMethod_CF(test).xlsx"
+    # the engine against the independent calculation, with the file's factors
+    node = bafu("Electricity, low voltage, at grid", "CH")
+    ref, gross, _lca = independent(node, 1.0, M_FILE, co2, FILE_TABLE)
+    assert abs(models.system_for(node).score({node: 1.0}, M_FILE) - ref) <= 1e-9 * gross
+    s_ = regional.summary(M_FILE)
+    assert s_["files"] == [{"id": "ef3.1", "file": "EF-LCIAMethod_CF(test).xlsx", "loaded": entry["loaded"]}]
+    # removed: back to the method's own factors
+    factor_files.unload("ef3.1")
+    assert regional.table(M_FILE) is None and all(regional.table(M_ROWS).factors[f] == TABLE for f in co2)
+    assert not (factor_files.folder() / entry["stored"]).exists()
+
+
+def test_ef_workbook_api(methods, co2, file_methods):
+    with TestClient(app, base_url="http://127.0.0.1") as client:
+        bad = client.post("/api/regional/load?name=x.xlsx", content=b"not a workbook",
+                          headers={"Content-Type": "application/octet-stream"})
+        assert bad.status_code == 400
+        r = client.post("/api/regional/load?name=ef.xlsx", content=ef_workbook(co2),
+                        headers={"Content-Type": "application/octet-stream"})
+        assert r.status_code == 200 and r.json()["id"] == "ef3.1"
+        assert [f["file"] for f in r.json()["state"]["regional"]["files"]] == ["ef.xlsx"]
+        el = bafu("Electricity, low voltage, at grid", "CH")
+        calc = client.post("/api/calc", json={"id": str(el), "amount": 1, "method": list(M_FILE)}).json()
+        assert calc["regional"]["available"] and calc["regional"]["files"][0]["id"] == "ef3.1"
+        st = client.post("/api/regional/unload", json={"name": "ef3.1"}).json()
+        assert st["files"] == []
+        assert client.post("/api/regional/unload", json={"name": "ef3.1"}).status_code == 404

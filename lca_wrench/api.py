@@ -23,9 +23,10 @@ from bw2data.backends.schema import ExchangeDataset
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
+from starlette.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
 
-from . import beispiel, crosswalk, ecoinvent, excel, i18n, imports, overview, params, reproject, versions
+from . import beispiel, crosswalk, ecoinvent, excel, factor_files, i18n, imports, overview, params, reproject, versions
 from . import models as mdl
 from . import service as s
 from . import setups as cs
@@ -733,6 +734,26 @@ def post_regional(body: FlowmapIn):
 def post_regional_factors(body: MethodIn):
     """Every factor by location of a method: flow, location, factor, normal factor, source."""
     return run(s.regional_factors, tuple(body.method))
+
+
+@app.post("/api/regional/load")
+async def post_regional_load(request: Request, name: str = ""):
+    """Load the JRC's EF 3.1 workbook (the user's own copy, sent as the body) and keep its factors by location."""
+    if int(request.headers.get("content-length") or 0) > factor_files.MAX_BYTES:
+        raise HTTPException(413, _("Die Datei ist zu gross (höchstens {n} MB).", n=factor_files.MAX_BYTES // (1024 * 1024)))
+    data = await request.body()
+    try:  # reading the workbook takes a minute and needs no project: outside the lock, so the app stays usable
+        table = await run_in_threadpool(factor_files.read_ef, data)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    entry = run(factor_files.store, table, name or "EF", hashlib.sha256(data).hexdigest())
+    return {**entry, "state": run(s.state)}
+
+
+@app.post("/api/regional/unload")
+def post_regional_unload(body: NameIn):
+    """Remove a loaded file with factors by location."""
+    return run(s.unload_factor_file, body.name)
 
 
 @app.post("/api/compare")
