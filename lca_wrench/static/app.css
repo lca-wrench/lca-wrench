@@ -408,3 +408,6 @@ label.row > input[type=checkbox],label.row > input[type=radio]{flex:none;margin-
 @media (hover:none) and (pointer:coarse){
   :root :is(input:where(:not([type=checkbox],[type=radio],[type=range],[type=file])),select,textarea){font-size:16px}
 }
+/* the smallest phones (320-400 px): the four header buttons still fit in one row, also in German; the Start cards
+   (inline padding, hence !important) and their table fit as well */
+@media (max-width:400px){.topbtns{gap:4px}.topbtns .btn{padding:4px 6px}.hero .card{padding:16px !important}.hero .tbl td.nw{white-space:normal}}
