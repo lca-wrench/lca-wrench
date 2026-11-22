@@ -222,7 +222,11 @@ function renderTop() {
   $('undoBtn').hidden = !j.length;
   $('undoBtn').title = j.length ? t('Rückgängig: {label} (⌘Z / Ctrl+Z)', { label: j[0].label }) : '';
   const eb = $('explainBtn'); eb.setAttribute('aria-pressed', S.explain); eb.textContent = S.explain ? t('Erklärungen an') : t('Erklärungen aus');
-  $('rail').innerHTML = views().map(([k, l]) => `<button class="nav" data-act="view" data-k="${k}" ${S.view === k ? 'aria-current="page"' : ''}>${icon(k)}<span>${l}</span></button>`).join('');
+  const rail = $('rail');
+  rail.innerHTML = views().map(([k, l]) => `<button class="nav" data-act="view" data-k="${k}" ${S.view === k ? 'aria-current="page"' : ''}>${icon(k)}<span>${l}</span></button>`).join('');
+  // on a narrow screen the views are a row that scrolls sideways: keep the open one in sight
+  const cur = rail.querySelector('[aria-current]');
+  if (cur && rail.scrollWidth > rail.clientWidth) rail.scrollLeft += cur.getBoundingClientRect().left - rail.getBoundingClientRect().left - (rail.clientWidth - cur.offsetWidth) / 2;
 }
 function projectTag(p) {
   return p.copy ? ' ' + t('(Arbeitskopie)') : p.testcopy ? ' ' + t('(Testkopie)') : p.legacy ? ' ' + t('(Activity Browser 2, nur als Kopie)')
