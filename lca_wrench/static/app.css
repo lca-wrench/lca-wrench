@@ -364,3 +364,14 @@ label.row > input[type=checkbox],label.row > input[type=radio]{flex:none;margin-
 .toast.err .tlink{color:inherit}
 .toast .tclose{border:0;background:transparent;color:inherit;opacity:.75;cursor:pointer;font-size:18px;line-height:1;padding:0 2px;margin-left:auto}
 .toast .tclose:hover{opacity:1}
+/* while the server works: a thin moving line along the top edge (it does not push the header around);
+   the text stays for screen readers */
+#busy{position:fixed;top:0;left:0;right:0;height:3px;z-index:30;pointer-events:none}
+#busy .busy{position:absolute;inset:0;overflow:hidden;font-size:0;color:transparent;background:linear-gradient(90deg,transparent,var(--accent),transparent) no-repeat;background-size:40% 100%;animation:busybar 1.1s linear infinite}
+#busy .busy::before{display:none}
+@keyframes busybar{from{background-position:-60% 0}to{background-position:160% 0}}
+@media (prefers-reduced-motion:reduce){#busy .busy{animation:none;background:var(--accent)}}
+/* a button whose action takes a while */
+[data-act][aria-busy="true"]{cursor:progress}
+.btn[aria-busy="true"]::after{content:"";display:inline-block;width:9px;height:9px;margin-left:7px;vertical-align:-1px;border-radius:50%;border:2px solid currentColor;border-right-color:transparent;animation:spin .8s linear infinite}
+@media (prefers-reduced-motion:reduce){.btn[aria-busy="true"]::after{animation:none}}

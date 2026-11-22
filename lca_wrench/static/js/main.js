@@ -695,11 +695,18 @@ function addCmp(src) {
 }
 
 // ---------- events ----------
+// an action runs once at a time: a second click while it runs (impatient, or a double click) is ignored,
+// and a button that takes a while says so
+const running = new Set();
 document.addEventListener('click', ev => {
   const b = ev.target.closest('[data-act]'); if (!b || b.disabled) return;
   const fn = A[b.dataset.act]; if (!fn) return;
   if (b.closest('#toast')) $('toast').hidden = true;
-  guard(() => fn(b.dataset.k, b, ev));
+  const key = b.dataset.act + '|' + (b.dataset.k ?? '');
+  if (running.has(key)) return;
+  running.add(key);
+  const slow = setTimeout(() => b.setAttribute('aria-busy', 'true'), 300);
+  guard(() => fn(b.dataset.k, b, ev)).finally(() => { running.delete(key); clearTimeout(slow); b.removeAttribute('aria-busy'); });
 });
 document.addEventListener('keydown', ev => {
   if (tourKey(ev)) { ev.preventDefault(); return; }
