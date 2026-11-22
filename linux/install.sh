@@ -54,7 +54,7 @@ if [ -f FILES.txt ]; then
   if [ ${#MISSING[@]} -gt 0 ]; then
     echo "Missing in this folder (${#MISSING[@]} files), e.g.:"
     printf '  %s\n' "${MISSING[@]:0:5}"
-    fail "This folder is incomplete. Unpack the archive again into a new, empty folder (not over an older one) and run the installation there."
+    fail "This folder is incomplete. Delete its folder lca_wrench, unpack the archive over it again and run ./install.sh again (README.txt, \"Updating\"). Or install into a new, empty folder."
   fi
 fi
 

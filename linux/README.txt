@@ -12,10 +12,27 @@ aarch64, and curl or wget. No root password, no system Python needed.
    It loads the tool uv, with it its own Python 3.12 and the packages (Brightway and the app). Takes about 3 to 5
    minutes, needs internet. Everything is installed inside this folder only: no PATH, no shell profile, no conda,
    the Brightway projects are not changed. At the end it adds "LCA Wrench" to the applications menu.
-   To update, unpack a newer package over this folder and run ./install.sh again: the Python and the packages stay.
+   To update to a newer version, see "Updating to a newer version" below.
 3. Start: "LCA Wrench" in the applications menu, or ./start.sh in this folder. The browser opens LCA Wrench.
    Keep the terminal window open, closing it (or Ctrl+C) stops LCA Wrench.
 4. The interface is in English. "Deutsch" at the top right switches it to German.
+
+Updating to a newer version (e.g. from 0.1.0)
+Your projects, with your models, calculation setups and the settings of LCA Wrench, stay as they are: they are in
+~/.local/share/Brightway3, not in the folder LCA-Wrench, and the update does not touch them. The Python and the
+packages in LCA-Wrench stay too; ./install.sh only replaces what changed.
+1. Close LCA Wrench: Ctrl+C in its terminal, or close the terminal window. Let an import that is still running
+   finish first.
+2. Delete the program code of the old version (the folder lca_wrench, none of your data is in it), unpack the new
+   package over the folder and install, in a terminal:
+     rm -rf ~/LCA-Wrench/lca_wrench
+     tar -xzf LCA-Wrench-Linux.tar.gz -C ~
+     cd ~/LCA-Wrench && ./install.sh
+   (With the folder elsewhere, use its path instead of ~/LCA-Wrench, and its parent folder instead of ~.)
+3. Check: cat ~/LCA-Wrench/VERSION shows the new version number first. Start LCA Wrench: your projects are in the
+   list at the top, and lca-wrench.log in the folder has a line "Start, version <new number>".
+If ./install.sh says the folder is incomplete, do step 2 again. Installing into a new, empty folder works as well:
+LCA Wrench finds the projects again, as they are not in its folder.
 
 Data: a new project with BAFU 2026 or ecoinvent
 On the start page "New project": empty, or right away with background data. Other projects stay untouched.
@@ -57,11 +74,27 @@ oder aarch64, und curl oder wget. Kein Root-Passwort, kein System-Python nötig.
    Lädt das Werkzeug uv, damit ein eigenes Python 3.12 und die Pakete (Brightway und die App). Dauer etwa 3 bis
    5 Minuten, Internet nötig. Alles wird nur in diesen Ordner installiert: kein PATH, kein Shell-Profil, kein conda,
    die Brightway-Projekte werden nicht verändert. Am Schluss kommt «LCA Wrench» ins Anwendungsmenü.
-   Zum Aktualisieren ein neueres Paket über diesen Ordner entpacken und ./install.sh nochmals laufen lassen:
-   Python und Pakete bleiben.
+   Zum Aktualisieren auf eine neuere Version siehe «Auf eine neuere Version aktualisieren» weiter unten.
 3. Starten: «LCA Wrench» im Anwendungsmenü oder ./start.sh in diesem Ordner. Der Browser öffnet LCA Wrench.
    Das Terminal-Fenster offen lassen, Schliessen (oder Ctrl+C) beendet LCA Wrench.
 4. Die Oberfläche ist englisch. «Deutsch» oben rechts schaltet auf Deutsch um.
+
+Auf eine neuere Version aktualisieren (z.B. von 0.1.0)
+Die Projekte, mit den eigenen Modellen, Rechnungen und den Einstellungen von LCA Wrench, bleiben wie sie sind: Sie
+liegen in ~/.local/share/Brightway3, nicht im Ordner LCA-Wrench, und das Update verändert sie nicht. Auch Python
+und die Pakete in LCA-Wrench bleiben; ./install.sh ersetzt nur, was sich geändert hat.
+1. LCA Wrench beenden: Ctrl+C in seinem Terminal, oder das Terminal-Fenster schliessen. Einen laufenden Import
+   vorher fertig laufen lassen.
+2. Den Programmcode der alten Version löschen (den Ordner lca_wrench, darin sind keine eigenen Daten), das neue
+   Paket über den Ordner entpacken und installieren, im Terminal:
+     rm -rf ~/LCA-Wrench/lca_wrench
+     tar -xzf LCA-Wrench-Linux.tar.gz -C ~
+     cd ~/LCA-Wrench && ./install.sh
+   (Liegt der Ordner anderswo, dessen Pfad statt ~/LCA-Wrench und den Ordner darüber statt ~ nehmen.)
+3. Prüfen: cat ~/LCA-Wrench/VERSION zeigt zuerst die neue Versionsnummer. LCA Wrench starten: Die Projekte stehen
+   oben in der Liste, und lca-wrench.log im Ordner hat eine Zeile «Start, version <neue Nummer>».
+Meldet ./install.sh, der Ordner sei unvollständig, Schritt 2 nochmals machen. Auch eine Installation in einen neuen,
+leeren Ordner geht: LCA Wrench findet die Projekte wieder, denn sie liegen nicht in seinem Ordner.
 
 Daten, eigene Projekte, Fehler und Entfernen: wie oben im englischen Teil. Brightway-Projekte liegen in
 ~/.local/share/Brightway3. Wenn etwas nicht klappt: «lca-wrench.log» (und bei einer misslungenen Installation

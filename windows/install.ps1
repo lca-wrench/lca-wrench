@@ -68,7 +68,7 @@ if (Test-Path $FileList) {
     if ($Missing.Count -gt 0) {
         Write-Host ("Missing in this folder ({0} files), e.g.:" -f $Missing.Count)
         $Missing | Select-Object -First 5 | ForEach-Object { Write-Host "  $_" }
-        Fail 'This folder is incomplete. Unpack the zip again into a new, empty folder (not over an older one) and run the installation there.'
+        Fail 'This folder is incomplete. Delete its folder "lca_wrench", unzip the package over it again and run the installation again (README.txt, "Updating"). Or install into a new, empty folder.'
     }
 }
 

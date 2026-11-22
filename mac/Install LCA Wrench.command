@@ -54,7 +54,7 @@ if [ -f FILES.txt ]; then
   if [ ${#MISSING[@]} -gt 0 ]; then
     echo "Missing in this folder (${#MISSING[@]} files), e.g.:"
     printf '  %s\n' "${MISSING[@]:0:5}"
-    fail "This folder is incomplete. Unpack the zip again into a new, empty folder (not over an older one) and run the installation there."
+    fail "This folder is incomplete. Run the installer of the package again into this folder (README.txt, \"Updating\"), or into a new, empty folder."
   fi
 fi
 
