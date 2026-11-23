@@ -269,6 +269,34 @@ def test_own_model_process(methods, co2):
         models.delete_database(MODEL_DB)
 
 
+def test_process_with_several_products(methods, co2, switch):
+    """A process in Germany with a co-product (the model is then stored in the Activity Browser 3 format): its products
+    keep its location, and each bears its share of the process's CO2 at the German factor; off, the normal factor."""
+    name = MODEL_DB + "-several"
+    bd.projects.set_current(TEST_PROJECT)
+    if name in bd.databases:
+        models.delete_database(name)
+    models.create_database(name)
+    try:
+        p = int(models.create_process(name, "Pressen", "kilogram", "DE", product="Rapsöl"))
+        models.add_exchange(p, co2[0], 4.0)
+        cake = int(models.add_product(p, "Presskuchen", "kilogram", 1.0))
+        oil = next(q.id for q in bd.get_node(id=p).products() if q.get("product") == "Rapsöl")
+        assert bd.get_node(id=oil)["location"] == bd.get_node(id=cake)["location"] == "DE"
+        models.set_allocation(p, "manual", {oil: 3.0, cake: 1.0})  # 75 % and 25 %
+        S = models.system()
+        assert S.score({oil: 1.0}, M_ROWS) == pytest.approx(0.75 * 4.0 * TABLE["DE"], rel=1e-9)
+        assert S.score({cake: 1.0}, M_ROWS) == pytest.approx(0.25 * 4.0 * TABLE["DE"], rel=1e-9)
+        switch(False)
+        S = models.system()
+        assert S.score({oil: 1.0}, M_ROWS) == pytest.approx(0.75 * 4.0, rel=1e-9)
+        assert S.score({cake: 1.0}, M_ROWS) == pytest.approx(0.25 * 4.0, rel=1e-9)
+    finally:
+        bd.projects.set_current(TEST_PROJECT)
+        if name in bd.databases:
+            models.delete_database(name)
+
+
 def test_background_data_sheet_adds_up(methods):
     node = bafu("Electricity, high voltage, production DE, at grid", "DE") or bafu("Electricity, at cogen 1MWe lean burn, allocation exergy", "CH")
     d = models.process_detail(node, M_ROWS)
