@@ -37,9 +37,26 @@ and only where the method has a non-zero factor on that flow. Never changed:
 
 The derived "UBP total" stays the sum of its 21 categories: it gets the sum of what each category gets.
 
-The rule applies to every method in every project; for most methods it adds nothing. It is applied in the engine,
-the cross-check with bw2calc (the same added factors on both sides, so the cross-check compares like with like in
-both modes) and Monte Carlo. Code: `lca_wrench/completion.py`; tests: `tests/test_completion.py`.
+## Which methods
+
+Only a method family that carries its factors on the flows without sub-compartment is completed. For each method,
+LCA Wrench takes the sub-compartment flows (not long-term) of the substances it has a top-level factor for, and the
+share of them with a factor of their own. A family whose median share is below 0.5 is completed; a family that gives
+most sub-compartments a factor of its own has decided which ones count, and a sub-compartment it leaves out stays
+out. ecoinvent's LCIA methods are such families: a sub-compartment they leave without a factor (emissions to
+groundwater, for instance) stays without one, instead of taking the factor of the unspecified compartment.
+
+| Family | Median share | Completed |
+|---|---:|---|
+| Ecological Scarcity 2021 of the BAFU-2025-v2 template (16 methods with top-level factors) | 0.01 | yes |
+| The climate method derived from it (LCA Wrench) | 0.03 | yes |
+| Families that characterize their sub-compartments themselves (for example ecoinvent's) | 0.5 or more | no |
+
+Families are those of the method list (`overview.method_family`), with ecoinvent's version kept apart, so the BAFU
+template and ecoinvent's Ecological Scarcity 2021 are judged separately in one project. The rule is applied in the
+engine, the cross-check with bw2calc (the same added factors on both sides, so the cross-check compares like with
+like in both modes) and Monte Carlo. Code: `lca_wrench/completion.py` (`sub_share`, `needs_completion`); tests:
+`tests/test_completion.py`.
 
 ## In the app
 
