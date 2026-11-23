@@ -892,7 +892,7 @@ document.addEventListener('change', ev => {
     else if (el.id === 'mdbSel') { S.mdb = el.value; S.msel = null; S.mact = null; await loadView(); render(); }
     else if (el.id === 'fuSetup') { fuFromSetup(+el.value); render(); await loadErgebnis(); render(); }
     else if (el.id === 'fuAmt') { const v = parseFloat(el.value); if (isFinite(v) && v > 0) { S.fu.amount = v; resetErgebnis(); await loadErgebnis(); } render(); }
-    else if (el.id === 'ssSel') { S.ss.set = el.value; S.ss.w = null; S.ss.res = null; render(); await loadErgebnis(); render(); }
+    else if (el.id === 'ssSel') { S.ss.set = el.value; S.ss.picked = true; S.ss.w = null; S.ss.res = null; render(); await loadErgebnis(); render(); }
     else if (el.id === 'ssW') { S.ss.w = el.value; S.ss.res = null; render(); await loadErgebnis(); render(); }
     else if (el.id === 'cutSel') { S.cutoff = +el.value; await loadErgebnis(); render(); }
     else if (el.id === 'depSel') { S.depth = +el.value; await loadErgebnis(); render(); }

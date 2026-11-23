@@ -14,6 +14,11 @@
 Methods are found by their names in the usual spellings (sentier, ecoinvent, the BAFU template, with or without
 long-term emissions); a set names the categories it could not find. All numbers come from one inventory of the
 product, characterized with each method: the same results as calculating each method on its own.
+
+A method implemented on another list of elementary flows than the product's (sentier's EF 3.1 on an ecoinvent
+product) gives 0 where the flow mapping does not fill it (between ecoinvent and EF 3.1: toxicity, particulate matter,
+water use, resources): the result names these categories and warns, and the list of sets says per product whether a
+set covers it (flowmap.coverage).
 """
 
 from __future__ import annotations
@@ -24,7 +29,9 @@ from functools import lru_cache
 from pathlib import Path
 
 import bw2data as bd
+import numpy as np
 
+from . import flowmap
 from .i18n import _
 
 DATA = Path(__file__).parent / "data" / "nw"
@@ -171,12 +178,43 @@ def find(set_id: str) -> dict:
     raise KeyError(_("Diesen Einzelwert gibt es in diesem Projekt nicht."))
 
 
+def methods_of(s: dict) -> list[tuple]:
+    """The methods a set calculates with (ReCiPe: an area's categories, else its total)."""
+    if s["kind"] == "ef31":
+        return [tuple(c["method"]) for c in s["components"]]
+    if s["kind"] == "recipe2016":
+        return [tuple(m) for a in s["components"] for m in (s["categories"].get(a) or [s["totals"][a]])]
+    return [tuple(m) for m in s["categories"]] + ([tuple(s["total"])] if s["total"] else [])
+
+
+def flow_lists(S, g) -> set[str]:
+    """The lists of elementary flows (biosphere databases) an inventory draws on."""
+    return flowmap.index().dbs_of(np.asarray(S.bio_ids)[np.asarray(g) != 0])
+
+
+def _cover(method: tuple, lists: set[str]) -> str:
+    """flowmap.coverage, except that a method without any factor (the BAFU template's noise) is on no other list."""
+    method = tuple(method)
+    return flowmap.coverage(method, lists)[0] if flowmap.method_dbs(method) else "native"
+
+
+def coverage(s: dict, lists: set[str]) -> str:
+    """How a set's methods cover these flow lists: "native", "mapped" (some through the flow mapping) or "missing"
+    (a method implemented on another list, which the flow mapping does not fill: its category would count as 0)."""
+    how = {_cover(m, lists) for m in methods_of(s)}
+    return "missing" if "missing" in how else "mapped" if "mapped" in how else "native"
+
+
 def compute(S, demand: dict[int, float], s: dict, weighting: str | None = None) -> dict:
     """The single score of `demand` in system S, with its parts. One inventory, characterized per method."""
     g = S.inventory(S.supply(demand))
+    lists = flow_lists(S, g)
 
     def h(method) -> float:
         return float(S.cvec(tuple(method)) @ g)
+
+    def cov(method) -> str:
+        return _cover(method, lists)
 
     notes: list[str] = []
     rows: list[dict] = []
@@ -191,7 +229,7 @@ def compute(S, demand: dict[int, float], s: dict, weighting: str | None = None) 
             n = r / c["normalisation"]
             rows.append({"label": c["label"], "group": None, "method": list(c["method"]), "unit": c["unit"], "result": r,
                          "normalisation": c["normalisation"], "normalised": n, "weight": c["weighting"],
-                         "score": n * c["weighting"] / 100 * scale})
+                         "score": n * c["weighting"] / 100 * scale, "coverage": cov(c["method"])})
     elif s["kind"] == "recipe2016":
         data = factors("recipe2016-endpoint.json")
         p = s["perspective"]
@@ -206,7 +244,8 @@ def compute(S, demand: dict[int, float], s: dict, weighting: str | None = None) 
                     r = h(m)
                     rows.append({"label": " · ".join(str(x) for x in m[n_fam + 1:]) or str(m[-1]), "group": group,
                                  "area": area, "method": list(m), "unit": unit, "result": r, "normalisation": nf[area],
-                                 "normalised": r / nf[area], "weight": wf[area], "score": r / nf[area] * wf[area]})
+                                 "normalised": r / nf[area], "weight": wf[area], "score": r / nf[area] * wf[area],
+                                 "coverage": cov(m)})
                 if area in s["totals"]:  # the categories must add up to the area's total
                     t = h(s["totals"][area])
                     part = sum(x["result"] for x in rows if x.get("area") == area)
@@ -217,7 +256,7 @@ def compute(S, demand: dict[int, float], s: dict, weighting: str | None = None) 
                 r = h(s["totals"][area])
                 rows.append({"label": group, "group": group, "area": area, "method": list(s["totals"][area]),
                              "unit": unit, "result": r, "normalisation": nf[area], "normalised": r / nf[area],
-                             "weight": wf[area], "score": r / nf[area] * wf[area]})
+                             "weight": wf[area], "score": r / nf[area] * wf[area], "coverage": cov(s["totals"][area])})
         notes.append(_("Gewichtung {ws}: Menschliche Gesundheit {hh}, Ökosysteme {eq}, Ressourcen {res} (Panel von "
                        "Eco-indicator 99, wie in SimaPro). Normalisierung: RIVM, Welt 2010, pro Person.", ws=ws,
                        hh=wf["human health"], eq=wf["ecosystem quality"], res=wf["natural resources"]))
@@ -230,7 +269,7 @@ def compute(S, demand: dict[int, float], s: dict, weighting: str | None = None) 
             parts = [str(x) for x in m[len(s["family"]):] if norm(x) != "ubp"]  # ecoinvent ends its names in "UBP"
             rows.append({"label": " · ".join(parts) or str(m[-1]), "group": None, "method": list(m),
                          "unit": "UBP", "result": r, "normalisation": None, "normalised": None, "weight": None,
-                         "score": r})
+                         "score": r, "coverage": cov(m)})
         if s["total"] is not None:
             t = h(s["total"])
             part = sum(x["score"] for x in rows)
@@ -248,4 +287,13 @@ def _result(s: dict, rows: list[dict], total: float, notes: list[str]) -> dict:
     for r in rows:
         r["share"] = r["score"] / total if total else None
     rows.sort(key=lambda r: -abs(r["score"]))
-    return {**summary(s), "total": total, "rows": rows, "notes": notes}
+    # a method on another list of elementary flows gives 0 for this product where the flow mapping does not fill it
+    incomplete = [r["label"] for r in rows if r.get("coverage") == "missing"]
+    mapped = [r["label"] for r in rows if r.get("coverage") == "mapped"]
+    warning = _("{n} Kategorie(n) ohne Faktoren für die Elementarflüsse dieses Produkts: {names}. Die Methode ist auf "
+                "einer anderen Liste von Elementarflüssen umgesetzt, und die Flusszuordnung deckt diese Wirkungen nicht "
+                "ab. Sie zählen als 0, der Einzelwert ist also zu tief: besser einen Einzelwert auf der Flussliste des "
+                "Produkts wählen.", n=len(incomplete), names=", ".join(incomplete)) if incomplete else None
+    if mapped:
+        notes = notes + [_("Über die Flusszuordnung (ecoinvent ↔ EF 3.1) bewertet: {names}.", names=", ".join(mapped))]
+    return {**summary(s), "total": total, "rows": rows, "notes": notes, "warning": warning, "incomplete": incomplete}

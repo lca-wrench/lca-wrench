@@ -736,11 +736,19 @@ def allocation_compare(activity_id: int | str, method: tuple) -> dict:
 
 # ---------- results ----------
 
-def single_score_sets() -> dict:
-    """The single scores this project's methods allow (singlescore.py): EF 3.1, ReCiPe 2016 endpoint, UBP."""
+def single_score_sets(activity_id: int | str | None = None, amount: float = 1.0) -> dict:
+    """The single scores this project's methods allow (singlescore.py): EF 3.1, ReCiPe 2016 endpoint, UBP. With a
+    product, each says whether its methods cover the product's elementary flows ("coverage": native, mapped, missing)."""
     from . import singlescore
 
-    return {"sets": [singlescore.summary(x) for x in singlescore.sets()]}
+    sets = singlescore.sets()
+    out = [singlescore.summary(x) for x in sets]
+    if activity_id is not None and sets:
+        S = models.system_for(activity_id)
+        lists = singlescore.flow_lists(S, S.inventory(S.supply({int(activity_id): float(amount)})))
+        for o, x in zip(out, sets):
+            o["coverage"] = singlescore.coverage(x, lists)
+    return {"sets": out}
 
 
 def single_score(activity_id: int | str, amount: float, set_id: str, weighting: str | None = None) -> dict:

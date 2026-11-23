@@ -507,8 +507,8 @@ def post_activity(body: ActIn):
 # ---------- results ----------
 
 @app.get("/api/singlescore/sets")
-def get_singlescore_sets():
-    return run(s.single_score_sets)
+def get_singlescore_sets(id: str | None = None):  # noqa: A002 - with a product: does each set cover its flows?
+    return run(s.single_score_sets, id)
 
 
 @app.post("/api/singlescore")

@@ -18,7 +18,7 @@ export const S = {
   fu: null, tab: 'beitraege', calc: null, cats: { a: null, b: '', topic: '', res: null }, contrib: 'act', graph: null, cutoff: 0.01, depth: 4, gsel: null,
   par: { data: null, adding: null }, formulaFor: null,
   why: null, cw: { project: null, database: null, targets: null, method: '', res: null, running: false, error: null, open: null, q: '', hits: null, view: 'datasets', trace: {} },
-  ss: { sets: null, setsKey: null, set: null, w: null, res: null, error: null },
+  ss: { sets: null, setsKey: null, set: null, picked: false, w: null, res: null, error: null },
   ver: { project: null, database: null, targets: null, res: null, detail: null, k: null, running: false, error: null }, sankey: null, skCut: 0.02, skMax: 40, skMode: 'cum', sksel: null, inv: null, invQ: '', invF: '', fuVerify: null,
   // Vergleich
   cmp: [], cmpRes: null,

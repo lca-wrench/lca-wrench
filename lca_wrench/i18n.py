@@ -352,6 +352,9 @@ EN = {
     "RIVMs Normalisierung enthält keine Landnutzung, und die mineralischen Ressourcen machen fast die ganze Ressourcen-Normalisierung aus (bitte prüfen).":
         "RIVM's normalization has no land use, and mineral resources make up almost all of the resource normalization (please check).",
     "Die Kategorien ergeben {part} UBP, die Methode «gesamt» {total} UBP.": "The categories add up to {part} UBP, the “total” method to {total} UBP.",
+    "{n} Kategorie(n) ohne Faktoren für die Elementarflüsse dieses Produkts: {names}. Die Methode ist auf einer anderen Liste von Elementarflüssen umgesetzt, und die Flusszuordnung deckt diese Wirkungen nicht ab. Sie zählen als 0, der Einzelwert ist also zu tief: besser einen Einzelwert auf der Flussliste des Produkts wählen.":
+        "{n} category(ies) without factors for this product's elementary flows: {names}. The method is implemented on another list of elementary flows, and the flow mapping does not cover these impacts. They count as 0, so the single score is too low: better choose a single score on the product's flow list.",
+    "Über die Flusszuordnung (ecoinvent ↔ EF 3.1) bewertet: {names}.": "Assessed through the flow mapping (ecoinvent ↔ EF 3.1): {names}.",
     "Menschliche Gesundheit": "Human health",
     "Ökosystemqualität": "Ecosystem quality",
     "Natürliche Ressourcen": "Natural resources",

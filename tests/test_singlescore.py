@@ -185,3 +185,39 @@ def test_api(methods, electricity):
     assert two["total"] == pytest.approx(2 * sum(x["normalised"] * e[x["area"]] for x in one["rows"]), rel=1e-6)
     bad = client.post("/api/singlescore", json={"id": str(electricity.id), "set": "ef31:nothing"})
     assert bad.status_code == 404 and "Einzelwert" in bad.json()["detail"]
+    # with a product, each set says whether it covers the product's elementary flows
+    per_product = client.get("/api/singlescore/sets", params={"id": str(electricity.id)}).json()["sets"]
+    assert {x["coverage"] for x in per_product} == {"native"} and "coverage" not in sets[0]
+
+
+OTHER = "singlescore-test-flows"
+
+
+@pytest.fixture
+def other_flow_list():
+    """A second list of elementary flows with one flow, and an EF family whose climate change has factors only there
+    (as sentier's EF 3.1 on an ecoinvent product, for an impact the flow mapping does not fill)."""
+    bd.Database(OTHER).write({(OTHER, "x"): {"name": "x", "unit": "kilogram", "type": "emission", "categories": ("air",)}})
+    cfs = bd.Method(s.CLIMATE_METHOD).load()
+    made = {("other-list", "EF v3.1", "Climate change"): [((OTHER, "x"), 1.0)],
+            ("other-list", "EF v3.1", "Particulate matter"): [(key, cf * 1e-6) for key, cf in cfs]}
+    for name, data in made.items():
+        bd.Method(name).register(unit="test", description="test_singlescore.py")
+        bd.Method(name).write(data)
+    yield made
+    for name in made:
+        bd.Method(name).deregister()
+    del bd.databases[OTHER]
+
+
+def test_a_category_on_another_flow_list_is_flagged(methods, climate, electricity, other_flow_list):
+    S, demand, _c = climate
+    r = singlescore.compute(S, demand, singlescore.find("ef31:other-list|EF v3.1"))
+    by = {x["label"]: x for x in r["rows"]}
+    assert by["Climate change"]["coverage"] == "missing" and by["Climate change"]["result"] == 0
+    assert by["Particulate matter"]["coverage"] == "native" and by["Particulate matter"]["result"] > 0
+    assert r["incomplete"] == ["Climate change"] and "1 Kategorie(n)" in r["warning"] and "Climate change" in r["warning"]
+    assert singlescore.compute(S, demand, singlescore.find("ef31:sentier|EF v3.1"))["warning"] is None
+    sets = {x["id"]: x for x in s.single_score_sets(electricity.id)["sets"]}
+    assert sets["ef31:other-list|EF v3.1"]["coverage"] == "missing"
+    assert sets["ef31:sentier|EF v3.1"]["coverage"] == "native"

@@ -153,10 +153,11 @@ function tKategorien() {
 // the sets the project's methods allow (by project and number of methods); the score of the chosen set
 const ssKey = () => JSON.stringify([S.fu.id, S.fu.amount, S.st.journal.length, S.st.changes.length, S.st.completion?.enabled, S.st.flowmap?.enabled, S.ss.set, S.ss.w]);
 export async function loadSS() {
-  const s = S.ss, k = S.st.project + '|' + S.st.methods.length;
-  if (s.setsKey !== k) { s.sets = (await api('/api/singlescore/sets')).sets; s.setsKey = k; s.res = null; }
+  const s = S.ss, k = S.st.project + '|' + S.st.methods.length + '|' + S.fu.id;
+  if (s.setsKey !== k) { s.sets = (await api(`/api/singlescore/sets?id=${encodeURIComponent(S.fu.id)}`)).sets; s.setsKey = k; s.res = null; }
   if (!s.sets.length) return;
-  if (!s.sets.some(x => x.id === s.set)) { s.set = s.sets[0].id; s.w = null; }
+  const ok = x => x && x.coverage !== 'missing';
+  if (!s.sets.some(x => x.id === s.set) || (!s.picked && !ok(s.sets.find(x => x.id === s.set)))) { s.set = (s.sets.find(ok) || s.sets[0]).id; s.w = null; }
   if (s.res && s.res._key === ssKey()) return;
   s.error = null;
   try { s.res = await api('/api/singlescore', { id: S.fu.id, amount: S.fu.amount, set: s.set, weighting: s.w }); s.res._key = ssKey(); }
@@ -173,7 +174,7 @@ function tEinzelwert() {
   const found = cur.kind === 'ef31' ? t('{n} von 16 Kategorien', { n: cur.found }) : cur.kind === 'recipe2016' ? t('{n} von 3 Schutzgütern', { n: cur.found }) : t('{n} Kategorien', { n: cur.found });
   const controls = `<section class="card row" style="justify-content:space-between">
     <span class="muted" style="font-size:13.5px">${found}</span>
-    <div class="row"><label class="f">${t('Einzelwert')}<select id="ssSel">${s.sets.map(x => `<option value="${esc(x.id)}" ${x.id === cur.id ? 'selected' : ''}>${esc(x.label)}</option>`).join('')}</select></label>
+    <div class="row"><label class="f">${t('Einzelwert')}<select id="ssSel">${s.sets.map(x => `<option value="${esc(x.id)}" ${x.id === cur.id ? 'selected' : ''}>${esc(x.label)}${x.coverage === 'missing' ? ' · ' + t('unvollständig für dieses Produkt') : ''}</option>`).join('')}</select></label>
       ${cur.kind === 'recipe2016' ? `<label class="f" title="${t('Gewichte der Schutzgüter (Panel von Eco-indicator 99): I/I individualistisch, H/A hierarchistisch mit Durchschnittsgewichten, H/H hierarchistisch, E/E egalitär')}">${t('Gewichtung')}<select id="ssW">${cur.weightings.map(x => `<option value="${esc(x)}" ${x === w ? 'selected' : ''}>${esc(x)}${x === cur.weighting ? ' · ' + t('Standard für {p}', { p: cur.perspective }) : ''}</option>`).join('')}</select></label>` : ''}</div></section>`;
   if (s.error) return intro + controls + `<div class="warnbox"><b>${t('Hinweis')}</b><span>${esc(s.error)}</span></div>`;
   if (!r) return intro + controls + busy();
@@ -184,9 +185,10 @@ function tEinzelwert() {
   const rows = recipe ? areas.flatMap(a => r.rows.filter(x => x.group === a.g)) : r.rows;
   const td = v => `<td class="num nw" style="text-align:right">${v}</td>`;
   const head = `<tr>${recipe ? `<th>${t('Schutzgut')}</th>` : ''}<th>${t('Kategorie')}</th><th style="text-align:right">${t('Ergebnis')}</th><th>${t('Einheit')}</th>${weighted ? `<th style="text-align:right" title="${t('Die Jahreswirkung einer Person (Welt)')}">${t('Normalisierung pro Person')}</th><th style="text-align:right" title="${t('Ergebnis geteilt durch die Normalisierung: Personenjahre')}">${t('Normalisiert')}</th><th style="text-align:right">${r.kind === 'ef31' ? t('Gewicht (%)') : t('Gewicht (Pt)')}</th><th style="text-align:right">${esc(r.unit)}</th>` : ''}<th style="text-align:right">${t('Anteil')}</th></tr>`;
-  const body = rows.map(x => `<tr>${recipe ? `<td class="muted">${esc(x.group || '')}</td>` : ''}<td><button class="linkbtn" data-act="ss-open" data-k="${r.rows.indexOf(x)}" title="${t('Beiträge zu dieser Kategorie zeigen')}">${esc(x.label)}</button></td>${td(nf(x.result))}<td class="muted nw">${esc(x.unit)}</td>${weighted ? td(num(x.normalisation)) + td(num(x.normalised)) + td(num(x.weight, 2)) + td(nf(x.score)) : ''}${td(x.share === null ? '–' : pct(x.share))}</tr>`).join('');
+  const body = rows.map(x => `<tr>${recipe ? `<td class="muted">${esc(x.group || '')}</td>` : ''}<td><button class="linkbtn" data-act="ss-open" data-k="${r.rows.indexOf(x)}" title="${t('Beiträge zu dieser Kategorie zeigen')}">${esc(x.label)}</button>${x.coverage === 'missing' ? ` <span class="chip hot">${t('nicht bewertet')}</span>` : x.coverage === 'mapped' ? ` <span class="chip acc">${t('bewertet (Flusszuordnung)')}</span>` : ''}</td>${td(nf(x.result))}<td class="muted nw">${esc(x.unit)}</td>${weighted ? td(num(x.normalisation)) + td(num(x.normalised)) + td(num(x.weight, 2)) + td(nf(x.score)) : ''}${td(x.share === null ? '–' : pct(x.share))}</tr>`).join('');
   const shown = r.rows.filter(x => Math.abs(x.score) > 0);
   return intro + controls + `<section class="card" style="display:flex;flex-direction:column;gap:12px">
+    ${r.warning ? `<div class="warnbox"><b>${t('Unvollständig')}</b><span>${esc(r.warning)}</span></div>` : ''}
     <div class="row" style="justify-content:space-between;align-items:flex-end">
       <div><span class="eyebrow">${esc(r.label)}${recipe ? ' · ' + t('Gewichtung {w}', { w: esc(r.weighting) }) : ''}</span><div class="kpi"><span class="big">${nf(r.total)}</span><span class="u">${esc(r.unit)}</span></div></div>
       ${areas.length ? `<div class="row">${areas.map(a => `<span class="chip">${esc(a.g)}: <span class="num">${nf(a.v)}</span> ${esc(r.unit)}</span>`).join('')}</div>` : ''}

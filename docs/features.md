@@ -326,5 +326,13 @@ contributions). The sets the project's methods allow are listed; a set names the
 All numbers come from one inventory of the product, characterized with each method (including flow mapping and
 completed factors), so they are the same as calculating each method on its own. The factors, their sources and the
 points to check (RIVM's table has no land use; mineral resources dominate the resource normalization) are in
-[../lca_wrench/data/nw/README.md](../lca_wrench/data/nw/README.md). API: `GET /api/singlescore/sets`,
+[../lca_wrench/data/nw/README.md](../lca_wrench/data/nw/README.md).
+
+A set whose methods are implemented on another list of elementary flows than the product's (sentier's EF 3.1 or the
+PEF methods on an ecoinvent product) gets 0 for the categories the flow mapping does not fill: particulate matter,
+toxicity, water use and resources (see [flow-mapping.md](flow-mapping.md)). Its single score would be too low, so the
+list marks such a set "incomplete for this product" and picks a complete one by default; chosen anyway, the result
+warns and marks the categories "not characterized".
+
+API: `GET /api/singlescore/sets` (with `?id=<product>`: a `coverage` per set: native, mapped or missing),
 `POST /api/singlescore` with `{"id", "amount", "set", "weighting"}`.

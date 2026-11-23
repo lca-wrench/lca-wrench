@@ -880,4 +880,6 @@ const EN = {
   'Gewicht (Pt)': 'Weight (Pt)',
   'Gewichtung {w}': 'weighting {w}',
   'Rechenweg': 'Calculation',
+  'unvollständig für dieses Produkt': 'incomplete for this product',
+  'Unvollständig': 'Incomplete',
 };
