@@ -1,13 +1,14 @@
 """Write the normalization and weighting factors LCA Wrench bundles for single scores (lca_wrench/data/nw).
 
-    python scripts/nw_factors.py <ef31_nw.csv> <Normalization scores ReCiPe 2016.xlsx>
+    python scripts/nw_factors.py <ef31_nw.csv> "<Normalization scores ReCiPe2016v1.1_20190514.xlsx>"
 
 - EF 3.1: a CSV with the 16 categories, normalisation per person and weighting in %, from the JRC EF 3.1 reference
   package (identical to tables 61 and 62 of the dairy PEFCR); columns category, unit, normalisation_per_person,
   weighting_pct.
-- ReCiPe 2016: RIVM's "Normalization scores ReCiPe 2016" (world 2010, per person), sheet "Final normalization
-  scores": one row per impact category, endpoint values in the columns of the Individualist, Hierarchist and
-  Egalitarian perspectives. The normalization of each area of protection is the sum of its categories.
+- ReCiPe 2016: RIVM's "Normalization scores ReCiPe 2016 v1.1" (2019-05-14; world 2010, per person), sheet "Final
+  normalization scores": one row per impact category, endpoint values in columns H, I and J (Individualist,
+  Hierarchist, Egalitarian). The normalization of each area of protection is the sum of its categories, land use
+  (occupation) included.
   The weighting sets are those of the Eco-indicator 99 panel, reused by ReCiPe 2008 and, for ReCiPe 2016, by SimaPro.
 """
 
@@ -57,7 +58,8 @@ RECIPE_AREAS = {
     "ecosystem quality": ["Global Warming - Terrestrial ecosystems", "Photochemical ozone formation - Terrestrial ecosystems",
                           "Acidification - Terrestrial ecosystems", "Toxicity - Terrestrial ecosystems",
                           "Water consumption - terrestrial ecosystems", "Global Warming - Freshwater ecosystems",
-                          "Eutrophication - Freshwater ecosystems", "Toxicity - Freshwater ecosystems",
+                          "Land use - occupation", "Eutrophication - Freshwater ecosystems",
+                          "Toxicity - Freshwater ecosystems",
                           "Water consumption -aquatic ecosystems", "Toxicity - Marine ecosystems",
                           "Eutrophication - marine ecosystems"],
     "natural resources": ["Mineral resource scarcity", "Fossil resource scarcity"],
@@ -92,7 +94,10 @@ def recipe2016(path: Path) -> dict:
     import openpyxl
 
     ws = openpyxl.load_workbook(path, data_only=True, read_only=True)["Final normalization scores"]
-    rows = {str(r[0]).strip(): r for r in ws.iter_rows(values_only=True) if r and r[0]}
+    rows = {str(r[0]).strip(): r for r in ws.iter_rows(values_only=True) if r and r[0]}  # names end in spaces
+    lacking = [n for names in RECIPE_AREAS.values() for n in names if n not in rows]
+    if lacking:
+        raise SystemExit(f"rows missing in {path.name}: {lacking}")
     norm, detail = {}, {}
     for p, col in PERSPECTIVES.items():
         norm[p] = {}
@@ -101,8 +106,9 @@ def recipe2016(path: Path) -> dict:
             detail.setdefault(area, {})[p] = vals
             norm[p][area] = sum(vals.values())
     return {
-        "source": "Normalization: RIVM, Normalization scores ReCiPe 2016, world 2010, per person (sheet 'Final "
-                  "normalization scores'); the normalization of an area of protection is the sum of its categories. "
+        "source": "Normalization: RIVM, Normalization scores ReCiPe 2016 v1.1 (2019-05-14), world 2010, per person "
+                  "(sheet 'Final normalization scores', endpoint columns H, I, J); the normalization of an area of "
+                  "protection is the sum of its categories, land use (occupation) included. "
                   "Weighting: the Eco-indicator 99 panel sets (Goedkoop & Spriensma, PRe), reused by ReCiPe 2008 and, for "
                   "ReCiPe 2016, by SimaPro (method developers published only normalization factors).",
         "single_score": "sum over the three areas of result / normalization x weight, in Pt (1000 Pt = the yearly impact "
@@ -116,8 +122,6 @@ def recipe2016(path: Path) -> dict:
         "weighting": WEIGHTING,
         "default_weighting": {"I": "I/I", "H": "H/A", "E": "E/E"},
         "notes": [
-            "RIVM's table has no land use row, while ecoinvent's ReCiPe 2016 endpoint counts land use under ecosystem "
-            "quality: the ecosystem normalization leaves land use out.",
             "Mineral resource scarcity makes up most of the resource normalization (27,742 of 28,033 USD2013 per person, "
             "H); its midpoint value in the same table, 120,051 kg Cu-eq per person, looks implausibly high.",
             "Water consumption, terrestrial ecosystems is 0 for the Individualist perspective in RIVM's table.",

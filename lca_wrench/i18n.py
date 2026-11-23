@@ -347,10 +347,10 @@ EN = {
     "Ohne {n} Kategorie(n), die in diesem Projekt fehlen: {names}.":
         "Without {n} category(ies) that this project lacks: {names}.",
     "Die Kategorien von «{area}» ergeben {part} statt {total}.": "The categories of “{area}” add up to {part} instead of {total}.",
-    "Gewichtung {ws}: Menschliche Gesundheit {hh}, Ökosysteme {eq}, Ressourcen {res} (Panel von Eco-indicator 99, wie in SimaPro). Normalisierung: RIVM, Welt 2010, pro Person.":
-        "Weighting {ws}: human health {hh}, ecosystems {eq}, resources {res} (Eco-indicator 99 panel, as in SimaPro). Normalization: RIVM, world 2010, per person.",
-    "RIVMs Normalisierung enthält keine Landnutzung, und die mineralischen Ressourcen machen fast die ganze Ressourcen-Normalisierung aus (bitte prüfen).":
-        "RIVM's normalization has no land use, and mineral resources make up almost all of the resource normalization (please check).",
+    "Gewichtung {ws}: Menschliche Gesundheit {hh}, Ökosysteme {eq}, Ressourcen {res} (Panel von Eco-indicator 99, wie in SimaPro). Normalisierung: RIVM, ReCiPe 2016 v1.1, Welt 2010, pro Person.":
+        "Weighting {ws}: human health {hh}, ecosystems {eq}, resources {res} (Eco-indicator 99 panel, as in SimaPro). Normalization: RIVM, ReCiPe 2016 v1.1, world 2010, per person.",
+    "Die mineralischen Ressourcen machen fast die ganze Ressourcen-Normalisierung von RIVM aus (bitte prüfen).":
+        "Mineral resources make up almost all of RIVM's resource normalization (please check).",
     "Die Kategorien ergeben {part} UBP, die Methode «gesamt» {total} UBP.": "The categories add up to {part} UBP, the “total” method to {total} UBP.",
     "{n} Kategorie(n) ohne Faktoren für die Elementarflüsse dieses Produkts: {names}. Die Methode ist auf einer anderen Liste von Elementarflüssen umgesetzt, und die Flusszuordnung deckt diese Wirkungen nicht ab. Sie zählen als 0, der Einzelwert ist also zu tief: besser einen Einzelwert auf der Flussliste des Produkts wählen.":
         "{n} category(ies) without factors for this product's elementary flows: {names}. The method is implemented on another list of elementary flows, and the flow mapping does not cover these impacts. They count as 0, so the single score is too low: better choose a single score on the product's flow list.",

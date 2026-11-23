@@ -3,7 +3,7 @@
 LCA Wrench reads these files to compute single scores (`lca_wrench/singlescore.py`, tab "Single score" in Result).
 `scripts/nw_factors.py` writes them from the source tables:
 
-    python scripts/nw_factors.py <ef31_nw.csv> "<Normalization scores ReCiPe 2016.xlsx>"
+    python scripts/nw_factors.py <ef31_nw.csv> "<Normalization scores ReCiPe2016v1.1_20190514.xlsx>"
 
 ## `ef31.json`: EF 3.1
 
@@ -29,7 +29,8 @@ Sources:
 
 The three areas of protection: human health (DALY), ecosystem quality (species.yr) and natural resources (USD 2013).
 For each perspective (Individualist, Hierarchist, Egalitarian) the normalization of an area is the sum of its impact
-categories in RIVM's table (world 2010, per person); `normalisation_categories` keeps the rows. The single score is
+categories in RIVM's table (world 2010, per person; endpoint columns H, I, J), land use (occupation) included under
+ecosystem quality; `normalisation_categories` keeps the rows. The single score is
 
     sum over the three areas of  result / normalization × weight,  in Pt (1000 Pt = the yearly impact of one person)
 
@@ -41,7 +42,8 @@ Sources:
 
 - Method: Huijbregts, M. A. J. et al. (2017): ReCiPe2016: a harmonised life cycle impact assessment method at
   midpoint and endpoint level. International Journal of Life Cycle Assessment 22, 138–147.
-- Normalization: RIVM, "Normalization scores ReCiPe 2016" (spreadsheet, sheet "Final normalization scores").
+- Normalization: RIVM, "Normalization scores ReCiPe 2016 v1.1" (spreadsheet of 2019-05-14, sheet "Final
+  normalization scores").
 - Weighting: the panel weighting of Eco-indicator 99 (Goedkoop, M. & Spriensma, R., The Eco-indicator 99, a damage
   oriented method for life cycle impact assessment, methodology report, PRé Consultants), reused by ReCiPe 2008 and,
   for ReCiPe 2016, by SimaPro. The ReCiPe 2016 developers published normalization factors only. The same sets are
@@ -50,9 +52,6 @@ Sources:
 
 Points to check (also in `notes` in the file and in the result):
 
-- RIVM's table has no land use row, while ecoinvent's ReCiPe 2016 endpoint counts land use under ecosystem quality. The
-  normalization of ecosystem quality therefore leaves land use out, and the normalized ecosystem result comes out
-  somewhat higher than it would with land use in the reference.
 - Mineral resource scarcity makes up almost all of the resource normalization (27,742 of 28,033 USD 2013 per person,
   Hierarchist; fossil resources: 291). Its midpoint value in the same table, 120,051 kg Cu-eq per person, looks
   implausibly high, so the resource part of the single score may be too small. Worth comparing with another

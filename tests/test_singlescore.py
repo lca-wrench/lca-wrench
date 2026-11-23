@@ -77,6 +77,10 @@ def test_factor_files():
     assert cc["normalisation"] == pytest.approx(7553.08, rel=1e-6) and cc["weighting"] == 21.06 and EF31["scale"] == 1000
     assert NF_H["human health"] == pytest.approx(0.0240019, rel=1e-5)  # RIVM, world 2010, the sum of 8 categories
     assert NF_H["natural resources"] == pytest.approx(28033.3, rel=1e-5)
+    # ecosystem quality with land use (occupation), the row whose name in RIVM's sheet ends in a space
+    assert RECIPE["normalisation_categories"]["ecosystem quality"]["H"]["Land use - occupation"] == pytest.approx(
+        6.23363e-4, rel=1e-5)
+    assert NF_H["ecosystem quality"] == pytest.approx(1.479212e-3, rel=1e-5)
     assert all(sum(w.values()) == 1000 for w in RECIPE["weighting"].values())
     assert RECIPE["default_weighting"] == {"I": "I/I", "H": "H/A", "E": "E/E"}
 

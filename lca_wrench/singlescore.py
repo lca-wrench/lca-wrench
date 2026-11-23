@@ -3,8 +3,8 @@
 - EF 3.1: each of the 16 categories as result / normalisation x weighting / 100, summed, in mPt (x 1000); factors of
   the JRC EF 3.1 reference package (data/nw/ef31.json).
 - ReCiPe 2016 endpoint (I, H, E): the three areas of protection, each as result / normalisation x weight, summed, in
-  Pt (1000 Pt = the yearly impact of an average world citizen). Normalisation: RIVM, world 2010, per person, the
-  sum of each area's categories. Weighting: the Eco-indicator 99 panel sets that SimaPro uses for ReCiPe; by default
+  Pt (1000 Pt = the yearly impact of an average world citizen). Normalisation: RIVM, ReCiPe 2016 v1.1, world 2010,
+  per person, the sum of each area's categories. Weighting: the Eco-indicator 99 panel sets that SimaPro uses for ReCiPe; by default
   I/I for the Individualist, H/A for the Hierarchist and E/E for the Egalitarian perspective, H/H on request
   (data/nw/recipe2016-endpoint.json).
 - Ecological Scarcity 2021: its eco-factors already weight, so the single score is the total in UBP: the family's
@@ -258,10 +258,11 @@ def compute(S, demand: dict[int, float], s: dict, weighting: str | None = None) 
                              "unit": unit, "result": r, "normalisation": nf[area], "normalised": r / nf[area],
                              "weight": wf[area], "score": r / nf[area] * wf[area], "coverage": cov(s["totals"][area])})
         notes.append(_("Gewichtung {ws}: Menschliche Gesundheit {hh}, Ökosysteme {eq}, Ressourcen {res} (Panel von "
-                       "Eco-indicator 99, wie in SimaPro). Normalisierung: RIVM, Welt 2010, pro Person.", ws=ws,
+                       "Eco-indicator 99, wie in SimaPro). Normalisierung: RIVM, ReCiPe 2016 v1.1, Welt 2010, pro "
+                       "Person.", ws=ws,
                        hh=wf["human health"], eq=wf["ecosystem quality"], res=wf["natural resources"]))
-        notes.append(_("RIVMs Normalisierung enthält keine Landnutzung, und die mineralischen Ressourcen machen fast "
-                       "die ganze Ressourcen-Normalisierung aus (bitte prüfen)."))
+        notes.append(_("Die mineralischen Ressourcen machen fast die ganze Ressourcen-Normalisierung von RIVM aus "
+                       "(bitte prüfen)."))
         s = {**s, "weighting": ws}
     else:
         for m in s["categories"]:

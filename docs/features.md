@@ -325,7 +325,7 @@ contributions). The sets the project's methods allow are listed; a set names the
 
 All numbers come from one inventory of the product, characterized with each method (including flow mapping and
 completed factors), so they are the same as calculating each method on its own. The factors, their sources and the
-points to check (RIVM's table has no land use; mineral resources dominate the resource normalization) are in
+points to check (mineral resources dominate RIVM's resource normalization) are in
 [../lca_wrench/data/nw/README.md](../lca_wrench/data/nw/README.md).
 
 A set whose methods are implemented on another list of elementary flows than the product's (sentier's EF 3.1 or the
