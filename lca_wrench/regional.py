@@ -99,9 +99,16 @@ class Table:
 
 def table(method: tuple) -> Table | None:
     """The method's location-dependent factors, whether switched on or not; None if it has none."""
+    import bw2data as bd
+
     from . import flowmap
 
-    k = flowmap._key(method)
+    m = bd.Method(tuple(method))
+    try:  # a method written again with as many rows as before has another time stamp
+        stamp = (bd.projects.dir / m._intermediate_dir / (m.filename + ".pickle")).stat().st_mtime_ns
+    except OSError:
+        stamp = None
+    k = (*flowmap._key(method), stamp)
     with _lock:
         if k in _tables:
             return _tables[k]
@@ -169,7 +176,7 @@ def _build(method: tuple) -> Table | None:
         source[(generic, loc)] = copy
     from . import factor_files
 
-    for fid, loc, cf, file_id in factor_files.factors_for(normal):
+    for fid, loc, cf, file_id in factor_files.factors_for(method, normal):
         if loc in factors.get(fid, {}):
             continue  # the method's own factors win over a loaded file
         factors.setdefault(fid, {})[loc] = cf

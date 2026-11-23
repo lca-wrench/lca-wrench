@@ -458,3 +458,94 @@ def test_ef_workbook_api(methods, co2, file_methods):
         st = client.post("/api/regional/unload", json={"name": "ef3.1"}).json()
         assert st["files"] == []
         assert client.post("/api/regional/unload", json={"name": "ef3.1"}).status_code == 404
+
+
+# ---------- ecoinvent's EF 3.1: through the flow mapping, and by ratio (factor_files.py) ----------
+
+TINY_BIO, TINY = "zz-regional-ecoinvent-like-flows", "zz-regional-tiny"
+M_EI = ("zz Regional Test", "CO2 on an ecoinvent flow")
+M_EVAP = ("zz Regional Test", "Water use, evaporation")
+M_EVAP_CLIMATE = ("zz Regional Test", "Climate change, evaporation")
+RATIOS = {"CH": 0.5, "ES": 2.0}
+
+
+def jrc_workbook(entries) -> bytes:
+    """A workbook in the JRC's form from (flow uuid, category, default, {location: factor})."""
+    import io
+
+    import openpyxl
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "lciamethods_CF"
+    ws.append(HEADER)
+    for uuid, cat, default, locs in entries:
+        ws.append([uuid, "x", "m-uuid", cat, default, None])
+        for loc, v in locs.items():
+            ws.append([uuid, "x", "m-uuid", cat, v, loc])
+    out = io.BytesIO()
+    wb.save(out)
+    return out.getvalue()
+
+
+@pytest.fixture
+def ecoinvent_like():
+    """A flow with the code of an ecoinvent flow from the bundled flow mapping (an identifier, no ecoinvent data), a
+    flow of no list, and one activity per place emitting one unit of each."""
+    from lca_wrench import factor_files, flowmap
+
+    bd.projects.set_current(TEST_PROJECT)
+    ei, ef = flowmap.pairs()[0]
+    for db in (TINY, TINY_BIO):
+        if db in bd.databases:
+            del bd.databases[db]
+    bd.Database(TINY_BIO).write({
+        (TINY_BIO, ei): {"name": "mapped flow", "categories": ("air",), "unit": "kilogram", "type": "emission"},
+        (TINY_BIO, "evaporation"): {"name": "Water", "categories": ("air",), "unit": "cubic meter", "type": "emission"}})
+    places = ("CH", "DE", "ES", "RER")
+    bd.Database(TINY).write({(TINY, loc): {
+        "name": "thing", "reference product": "thing", "unit": "kilogram", "location": loc, "type": "process",
+        "exchanges": [{"input": (TINY, loc), "amount": 1.0, "type": "production"},
+                      {"input": (TINY_BIO, ei), "amount": 1.0, "type": "biosphere"},
+                      {"input": (TINY_BIO, "evaporation"), "amount": 1.0, "type": "biosphere"}]} for loc in places})
+    flow = bd.get_node(database=TINY_BIO, code=ei).id
+    evap = bd.get_node(database=TINY_BIO, code="evaporation").id
+    for mt, rows in ((M_EI, [(flow, 1.0)]), (M_EVAP, [(evap, 10.0)]), (M_EVAP_CLIMATE, [(evap, 10.0)])):
+        bd.Method(mt).register(unit="x")
+        bd.Method(mt).write(rows)
+    yield {"ef": ef, "flow": flow, "evap": evap, "act": {loc: bd.get_node(database=TINY, code=loc).id for loc in places}}
+    for e in factor_files.files():
+        factor_files.unload(e["id"])
+    bd.projects.set_current(TEST_PROJECT)
+    for mt in (M_EI, M_EVAP, M_EVAP_CLIMATE):
+        bd.Method(mt).deregister()
+    for db in (TINY, TINY_BIO):
+        del bd.databases[db]
+
+
+def test_ef_workbook_on_ecoinvent_flows(ecoinvent_like):
+    """A table on an EF flow reaches the ecoinvent flow the mapping matches to it. A table whose factors are the
+    default times one ratio per country (water use) reaches a method of the same kind on other flows, as ecoinvent's
+    water use on evaporated water, and no method of another kind."""
+    from lca_wrench import factor_files
+
+    t = ecoinvent_like
+    data = jrc_workbook([(t["ef"], "CO2 test", 1.0, FILE_TABLE),
+                         ("w-1", "Water use", 10.0, {k: 10.0 * r for k, r in RATIOS.items()}),
+                         ("w-2", "Water use", -10.0, {k: -10.0 * r for k, r in RATIOS.items()})])
+    assert factor_files.ratios(factor_files.read_ef(data)["methods"]["Water use"]) == RATIOS
+    factor_files.load(data, "ef.xlsx")
+    T = regional.table(M_EI)
+    assert T.factors == {t["flow"]: FILE_TABLE} and T.source[(t["flow"], "CH")] == "ef3.1"
+    W = regional.table(M_EVAP)
+    assert W.factors == {t["evap"]: {k: 10.0 * r for k, r in RATIOS.items()}}
+    assert regional.table(M_EVAP_CLIMATE) is None  # the same factors, but climate change: not water use
+    S = engine.alone(TINY)
+    a = t["act"]
+    for loc in ("CH", "DE", "ES", "RER"):
+        assert S.score({a[loc]: 1.0}, M_EI) == pytest.approx(expected_factor(loc, FILE_TABLE), rel=1e-12)
+        assert S.score({a[loc]: 1.0}, M_EVAP) == pytest.approx(
+            10.0 * expected_factor(loc, RATIOS), rel=1e-12)  # countries without a ratio count with the default
+    # factors that are not all plus or minus the default: not the same method, nothing by ratio
+    bd.Method(M_EVAP).write([(t["evap"], 7.0)])
+    assert regional.table(M_EVAP) is None

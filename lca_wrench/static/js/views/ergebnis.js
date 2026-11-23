@@ -77,9 +77,9 @@ function regFiles(g) {
     return used.map(x => `<span class="row" style="gap:6px;font-size:13px">${t('Länderfaktoren aus «{file}», geladen am {date}', { file: esc(x.file), date: esc(x.loaded) })}<button class="linkbtn" data-act="reg-unload" data-k="${esc(x.id)}">${t('entfernen')}</button></span>`).join('');
   }
   if (!g.loadable) return '';
-  const tip = t('Die JRC veröffentlicht die Faktoren von EF 3.1 als Excel-Datei («EF-LCIAMethod_CF», im EF reference package 3.1). LCA Wrench liest daraus die Faktoren nach Land für Wassernutzung, Landnutzung, Versauerung und terrestrische Eutrophierung und behält sie auf diesem Computer. Sie gelten für die EF-3.1-Methoden auf der EF-Flussliste in allen Projekten. Lesen dauert etwa eine halbe Minute.');
+  const tip = t('Die JRC veröffentlicht die Faktoren von EF 3.1 als Excel-Datei («EF-LCIAMethod_CF», im EF reference package 3.1). LCA Wrench liest daraus die Faktoren nach Land für Wassernutzung, Landnutzung, Versauerung und terrestrische Eutrophierung und behält sie auf diesem Computer. Sie gelten in allen Projekten für die EF-3.1-Methoden auf der EF-Flussliste und über die Flusszuordnung für die von ecoinvent. Lesen dauert etwa eine halbe Minute.');
   if (loaded.length) {
-    return `<span class="muted" style="font-size:13px">${t('Die geladenen Länderfaktoren ({files}) passen nicht zu dieser Methode: Sie gelten für Methoden auf der EF-3.1-Flussliste mit denselben Standardfaktoren.', { files: esc(loaded.map(x => x.file).join(', ')) })} ${loaded.map(x => `<button class="linkbtn" data-act="reg-unload" data-k="${esc(x.id)}">${t('«{file}» entfernen', { file: esc(x.file) })}</button>`).join(' ')}</span>`;
+    return `<span class="muted" style="font-size:13px">${t('Die geladenen Länderfaktoren ({files}) passen nicht zu dieser Methode: Sie gelten für Methoden, deren Faktoren den Standardfaktoren der Datei entsprechen.', { files: esc(loaded.map(x => x.file).join(', ')) })} ${loaded.map(x => `<button class="linkbtn" data-act="reg-unload" data-k="${esc(x.id)}">${t('«{file}» entfernen', { file: esc(x.file) })}</button>`).join(' ')}</span>`;
   }
   return `<label class="btn small" style="cursor:pointer" title="${tip}">${t('Länderfaktoren aus der EF-3.1-Datei laden …')}<input type="file" id="regFile" accept=".xlsx" hidden></label>`;
 }

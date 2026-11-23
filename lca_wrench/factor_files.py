@@ -8,10 +8,13 @@ package does not say whether it may be redistributed, so LCA Wrench bundles none
 once, the factors by location are kept on this computer (next to lca-wrench.json, never in a project) and apply in
 every project.
 
-A loaded table applies to a method when the method's factors on the table's flows (matched by UUID, the code of the
-EF 3.1 flow list) equal the table's defaults: the method is the category the table was made for. Only flows whose
-factor differs between locations are kept. regional.py gives the method's own factors precedence: its rows with a
-location, then its country copies, then a loaded table.
+A loaded table applies to a method when the method's factors on the table's flows equal the table's defaults: the
+method is the category the table was made for. The flows are found by their UUID (the code of the EF 3.1 flow list)
+and through the flow mapping as ecoinvent flows (biosphere3). Where no flow is shared, a table whose factors are the
+default times one ratio per location (water use) fits a method of the same kind whose factors are all plus or minus
+the default (ecoinvent's water use, on evaporated water). Only flows whose factor differs between locations are kept.
+regional.py gives the method's own factors precedence: its rows with a location, then its country copies, then a
+loaded table.
 """
 
 from __future__ import annotations
@@ -209,24 +212,76 @@ def _flow_ids(uuids: set[str]) -> dict[str, list[int]]:
         return {u: known.get(u, []) for u in uuids}
 
 
-def factors_for(normal: dict[int, float]):
+_ei_codes: dict[str, list[str]] | None = None
+
+
+def _mapped(uuid: str) -> list[str]:
+    """The ecoinvent flows (biosphere3 UUIDs) the flow mapping matches to an EF 3.1 flow, same unit only."""
+    global _ei_codes
+    if _ei_codes is None:
+        from . import flowmap
+
+        out: dict[str, list[str]] = {}
+        for ei, ef in flowmap.pairs():
+            out.setdefault(ef, []).append(ei)
+        _ei_codes = out
+    return _ei_codes.get(uuid, [])
+
+
+def _close(a: float, b: float) -> bool:
+    return abs(a - b) <= TOLERANCE * max(abs(b), 1e-12)
+
+
+def ratios(m: dict) -> dict[str, float] | None:
+    """{location: k} when every flow's factor there is its default times the same k (EF water use: the country's AWARE
+    factor over the world's, withdrawals positive and releases negative alike); None when the flows differ."""
+    out: dict[str, float] = {}
+    for f in m["flows"].values():
+        if not f["default"]:
+            return None
+        for loc, v in f["locations"].items():
+            k = v / f["default"]
+            if loc in out and not _close(k, out[loc]):
+                return None
+            out.setdefault(loc, k)
+    return out or None
+
+
+def factors_for(method: tuple, normal: dict[int, float]):
     """(flow id, location, factor, file id) of every loaded table that matches the method with these normal factors.
 
-    A table matches when the method has factors on some of its flows and at least 90 % of them equal the table's
-    default; the flows that do get the table's factors by location."""
+    By flow: the table's flows are found by their EF 3.1 UUID and, through the flow mapping, as ecoinvent flows
+    (biosphere3). The table matches when the method has factors on some of them and at least 90 % equal the table's
+    default; those flows get the table's factors by location.
+
+    By ratio, where no flow is shared: a table whose factors are the default times one ratio per location (water use)
+    also fits a method of the same kind of impact whose factors are all plus or minus the table's default, on other
+    flows. ecoinvent's EF 3.1 water use counts consumption as water evaporated to air (42.95), which the mapping does
+    not connect to the JRC's withdrawals and releases: each of its flows gets its factor times the location's ratio."""
+    from . import overview
+
     for entry in files():
         table = _table(entry)
         if not table:
             continue
-        for m in table["methods"].values():
-            ids = _flow_ids(set(m["flows"]))
-            shared = [(fid, f) for u, f in m["flows"].items() for fid in ids.get(u, ()) if fid in normal]
-            if not shared:
+        for name, m in table["methods"].items():
+            codes = {u: [u, *_mapped(u)] for u in m["flows"]}
+            ids = _flow_ids({c for cs in codes.values() for c in cs})
+            shared = [(fid, f) for u, f in m["flows"].items() for c in codes[u] for fid in ids.get(c, ()) if fid in normal]
+            if shared:
+                same = [(fid, f) for fid, f in shared if _close(normal[fid], f["default"])]
+                if len(same) >= 0.9 * len(shared):
+                    for fid, f in same:
+                        for loc, v in f["locations"].items():
+                            yield fid, loc, v, entry["id"]
                 continue
-            same = [(fid, f) for fid, f in shared
-                    if abs(normal[fid] - f["default"]) <= TOLERANCE * max(abs(f["default"]), 1e-12)]
-            if len(same) < 0.9 * len(shared):
+            k = ratios(m)
+            topic = overview.topic(("EF", name))
+            if not k or topic == "other" or topic != overview.topic(tuple(method)):
                 continue
-            for fid, f in same:
-                for loc, v in f["locations"].items():
-                    yield fid, loc, v, entry["id"]
+            size = {abs(f["default"]) for f in m["flows"].values()}
+            mine = {fid: cf for fid, cf in normal.items() if cf}
+            if mine and all(any(_close(abs(cf), d) for d in size) for cf in mine.values()):
+                for fid, cf in mine.items():
+                    for loc, r in k.items():
+                        yield fid, loc, cf * r, entry["id"]

@@ -43,10 +43,23 @@ in a file next to `lca-wrench.json` on this computer (`lca-wrench-regional/ef3.1
 they apply in every project. Loading a file of the same version again replaces it; **remove** next to the file's name
 takes it out. Code: `lca_wrench/factor_files.py`.
 
-A loaded table applies to a method when the method's factors on the table's flows, matched by flow UUID (the code of
-the EF 3.1 flow list, as in sentier's BAFU 2026 and EF 3.1 PEF projects), equal the table's defaults (relative
-tolerance 1e-3; at least 90 % of the shared flows). That picks the category the table was made for and leaves every
-other method alone. A method on another flow list (ecoinvent's biosphere3) does not match; the result then says so.
+A loaded table applies to a method in one of two ways:
+
+- **By flow.** The table's flows are found by their UUID (the code of the EF 3.1 flow list, as in sentier's BAFU 2026
+  and EF 3.1 PEF projects) and, through the flow mapping ([flow-mapping.md](flow-mapping.md)), as the ecoinvent flows
+  (biosphere3) matched to them. The table applies when the method's factors on those flows equal the table's defaults
+  (relative tolerance 1e-3, at least 90 % of the shared flows); they get the table's factors by location. That picks
+  the category the table was made for and leaves every other method alone. ecoinvent's EF 3.1 acidification,
+  terrestrial eutrophication and land use match this way.
+- **By ratio.** Where no flow is shared, a table whose factors are the default times one ratio per location, the same
+  for all its flows, fits a method of the same kind of impact whose factors are all plus or minus the table's default.
+  Each of the method's flows then gets its factor times the location's ratio. EF 3.1 water use is such a table (the
+  country's AWARE factor over the world's 42.95, withdrawals positive and releases negative alike), and ecoinvent's EF
+  3.1 water use such a method: it counts consumption as water evaporated to air, which the mapping does not connect
+  to the JRC's withdrawals and releases. The kind of impact must be named the same (water use with water use), never
+  "other".
+
+A method that fits neither keeps its normal factors; the result then says that the loaded file does not fit it.
 Projects that carry country copies of the water flows for only the countries their data use get the other countries
 from the file, so region averages no longer count missing countries with the default.
 
@@ -140,6 +153,5 @@ and the parts by location add up to the difference the factors by location make.
 ## Not yet
 
 - A map of the result by location (the location picker for activities is designed separately).
-- The JRC factors for methods on ecoinvent's flow list (through the flow mapping), and AWARE 2.0 basin factors with
-  a point for each activity.
+- AWARE 2.0 basin factors with a point for each activity.
 - RoW as the countries the sibling datasets leave out, instead of the world average.
