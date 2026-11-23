@@ -71,19 +71,34 @@ For each flow with factors by location, the activity's location decides; the fir
    and Montenegro), XK reads RS or CS, CW, SX and BQ read AN, UK reads GB and EL reads GR.
 2. **A part of a country** (CA-QC, US-WECC, CN-SGCC, IN-Western grid): the factor of the country.
 3. **A region** (RER, RAS, RLA, ENTSO-E, UCTE, NORDEL, "Europe without Switzerland", "RER w/o CH+DE" …) without a
-   factor of its own: the average over its countries, **weighted by production volume**: the production volumes of
-   the datasets with the same name and product in those countries, as ecoinvent and premise record them on the
-   reference product exchange. Where there are none, the countries are weighted equally. BAFU records no production
-   volumes, and ecoinvent avoids datasets that overlap a region (a country with its own dataset is cut out of the
-   region: "Europe without Switzerland"), so few ecoinvent region datasets have national datasets of the same product
-   inside their region; the others are averaged equally. A country of the region without a factor of its own counts
-   with the method's normal factor.
+   factor of its own: the average over its countries, **weighted by production**, from the first source that has
+   it:
+   1. the production volumes of the datasets with the same name and product in those countries, as ecoinvent and
+      premise record them on the reference product exchange. ecoinvent avoids datasets that overlap a region (a
+      country with its own dataset is cut out of it: "Europe without Switzerland"), so few region datasets have such
+      national datasets;
+   2. the output of the dataset's industry in each country, from the project's EXIOBASE (see below);
+   3. equal weights (BAFU without EXIOBASE, a dataset without a sure industry).
+
+   A country of the region without a factor of its own counts with the method's normal factor.
 4. **GLO, RoW and unknown locations** keep the method's **normal factor**: the result without factors by location.
    For RoW this is the world average; BAFU uses OCE for the oceans (ships), so OCE is not taken as Oceania.
 
 The normal factor is the one the calculation uses anyway: the method's global factor, together with the flow mapping
 and the completed factors where those apply. Factors by location apply to the flows they are given for; a flow that
 gets its factor through the flow mapping or the completion keeps that normal factor everywhere.
+
+### Weights from EXIOBASE
+
+When the project holds EXIOBASE 3 (imported in LCA Wrench, see [data.md](data.md)), its gross output weighs a
+region's countries. bw2io keeps the output of every sector and region as the dataset's "production volume" (EXIOBASE's
+`x.txt`, million euro); an industry table is taken first, else a product table, whose industry output is the sum of
+its products'. The industry of a region dataset is found as for "Other database" (`sectors.py`, the sector matching of
+Peng & Pfister 2023): by its ISIC class, by a rule on its name and product, or by its category. A dataset whose
+industry would come from the words of its name alone keeps equal weights. A country EXIOBASE lists gets the output of
+the industry there; a country of one of the five rest-of-world regions (RoW Europe, Africa, America, Asia and Pacific,
+Middle East, from Peng & Pfister's region matching, else by continent) an equal share of that region's output. Model
+processes in a region are weighted equally.
 
 ### Countries of a region
 

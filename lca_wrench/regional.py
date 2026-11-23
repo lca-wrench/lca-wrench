@@ -20,7 +20,8 @@ The factor of a flow for an activity follows the activity's location; the first 
 2. a part of a country (CA-QC, US-WECC, CN-SGCC): the country's factor;
 3. a region (RER, ENTSO-E, RAS …) without a factor of its own: the average over its countries (regions.members),
    weighted by the production volumes of the datasets with the same name and product in those countries (ecoinvent
-   records them); equally where there are none (BAFU). A country without a factor counts with the normal factor;
+   records them), else by the output of the dataset's industry in each country from the project's EXIOBASE
+   (sectors.OutputWeights), else equally. A country without a factor counts with the normal factor;
 4. GLO, RoW and anything else: the method's normal factor, the result without this module.
 
 The normal factor is the one the calculation uses anyway (the method's global factor, with the flow mapping and the
@@ -245,12 +246,14 @@ class Place:
     location: str
     kind: str  # "country", "subnational", "region", "global", "rest", "unknown"
     weights: tuple[tuple[str, float], ...] = ()
-    weighting: str | None = None  # region: "volume" or "equal"
+    weighting: str | None = None  # region: "volume", "exiobase" or "equal"
 
 
-def place_of(location: str | None, volumes: dict[str, float] | None = None) -> Place:
-    """The place of an activity at `location`; `volumes`: production volume by country of the datasets with the same
-    name and product (weights for a region)."""
+def place_of(location: str | None, volumes: dict[str, float] | None = None,
+             output: dict[str, float] | None = None) -> Place:
+    """The place of an activity at `location`. For a region, its countries are weighted by `volumes` (production
+    volume by country of the datasets with the same name and product), else by `output` (the output of the dataset's
+    sector by country, from EXIOBASE), else equally."""
     loc = (location or "").strip()
     if not loc:
         return Place("", "unknown")
@@ -266,10 +269,11 @@ def place_of(location: str | None, volumes: dict[str, float] | None = None) -> P
     members = regions.members(loc)
     if not members:
         return Place(loc, "unknown")
-    w = {c: v for c, v in (volumes or {}).items() if c in members and v > 0}
-    how = "volume" if w else "equal"
+    w, how = {c: v for c, v in (volumes or {}).items() if c in members and v > 0}, "volume"
     if not w:
-        w = {c: 1.0 for c in members}
+        w, how = {c: v for c, v in (output or {}).items() if c in members and v > 0}, "exiobase"
+    if not w:
+        w, how = {c: 1.0 for c in members}, "equal"
     total = sum(w.values())
     return Place(loc, "region", tuple(sorted((c, v / total) for c, v in w.items())), how)
 
@@ -277,8 +281,11 @@ def place_of(location: str | None, volumes: dict[str, float] | None = None) -> P
 class Places:
     """The places of a matrix's activity columns; columns at the same place share one entry."""
 
-    def __init__(self, act_ids, info: dict[int, tuple], volumes: dict[int, float] | None = None):
-        """info: {activity id: (database, name, product, location)}; volumes: {activity id: production volume}."""
+    def __init__(self, act_ids, info: dict[int, tuple], volumes: dict[int, float] | None = None, output=None,
+                 data: dict[int, dict] | None = None):
+        """info: {activity id: (database, name, product, location)}; volumes: {activity id: production volume};
+        output: sectors.OutputWeights of the project's EXIOBASE, with `data` (ISIC class, category) of the activities
+        in a region."""
         by_product: dict[tuple, dict[str, float]] = {}  # (database, name, product) -> {country: production volume}
         for a, v in (volumes or {}).items():
             if not v or v <= 0 or a not in info:
@@ -293,7 +300,11 @@ class Places:
         self.index = np.zeros(len(act_ids), dtype=np.int64)
         for j, a in enumerate(act_ids):
             db, name, product, loc = info.get(int(a)) or (None, None, None, None)
-            p = place_of(loc, by_product.get((db, name, product)))
+            vol, out = by_product.get((db, name, product)), None
+            members = regions.members(loc) if output is not None else None
+            if members and not any(c in members for c in (vol or ())):
+                out = _output(output, (data or {}).get(int(a)) or {}, name, product, members)
+            p = place_of(loc, vol, out)
             if p not in seen:
                 seen[p] = len(self.places)
                 self.places.append(p)
@@ -304,6 +315,14 @@ class Places:
 
     def column(self, j: int) -> Place:
         return self.places[int(self.index[j])]
+
+
+def _output(output, d: dict, name: str | None, product: str | None, members) -> dict[str, float] | None:
+    """The output of the dataset's EXIOBASE industries in the region's countries; None without a sure industry."""
+    from . import sectors
+
+    industries = sectors.proxy_industries(name or "", product or "", sectors.category(d), sectors.isic(d))
+    return output.weights(industries, members) if industries else None
 
 
 def activity_info(act_ids, full: bool = True, databases=None) -> dict[int, tuple]:
@@ -349,11 +368,28 @@ def places_for(act_ids, info: dict[int, tuple] | None = None, volumes: bool = Tr
     databases with an activity in a region; without, regions are weighted equally (enough to group by location).
     databases: the databases the activities are in, if known (quicker)."""
     info = info if info is not None else activity_info(act_ids, full=volumes, databases=databases)
-    vol = {}
+    vol, output, data = {}, None, {}
     if volumes:
         dbs = {db for db, _n, _p, loc in info.values() if db and regions.members(loc)}
         vol = production_volumes(dbs) if dbs else {}
-    return Places(act_ids, info, vol)
+        if dbs:
+            from . import sectors
+
+            output = sectors.output_weights()
+            if output is not None:  # the ISIC class and category of the datasets in a region, for their industry
+                data = activity_data([a for a, (_db, _n, _p, loc) in info.items() if regions.members(loc)])
+    return Places(act_ids, info, vol, output, data)
+
+
+def activity_data(ids) -> dict[int, dict]:
+    """The stored data (classifications, categories, sector) of some activities."""
+    from bw2data.backends import ActivityDataset as AD
+
+    ids = sorted({int(i) for i in ids})
+    out = {}
+    for i in range(0, len(ids), 900):
+        out.update(AD.select(AD.id, AD.data).where(AD.id << ids[i:i + 900]).tuples())
+    return out
 
 
 # ---------- the factors of a matrix ----------

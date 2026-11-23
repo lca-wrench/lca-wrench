@@ -549,3 +549,76 @@ def test_ef_workbook_on_ecoinvent_flows(ecoinvent_like):
     # factors that are not all plus or minus the default: not the same method, nothing by ratio
     bd.Method(M_EVAP).write([(t["evap"], 7.0)])
     assert regional.table(M_EVAP) is None
+
+
+# ---------- a region's countries weighted by EXIOBASE output (sectors.OutputWeights) ----------
+
+STEEL = "i27.a"  # ISIC 2410 in the Peng & Pfister matching
+
+
+def test_output_weights_by_country_and_rest_of_world():
+    """A country of EXIOBASE gets its own output, a country of a rest-of-world region an equal share of that region's."""
+    from lca_wrench import sectors
+
+    name = sectors.data()["exiobase_sectors"][STEEL]
+    rows = {1: {"name": name, "location": "DE", "volume": 300.0}, 2: {"name": name, "location": "FR", "volume": 100.0},
+            3: {"name": name, "location": "WE", "volume": 150.0}, 4: {"name": name, "location": "CH", "volume": 0.0}}
+    w = sectors.OutputWeights("x", rows)
+    assert w.system == "ixi" and w.region_of("DE") == "DE" and w.region_of("UA") == "WE"
+    assert w.region_of("AD") == "WE"  # Andorra, not in the region matching: by its continent
+    n = w.share["WE"]
+    assert n >= 15
+    got = w.weights((STEEL,), {"DE", "FR", "CH", "UA", "BY"})
+    assert got == pytest.approx({"DE": 300.0, "FR": 100.0, "UA": 150.0 / n, "BY": 150.0 / n})  # CH produces nothing
+    assert w.weights(("i01.a",), {"DE"}) is None
+    assert sectors.proxy_industries("zzz qqq", "zzz", "", None) == ()  # words alone: not sure enough
+
+
+@pytest.fixture
+def exio_like(co2):
+    """A stand-in for EXIOBASE (industry names of the bundled matching, made-up output), and datasets in RER."""
+    from lca_wrench import sectors
+
+    bd.projects.set_current(TEST_PROJECT)
+    exio, things = "zz EXIOBASE test industries", "zz-regional-things"
+    for db in (exio, things):
+        if db in bd.databases:
+            del bd.databases[db]
+    name = sectors.data()["exiobase_sectors"][STEEL]
+    bd.Database(exio).write({(exio, loc): {
+        "name": name, "reference product": name, "location": loc, "unit": "million €", "type": "process",
+        "production volume": v, "exchanges": [{"input": (exio, loc), "amount": 1.0, "type": "production"}]}
+        for loc, v in (("DE", 300.0), ("FR", 100.0))})
+    f = bd.get_node(id=co2[0]).key
+
+    def thing(code, nm, extra):
+        return {"name": nm, "reference product": nm, "unit": "kilogram", "location": "RER", "type": "process", **extra,
+                "exchanges": [{"input": (things, code), "amount": 1.0, "type": "production"},
+                              {"input": f, "amount": 1.0, "type": "biosphere"}]}
+
+    bd.Database(things).write({
+        (things, "steel"): thing("steel", "steel production, converter", {
+            "classifications": [("ISIC rev.4 ecoinvent", "2410:Manufacture of basic iron and steel")]}),
+        (things, "odd"): thing("odd", "zzz qqq", {})})
+    m = bd.Method(M_PV)
+    m.register(unit="kg CO2")
+    m.write([(co2[0], 1.0), (co2[0], 10.0, "DE"), (co2[0], 2.0, "FR")])
+    yield {db: db for db in (exio, things)} | {"things": things}
+    bd.projects.set_current(TEST_PROJECT)
+    bd.Method(M_PV).deregister()
+    for db in (exio, things):
+        del bd.databases[db]
+
+
+def test_region_weighted_by_exiobase_output(exio_like):
+    """A region dataset with a sure industry: its countries by that industry's output; without one: equally."""
+    things = exio_like["things"]
+    S = engine.alone(things)
+    steel, odd = (bd.get_node(database=things, code=c).id for c in ("steel", "odd"))
+    assert S.score({steel: 1.0}, M_PV) == pytest.approx((300 * 10.0 + 100 * 2.0) / 400, rel=1e-12)
+    place = S.bg.places().column(S.bg.act_col[steel])
+    assert place.weighting == "exiobase" and dict(place.weights) == pytest.approx({"DE": 0.75, "FR": 0.25})
+    members = regions.members("RER")
+    equal = np.mean([10.0 if c == "DE" else 2.0 if c == "FR" else 1.0 for c in members])
+    assert S.score({odd: 1.0}, M_PV) == pytest.approx(equal, rel=1e-12)
+    assert S.bg.places().column(S.bg.act_col[odd]).weighting == "equal"

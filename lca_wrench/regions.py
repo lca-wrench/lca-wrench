@@ -197,6 +197,21 @@ _WITHOUT = re.compile(r"^(Europe|RER|UCTE|ENTSO-E),?\s+(?:without|w/o)\s+(.+)$")
 _SUBNATIONAL = re.compile(r"^([A-Z]{2})-.+$")  # CA-QC, US-WECC, CN-SGCC, BR-Mid-western grid
 
 
+_CONTINENTS = [("Europe", _EUROPE), ("Africa", _AFRICA), ("Latin America", _LATIN_AMERICA),
+               ("Northern America", _m49("Northern America")), ("Western Asia", _m49("Western Asia")), ("Asia", _ASIA),
+               ("Oceania", _OCEANIA)]
+
+
+def continent(code: str | None) -> str | None:
+    """The UN M49 continent of a country (Western Asia apart from the rest of Asia); None for other codes."""
+    return next((name for name, members_ in _CONTINENTS if code in members_), None)
+
+
+def all_countries() -> frozenset[str]:
+    """Every country of the region lists (UN M49 sovereign states, TW, HK, MO, XK)."""
+    return frozenset().union(*(m for _n, m in _CONTINENTS))
+
+
 def is_country(code: str | None) -> bool:
     """A country code (ISO 3166 alpha-2, also old ones such as CS and AN)."""
     return bool(code) and len(code) == 2 and code.isalpha() and code.isupper()

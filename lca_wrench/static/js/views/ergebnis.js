@@ -56,7 +56,7 @@ function factorNotice(r) {
   const f = r.factors;
   const sw = f.completable ? `<label class="row" style="gap:6px;font-size:13.5px" title="${t('Die Methode hat für manche Stoffe nur einen Faktor auf dem Fluss ohne Subkompartiment. Ein Fluss ohne Faktor bekommt dann den Faktor des gleichnamigen Flusses ohne Subkompartiment im selben Kompartiment. Eigene Faktoren der Methode (auch 0) bleiben, Langzeit-Emissionen werden nie ergänzt. Gilt für alle Rechnungen.')}"><input type="checkbox" id="complChk" ${f.completion ? 'checked' : ''}> ${t('Fehlende Faktoren für Subkompartimente ergänzen ({n} in dieser Methode)', { n: nf(f.completable) })}</label>` : '';
   const g = r.regional || {};
-  let rsw = g.available ? `<label class="row" style="gap:6px;font-size:13.5px" title="${t('Die Methode hat Faktoren, die vom Ort abhängen (Zeilen mit Ort oder Länderkopien von Flüssen). Ein Prozess bekommt den Faktor seines Orts, ein Teil eines Landes den des Landes, eine Region das Mittel ihrer Länder (nach Produktionsmenge der gleichen Datensätze dort, sonst gleich gewichtet). GLO, RoW und unbekannte Orte behalten den normalen Faktor. Gilt für alle Rechnungen.')}"><input type="checkbox" id="regChk" ${g.enabled ? 'checked' : ''}> ${t('Faktoren nach Ort anwenden ({k} Ort(e) in dieser Methode)', { k: nf(g.locations) })}</label>` : '';
+  let rsw = g.available ? `<label class="row" style="gap:6px;font-size:13.5px" title="${t('Die Methode hat Faktoren, die vom Ort abhängen (Zeilen mit Ort oder Länderkopien von Flüssen). Ein Prozess bekommt den Faktor seines Orts, ein Teil eines Landes den des Landes, eine Region das Mittel ihrer Länder (nach Produktionsmenge der gleichen Datensätze dort, sonst nach der Produktion ihrer Branche laut EXIOBASE, sonst gleich gewichtet). GLO, RoW und unbekannte Orte behalten den normalen Faktor. Gilt für alle Rechnungen.')}"><input type="checkbox" id="regChk" ${g.enabled ? 'checked' : ''}> ${t('Faktoren nach Ort anwenden ({k} Ort(e) in dieser Methode)', { k: nf(g.locations) })}</label>` : '';
   rsw += regFiles(g);
   if (!f.uncharacterized && !sw && !rsw) return '';
   // loud only where it matters: the namesakes would add more than 0.1 % of the result. Most flows of an inventory
@@ -91,7 +91,7 @@ function locTable(r) {
   const max = Math.max(...rows.map(x => Math.abs(x.value)), 1e-300);
   const sign = v => v > 0 ? '+' : v < 0 ? '−' : '';
   const num = v => Math.abs(v) >= 1e-4 || !v ? nf(v) : v.toExponential(2).replace('e', ' e');  // tiny changes readable
-  const weighting = { volume: t('nach Produktionsmenge'), equal: t('gleich gewichtet'), mixed: t('nach Produktionsmenge oder gleich gewichtet') };
+  const weighting = { volume: t('nach Produktionsmenge'), exiobase: t('nach Produktion der Branche laut EXIOBASE'), equal: t('gleich gewichtet'), mixed: t('je nach Datensatz anders gewichtet') };
   const how = x => x.how === 'own' ? t('Faktor des Orts') : x.how === 'country' ? t('Faktor des Landes')
     : x.how === 'region' ? t('Mittel der Länder, {w}', { w: weighting[x.weighting] || weighting.equal })
       : x.kind === 'rest' || x.kind === 'global' ? t('normaler Faktor (Weltmittel)') : t('normaler Faktor');
