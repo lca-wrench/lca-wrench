@@ -97,8 +97,10 @@ its products'. The industry of a region dataset is found as for "Other database"
 Peng & Pfister 2023): by its ISIC class, by a rule on its name and product, or by its category. A dataset whose
 industry would come from the words of its name alone keeps equal weights. A country EXIOBASE lists gets the output of
 the industry there; a country of one of the five rest-of-world regions (RoW Europe, Africa, America, Asia and Pacific,
-Middle East, from Peng & Pfister's region matching, else by continent) an equal share of that region's output. Model
-processes in a region are weighted equally.
+Middle East, from Peng & Pfister's region matching, else by continent) a share of that region's output by its GDP
+(World Bank, 2022 or the nearest year, bundled in `lca_wrench/data/regions`, CC BY 4.0): in RoW America, Argentina
+weighs about 340 times as much as Antigua and Barbuda. A country without a GDP value (Eritrea, Gibraltar, North
+Korea, the Vatican) gets no share. Model processes in a region are weighted equally.
 
 ### Countries of a region
 

@@ -212,6 +212,23 @@ def all_countries() -> frozenset[str]:
     return frozenset().union(*(m for _n, m in _CONTINENTS))
 
 
+@functools.lru_cache(maxsize=1)
+def _gdp() -> dict[str, float]:
+    import json
+    from pathlib import Path
+
+    path = Path(__file__).parent / "data" / "regions" / "gdp.json"
+    try:
+        return {c: float(v["gdp"]) for c, v in json.loads(path.read_text(encoding="utf-8"))["countries"].items()}
+    except (OSError, ValueError, KeyError):
+        return {}  # the file is missing (an incomplete copy): shares fall back to equal
+
+
+def gdp(code: str | None) -> float | None:
+    """GDP of a country in US$ (World Bank, 2022 or the nearest year; data/regions/gdp.json); None without a value."""
+    return _gdp().get(code or "")
+
+
 def is_country(code: str | None) -> bool:
     """A country code (ISO 3166 alpha-2, also old ones such as CS and AN)."""
     return bool(code) and len(code) == 2 and code.isalpha() and code.isupper()

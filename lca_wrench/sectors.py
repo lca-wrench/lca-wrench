@@ -477,8 +477,9 @@ class OutputWeights:
 
     bw2io keeps the output of every EXIOBASE sector and region as "production volume" (from x.txt). A country EXIOBASE
     lists gets its own; a country of one of the five rest-of-world regions (RoW Europe, Africa, America, Asia and
-    Pacific, Middle East) an equal share of its region's (the region matching of Peng & Pfister, else the continent).
-    In a product table an industry's output is the sum of its products'."""
+    Pacific, Middle East; the region matching of Peng & Pfister, else the continent) a share of its region's by GDP
+    (World Bank, regions.gdp). A member without a GDP value gets none; a region without any, equal shares. In a
+    product table an industry's output is the sum of its products'."""
 
     def __init__(self, database: str, rows: dict[int, dict]):
         self.database = database
@@ -497,11 +498,17 @@ class OutputWeights:
         self.regions = {r["location"] for r in rows.values() if r.get("location")}
         self.rest = {r for r in REST.values() if r in self.regions}
         everyone = regions.all_countries() | {k for k in d["location_to_regions"] if regions.is_country(k)}
-        self.share: dict[str, int] = {}
-        for c in everyone:
+        self.members: dict[str, list[str]] = {}  # rest-of-world region -> its countries
+        for c in sorted(everyone):
             r = self.region_of(c)
             if r in self.rest:
-                self.share[r] = self.share.get(r, 0) + 1
+                self.members.setdefault(r, []).append(c)
+        self.share: dict[str, float] = {}  # a country's share of its rest-of-world region's output
+        for members in self.members.values():
+            g = {c: regions.gdp(c) or 0.0 for c in members}
+            total = sum(g.values())
+            for c in members:
+                self.share[c] = g[c] / total if total else 1.0 / len(members)
         self._memo: dict = {}
 
     def region_of(self, country: str) -> str | None:
@@ -525,7 +532,7 @@ class OutputWeights:
                     continue
                 v = sum(self.output.get((s, r), 0.0) for s in industries_)
                 if r in self.rest:
-                    v /= self.share.get(r) or 1
+                    v *= self.share.get(c, 0.0)
                 if v > 0:
                     out[c] = v
             self._memo[k] = out or None

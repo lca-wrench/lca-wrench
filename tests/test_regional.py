@@ -557,7 +557,8 @@ STEEL = "i27.a"  # ISIC 2410 in the Peng & Pfister matching
 
 
 def test_output_weights_by_country_and_rest_of_world():
-    """A country of EXIOBASE gets its own output, a country of a rest-of-world region an equal share of that region's."""
+    """A country of EXIOBASE gets its own output, a country of a rest-of-world region a share of that region's by
+    GDP (World Bank, bundled)."""
     from lca_wrench import sectors
 
     name = sectors.data()["exiobase_sectors"][STEEL]
@@ -566,10 +567,15 @@ def test_output_weights_by_country_and_rest_of_world():
     w = sectors.OutputWeights("x", rows)
     assert w.system == "ixi" and w.region_of("DE") == "DE" and w.region_of("UA") == "WE"
     assert w.region_of("AD") == "WE"  # Andorra, not in the region matching: by its continent
-    n = w.share["WE"]
-    assert n >= 15
+    members = w.members["WE"]
+    assert len(members) >= 15 and {"UA", "BY", "IS", "VA"} <= set(members)
+    total = sum(regions.gdp(c) or 0.0 for c in members)
+    assert sum(w.share[c] for c in members) == pytest.approx(1.0)
+    assert w.share["UA"] == pytest.approx(regions.gdp("UA") / total) and w.share["UA"] > w.share["IS"] > 0
+    assert regions.gdp("VA") is None and w.share["VA"] == 0.0  # no GDP value: no share
     got = w.weights((STEEL,), {"DE", "FR", "CH", "UA", "BY"})
-    assert got == pytest.approx({"DE": 300.0, "FR": 100.0, "UA": 150.0 / n, "BY": 150.0 / n})  # CH produces nothing
+    assert got == pytest.approx({"DE": 300.0, "FR": 100.0, "UA": 150.0 * regions.gdp("UA") / total,
+                                 "BY": 150.0 * regions.gdp("BY") / total})  # CH produces nothing
     assert w.weights(("i01.a",), {"DE"}) is None
     assert sectors.proxy_industries("zzz qqq", "zzz", "", None) == ()  # words alone: not sure enough
 
