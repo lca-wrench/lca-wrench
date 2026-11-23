@@ -1,7 +1,7 @@
 # Bundled flow mapping
 
-`ecoinvent-3.11-biosphere-EF-3.1-biosphere.json.gz` is one of two data files distributed with LCA Wrench; the other
-is the sector matching for EXIOBASE in `../sectors`.
+`ecoinvent-3.11-biosphere-EF-3.1-biosphere.json.gz` is one of three data files distributed with LCA Wrench; the
+others are the sector matching for EXIOBASE in `../sectors` and GDP by country in `../regions`.
 
 - Name: ecoinvent-3.11-biosphere-EF-3.1-biosphere
 - Version: 1.0.0

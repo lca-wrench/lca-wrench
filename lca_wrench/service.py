@@ -33,8 +33,8 @@ from bw2data.backends.schema import ExchangeDataset
 from bw2data.project import ProjectDataset
 from bw_processing import safe_filename
 
-from . import (analysis, backgrounds, bafu2026, beispiel, completion, engine, flowmap, functional, models, montecarlo,
-               overview, regions, registry, repair, setups)
+from . import (analysis, backgrounds, bafu2026, beispiel, completion, engine, factor_files, flowmap, functional,
+               models, montecarlo, overview, regional, regions, registry, repair, setups)
 from .analysis import short_unit
 from .i18n import _
 from .models import ReadOnlyError
@@ -154,6 +154,7 @@ def _project_state(reg: dict, cur: str) -> dict:
         "background": background_state(roles),
         "flowmap": flowmap.info(),
         "completion": completion.info(),
+        "regional": regional.info(),
     }
 
 
@@ -818,7 +819,9 @@ def verify(fus: list[dict], methods: list[tuple]) -> dict:
         lca = bc.LCA({node: amount}, tuple(methods[0]))
         lca.lci()
         bio_ids = np.array([f for f, _ in sorted(lca.dicts.biosphere.items(), key=lambda kv: kv[1])], dtype=np.int64)
+        act_ids = np.array([a for a, _ in sorted(lca.dicts.activity.items(), key=lambda kv: kv[1])], dtype=np.int64)
         g = np.asarray(lca.inventory.sum(axis=1)).ravel()
+        places = None
         for m in methods:
             m = tuple(m)
             lca.switch_method(m)
@@ -830,6 +833,14 @@ def verify(fus: list[dict], methods: list[tuple]) -> dict:
             ref = float(lca.score) + (float(add @ g) if add is not None else 0.0)
             # measure against the gross impact, so results where credits and burdens cancel stay meaningful
             gross = float(abs(lca.characterized_inventory).sum()) + (float(abs(add * g).sum()) if add is not None else 0.0)
+            T = regional.active(m)  # factors by location: bw2calc uses only the global rows of a method
+            if T is not None:
+                places = places or regional.places_for(act_ids)
+                c = np.asarray(lca.characterization_matrix.diagonal()).ravel() + (add if add is not None else 0.0)
+                part = regional.matrix(T, bio_ids, places, lca.biosphere_matrix, c)
+                if part is not None:
+                    ref += float((part.R @ lca.supply_array).sum())
+                    gross += float(abs(part.R.multiply(lca.supply_array[None, :])).sum())
             worst = max(worst, abs(mine - ref) / gross if gross > 0 else abs(mine - ref))
             checked += 1
     return {"ok": bool(worst < 1e-6), "max_rel": worst, "checked": checked, "seconds": time.perf_counter() - t}
@@ -945,6 +956,27 @@ def set_completion(on: bool) -> dict:
     return completion.info()
 
 
+def set_regional(on: bool) -> dict:
+    """Factors that depend on the location of the activity (regional.py): on or off, for all calculations."""
+    regional.set_enabled(on)
+    return regional.info()
+
+
+def regional_factors(method: tuple) -> dict:
+    """Every factor by location the method has (whether switched on or not), for the list in the UI."""
+    method = tuple(method)
+    if method not in bd.methods:
+        raise KeyError(_("Methode fehlt in diesem Projekt"))
+    return {**regional.summary(method), "method": list(method), "unit": short_unit(bd.methods[method].get("unit")),
+            "rows": regional.table_rows(method)}
+
+
+def unload_factor_file(fid: str) -> dict:
+    """Remove a loaded file with factors by location (factor_files.py)."""
+    factor_files.unload(fid)
+    return regional.info()
+
+
 def completed_factors(method: tuple) -> dict:
     """Every factor the completion gives the method (whether switched on or not), for the list in the UI."""
     method = tuple(method)
@@ -1048,7 +1080,9 @@ def explain_difference(activity_id: int | str, amount: float, method: tuple) -> 
                 k0, k1 = S0.bio_row.get(int(p["inp"])), S1.bio_row.get(int(p["inp"]))
                 if k0 is not None and k1 is not None:
                     d = float(S1.B[k1, j1] - S0.B[k0, j0])
-                    e["val"], e["used"] = c0[k0] * d * x1[S1.col[int(p["out"])]], float(x1[j1])
+                    # the factor at the emitting process's location (regional.py; the normal one without)
+                    cf = S0.column_factors(method, j0)[k0] if regional.active(method) is not None else c0[k0]
+                    e["val"], e["used"] = cf * d * x1[S1.col[int(p["out"])]], float(x1[j1])
             else:
                 i0, i1 = S0.row.get(int(p["inp"])), S1.row.get(int(p["inp"]))
                 if i0 is not None and i1 is not None:

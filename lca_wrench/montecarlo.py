@@ -74,6 +74,7 @@ def run_chunk(project: str, fus: list[tuple[int, float]], methods: list[tuple], 
         lca.build_demand_array({nid: amount})
         demands.append(lca.demand_array.copy())
     adds = _mapped(methods, lca)
+    regs = _regional(methods, lca, adds)
     out = np.empty((n, len(fus), len(methods)))
     for i in range(n):
         if i:
@@ -86,10 +87,16 @@ def run_chunk(project: str, fus: list[tuple[int, float]], methods: list[tuple], 
                 next(cm)
         solve = _factorize(lca.technosphere_matrix)
         B = lca.biosphere_matrix
+        # factors by location (regional.py) on this draw's B: fixed factors, the sampled normal factor elsewhere
+        BV = [(np.asarray(B.multiply(r[0]).sum(axis=0)).ravel(), B.multiply(r[1]).tocsr()) if r else None for r in regs]
         for j, f in enumerate(demands):
-            g = np.asarray(B @ solve(f)).ravel()
+            x = solve(f)
+            g = np.asarray(B @ x).ravel()
             for k, cm in enumerate(cms):
-                out[i, j, k] = float((cm.matrix.diagonal() + adds[k]) @ g)
+                c = cm.matrix.diagonal() + adds[k]
+                out[i, j, k] = float(c @ g)
+                if BV[k] is not None:
+                    out[i, j, k] += float(BV[k][0] @ x) - float(c @ (BV[k][1] @ x))
         if progress is not None:
             progress[slot] = i + 1
     return out
@@ -102,6 +109,26 @@ def _mapped(methods: list[tuple], lca) -> list:
 
     ids = _ids(lca.dicts.biosphere)
     return [a if (a := engine.extra_vector(tuple(m), ids)) is not None else 0.0 for m in methods]
+
+
+def _regional(methods: list[tuple], lca, adds) -> list:
+    """Per method (V, M) of regional.sampled_parts over lca's matrices, or None without factors by location. The
+    factors by location have no uncertainty; for a region's countries without one the normal factor is taken as
+    calculated (mean values), as in the engine."""
+    from . import engine, regional
+
+    out, places = [], None
+    bio_ids, act_ids = _ids(lca.dicts.biosphere), _ids(lca.dicts.activity)
+    for k, m in enumerate(methods):
+        T = regional.active(tuple(m))
+        if T is None:
+            out.append(None)
+            continue
+        places = places or regional.places_for(act_ids)
+        cf = engine.method_cfs(tuple(m))  # the stored values, not this draw's
+        c = np.fromiter((cf.get(int(f), 0.0) for f in bio_ids), dtype=float, count=len(bio_ids)) + adds[k]
+        out.append(regional.sampled_parts(T, bio_ids, places, lca.biosphere_matrix, c))
+    return out
 
 
 _progress = None

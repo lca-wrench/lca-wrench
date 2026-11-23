@@ -17,7 +17,11 @@ exact, not an approximation:
     x_b = A_bb^-1 (f_b - A_bf x_f)
     h   = s_b . (f_b - A_bf x_f) + c . B_f x_f,   s_b = c B_b A_bb^-1 (cached)
 
-tests/test_engine.py checks every quantity against plain bw2calc.
+Factors that depend on where an activity is (regional.py) enter as a matrix R of the shape of B: (factor at the
+activity's place - normal factor) times B. The characterized biosphere matrix is diag(c) B + R, so the direct impacts
+are B^T c + 1^T R; without such factors R is None and nothing changes.
+
+tests/test_engine.py checks every quantity against plain bw2calc, tests/test_regional.py the factors by location.
 """
 
 from __future__ import annotations
@@ -35,7 +39,7 @@ from scipy import sparse
 from scipy.linalg import lu_factor, lu_solve
 from scipy.sparse.linalg import splu
 
-from . import completion, flowmap, i18n
+from . import completion, flowmap, i18n, regional
 from . import functional  # noqa: F401  (registers the backend: Activity Browser 3 databases open at all)
 from .i18n import msg, render
 
@@ -115,6 +119,8 @@ class Background:
         self._cvec: dict = {}
         self._direct: dict = {}
         self._unit: dict = {}
+        self._reg: dict = {}
+        self._places: dict = {}
         demand = {}
         for name in self.dbs:
             node_id = AD.select(AD.id).where(AD.database == name, AD.type << list(PROCESS_TYPES)).limit(1).scalar()
@@ -166,10 +172,26 @@ class Background:
                 self._cvec[method] = c + add if add is not None else c
         return self._cvec[method]
 
+    def places(self, volumes: bool = True) -> regional.Places:
+        """Where each activity column is, for factors that depend on the location (regional.py). volumes=False: the
+        locations only, regions weighted equally (enough to group a result by location, and much quicker)."""
+        if volumes not in self._places:
+            self._places[volumes] = regional.places_for(self.act_ids, volumes=volumes, databases=self.dbs)
+        return self._places[volumes]
+
+    def regional(self, method: tuple) -> regional.Part | None:
+        """The location-dependent part of the characterized biosphere matrix; None when the method has none."""
+        if method not in self._reg:
+            T = regional.active(method) if self.lca is not None else None
+            self._reg[method] = regional.matrix(T, self.bio_ids, self.places(), self.B, self.cvec(method)) if T else None
+        return self._reg[method]
+
     def direct(self, method: tuple) -> np.ndarray:
         """Characterized direct emissions per activity column (for its production amount)."""
         if method not in self._direct:
-            self._direct[method] = np.asarray(self.B.T @ self.cvec(method)).ravel()
+            d = np.asarray(self.B.T @ self.cvec(method)).ravel()
+            part = self.regional(method)
+            self._direct[method] = d + np.asarray(part.R.sum(axis=0)).ravel() if part is not None else d
         return self._direct[method]
 
     def unit_scores(self, method: tuple) -> np.ndarray:
@@ -530,6 +552,9 @@ class System:
         self._unit: dict = {}
         self._cvec: dict = {}
         self._direct: dict = {}
+        self._reg: dict = {}
+        self._reg_f: dict = {}
+        self._fg_places = None
         self._A = None
         self._B = None
 
@@ -566,8 +591,70 @@ class System:
         if method not in self._direct:
             d_b = self.bg.direct(method)
             d_f = np.asarray(self.fg.B_f.T @ self.cvec(method)).ravel() if self.nf else np.zeros(0)
+            part = self._regional_fg(method)
+            if part is not None:
+                d_f = d_f + np.asarray(part.R.sum(axis=0)).ravel()
             self._direct[method] = np.concatenate([d_b, d_f])
         return self._direct[method]
+
+    # ---------- factors that depend on the location (regional.py) ----------
+
+    def fg_places(self) -> regional.Places:
+        if self._fg_places is None:
+            info = {int(i): (n["database"], n["name"], None, n["location"]) for i, n in self.fg.nodes.items()}
+            self._fg_places = regional.places_for(self.fg.act_ids, info, volumes=False)
+        return self._fg_places
+
+    def _regional_fg(self, method: tuple) -> regional.Part | None:
+        if method not in self._reg_f:
+            T = regional.active(method) if self.nf else None
+            self._reg_f[method] = regional.matrix(T, self.bio_ids, self.fg_places(), self.fg.B_f, self.cvec(method)) \
+                if T else None
+        return self._reg_f[method]
+
+    def regional(self, method: tuple) -> sparse.csc_matrix | None:
+        """R: the location-dependent part of the characterized biosphere matrix over all columns, so that the
+        characterized B is diag(c) B + R (None when the method has no factors by location or they are off)."""
+        if method not in self._reg:
+            pb, pf = self.bg.regional(method), self._regional_fg(method)
+            R = None
+            if pb is not None or pf is not None:
+                nbio = len(self.bio_ids)
+                Rb = pb.R if pb is not None else sparse.csc_matrix((len(self.bg.bio_ids), self.nb))
+                if Rb.shape[0] < nbio:
+                    Rb = sparse.vstack([Rb, sparse.csc_matrix((nbio - Rb.shape[0], Rb.shape[1]))]).tocsc()
+                Rf = pf.R if pf is not None else sparse.csc_matrix((nbio, self.nf))
+                R = sparse.hstack([Rb, Rf]).tocsc() if self.nf else Rb
+            self._reg[method] = R
+        return self._reg[method]
+
+    def flow_impacts(self, method: tuple, x: np.ndarray) -> np.ndarray:
+        """Impact per elementary flow for the supply x: c ∘ (B x), plus the part by location."""
+        out = self.cvec(method) * self.inventory(x)
+        R = self.regional(method)
+        return out + np.asarray(R @ x).ravel() if R is not None else out
+
+    def place(self, col: int) -> regional.Place:
+        return self.bg.places().column(col) if col < self.nb else self.fg_places().column(col - self.nb)
+
+    def column_places(self, method: tuple) -> tuple[np.ndarray, list, np.ndarray]:
+        """Per column the index of its place in `places`, the places (background ones first) and, per place, how a
+        flow of the method got its factor there (regional.OWN … NORMAL)."""
+        rb, rf = self.bg.regional(method), self._regional_fg(method)
+        pb, pf = self.bg.places(volumes=rb is not None), self.fg_places()  # the production volumes only when needed
+        idx = np.concatenate([pb.index, pf.index + len(pb.places)]) if self.nf else pb.index
+        how = np.zeros(len(pb.places) + len(pf.places), dtype=np.int8)
+        if rb is not None:
+            how[:len(pb.places)] = rb.how
+        if rf is not None:
+            how[len(pb.places):] = rf.how
+        return idx, pb.places + pf.places, how
+
+    def column_factors(self, method: tuple, col: int) -> np.ndarray:
+        """The factor of every flow for the activity in column `col`: the normal factors, with those of its place."""
+        c = self.cvec(method)
+        T = regional.active(method)
+        return regional.factors_at(T, self.bio_ids, c, self.place(col)) if T is not None else c
 
     def unit_scores(self, method: tuple) -> np.ndarray:
         """Cumulative score per unit of every product row, background and models."""
@@ -643,8 +730,12 @@ class System:
 
 
 def method_cfs(method: tuple) -> dict[int, float]:
+    """The method's normal factors per flow id: its rows without location or with the global one, as bw2calc uses
+    them. Rows with another location are factors by location (regional.py)."""
     out: dict[int, float] = {}
     for entry in bd.Method(method).load():
+        if not regional.is_global(entry):
+            continue
         key, cf = entry[0], entry[1]
         if isinstance(key, (list, tuple)):
             key = bd.get_id(tuple(key))

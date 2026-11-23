@@ -1190,7 +1190,8 @@ def process_detail(node_id: int | str, method: tuple) -> dict:
             errors.append(str(e))
     col = S.col.get(target)
     prod = float(S.production[col]) if col is not None else 1.0
-    cvec = S.cvec(method) if u is not None else None
+    # the factors at this process's location (regional.py), so the emissions add up to its direct impact
+    cvec = (S.column_factors(method, col) if col is not None else S.cvec(method)) if u is not None else None
     excs = []
     for e in (proc if share is not None else act).exchanges():
         try:

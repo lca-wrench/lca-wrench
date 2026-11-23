@@ -362,4 +362,22 @@ EN = {
     "Menschliche Gesundheit": "Human health",
     "Ökosystemqualität": "Ecosystem quality",
     "Natürliche Ressourcen": "Natural resources",
+    # factors by location (regional.py)
+    "Beiträge nach Ort": "Contributions by location",
+    "Land": "Country",
+    "davon Faktoren nach Ort": "of which factors by location",
+    "Prozesse": "Activities",
+    "Faktor des Orts": "Factor of the location",
+    "Faktor des Landes": "Factor of the country",
+    "Mittel der Länder": "Average of the countries",
+    "normaler Faktor": "normal factor",
+    # loading the JRC's EF 3.1 workbook (factor_files.py)
+    "Das ist keine Excel-Datei, die sich lesen lässt ({error}).": "This is not an Excel file that can be read ({error}).",
+    "In der Datei fehlt das Blatt «{sheet}». Erwartet wird die Excel-Datei der EF-3.1-Faktoren der JRC (EF-LCIAMethod_CF).":
+        "The file has no sheet “{sheet}”. Expected is the JRC's Excel file of the EF 3.1 factors (EF-LCIAMethod_CF).",
+    "Im Blatt «{sheet}» fehlen Spalten (FLOW_uuid, LCIAMethod_name, CF, LCIAMethod_location).":
+        "Sheet “{sheet}” lacks columns (FLOW_uuid, LCIAMethod_name, CF, LCIAMethod_location).",
+    "In der Datei stehen keine Faktoren, die vom Ort abhängen.": "The file has no factors that depend on the location.",
+    "Die Datei ist zu gross (höchstens {n} MB).": "The file is too large (at most {n} MB).",
+    "Diese Datei mit Faktoren nach Ort ist nicht geladen.": "This file with factors by location is not loaded.",
 }

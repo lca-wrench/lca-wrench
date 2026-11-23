@@ -419,6 +419,10 @@ def _demand(node_id: int, amount: float, method: tuple) -> dict:
         g = np.asarray(sysm.fg.B_f @ x_f).ravel()
     s = sysm.bg.unit_scores(method)
     c = sysm.cvec(method)
+    if sysm.nf and sysm.regional(method) is not None:
+        # factors by location (regional.py): the factor each flow gets on average over the model's processes
+        char = sysm.flow_impacts(method, np.concatenate([np.zeros(nb), x[nb:]]))
+        c = np.where(g != 0, char / np.where(g != 0, g, 1.0), c)
     rows = np.flatnonzero(np.abs(d) > 0)
     flows = np.flatnonzero(np.abs(g) > 0)
     return {"ids": [int(sysm.bg.prod_ids[r]) for r in rows], "d": d[rows], "s": s[rows],

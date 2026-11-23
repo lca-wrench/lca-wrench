@@ -72,6 +72,7 @@ Options: `python -m lca_wrench --port 8790 --no-browser`. `./start.sh` still wor
 | Flow mapping | Methods on one list of elementary flows are applied to products on the other where this holds ([docs](docs/flow-mapping.md)) |
 | Flows without a characterization factor | In Result, Inventory, each flow shows whether the method has a factor (characterized, characterized (flow mapping), characterized (completed), not characterized). A filter lists the not characterized flows, with a labelled estimate where the name has a factor in another sub-compartment; counts are shown above the result and the columns are in the export ([docs](docs/completed-factors.md)) |
 | Completed factors | Some methods (the Ecological Scarcity 2021 methods of the BAFU-2025-v2 template) carry most factors only on the flow without sub-compartment. LCA Wrench completes them at calculation time, marks this in the result, and the list of added factors can be exported. Only families that carry their factors on top-level flows are completed; families that characterize sub-compartments themselves (such as ecoinvent's) stay as they are. On by default, can be switched off; stored methods are not modified ([docs](docs/completed-factors.md)) |
+| Factors by location | Factors that depend on the location of the activity (EF 3.1 water use per country): read from the method's rows with a location (Brightway's convention), country copies of flows, or the JRC's EF 3.1 workbook loaded from your own copy; regions get the average of their countries, weighted by production volume or by their industry's output in EXIOBASE. Result by location, with what the factors change there. On by default, can be switched off ([docs](docs/regional-factors.md)) |
 | Real projects | Projects are never opened or converted without asking; test copies; Activity Browser 2 projects only as a copy; foreign databases are protected; changes from other programs are detected |
 | Language | English by default, German switchable in the interface |
 
@@ -125,7 +126,8 @@ flows without sub-compartment, so emissions into sub-compartments count as zero 
 
 - [Installation](docs/install.md), [Data and imports](docs/data.md), [Calculation](docs/calculation.md)
 - [Features](docs/features.md), [Uncertainty and sensitivity](docs/uncertainty.md), [Flow mapping](docs/flow-mapping.md)
-- [Completed factors](docs/completed-factors.md), [Validation](docs/validation.md), [Comparison with other tools](COMPARISON.md)
+- [Completed factors](docs/completed-factors.md), [Factors by location](docs/regional-factors.md), [Validation](docs/validation.md),
+  [Comparison with other tools](COMPARISON.md)
 - [Demo walkthrough](docs/demo.md), [Development](docs/development.md), [Contributing](CONTRIBUTING.md),
   [Security](SECURITY.md)
 

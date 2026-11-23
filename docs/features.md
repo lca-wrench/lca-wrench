@@ -349,3 +349,21 @@ warns and marks the categories "not characterized".
 
 API: `GET /api/singlescore/sets` (with `?id=<product>`: a `coverage` per set: native, mapped or missing),
 `POST /api/singlescore` with `{"id", "amount", "set", "weighting"}`.
+
+## Factors by location (regionalized impact assessment)
+
+A characterization factor can depend on where the emitting activity is: EF 3.1 water use has a factor per country
+(Switzerland 1.34, Spain 77.7 m³ world eq. per m³). LCA Wrench reads such factors from the method itself, in Brightway's
+convention (rows `(flow, factor, location)`, which bw2calc leaves out) or as country copies of a flow (a flow with a
+location of its own, "Water, AT", whose generic flow is in the same method). Each activity gets the factor of its
+location; a part of a country (CA-QC) the country's; a region (RER, ENTSO-E …) the average of its countries, weighted
+by the production volumes of the same datasets there, else by the output of the dataset's industry in the project's
+EXIOBASE, else equally; GLO, RoW and unknown
+locations keep the normal factor. Nothing is bundled and the stored methods are not changed. On by default, can be
+switched off above the result; a method without such factors gives exactly the result it gave before. The country
+factors of the JRC's EF 3.1 workbook (water use, land use, acidification, terrestrial eutrophication) are loaded once
+from your own copy and apply to the matching EF 3.1 methods in all projects.
+
+**Result by location**: Result, Contributions, "by location" lists the impact by the location of the activities that
+cause it, with what the factors by location change there and how each factor was found; also in the export. Details:
+[regional-factors.md](regional-factors.md).

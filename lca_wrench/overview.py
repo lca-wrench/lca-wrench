@@ -133,6 +133,10 @@ def _result_sections(activity_id: int | str, amount: float, method: tuple, fams:
     by_flow = [[r["name"], r.get("categories") or "", r["value"], unit] for r in c["by_flow"]]
     if c["by_flow_rest"]:
         by_flow.append([_("Übrige"), "", c["by_flow_rest"], unit])
+    how = {"own": _("Faktor des Orts"), "country": _("Faktor des Landes"), "region": _("Mittel der Länder"),
+           "normal": _("normaler Faktor")}
+    by_loc = [[r["location"], r["name"] or "", r["value"], unit, r["regional"], how[r["how"]], r["processes"]]
+              for r in c["by_location"]]
     cats = []
     for f in categories(nid, amount, fams, topic_key)["families"]:
         cats += [[f["family"], r["name"], r["value"], r["unit"]] for r in f["rows"]]
@@ -147,6 +151,8 @@ def _result_sections(activity_id: int | str, amount: float, method: tuple, fams:
         (_("Ergebnis"), head, summary),
         (_("Beiträge nach Prozess"), [_("Prozess"), _("Ort"), _("Datenbank"), _("Wert"), _("Einheit")], by_act),
         (_("Beiträge nach Stoff"), [_("Stofffluss"), _("Kompartiment"), _("Wert"), _("Einheit")], by_flow),
+        (_("Beiträge nach Ort"), [_("Ort"), _("Land"), _("Wert"), _("Einheit"), _("davon Faktoren nach Ort"), _("Faktor"),
+                                  _("Prozesse")], by_loc),
         (_("Alle Kategorien"), [_("Methode"), _("Kategorie"), _("Wert"), _("Einheit")], cats),
         (_("Inventar"), [_("Stofffluss"), _("Kompartiment"), _("Menge"), _("Einheit"), _("Charakterisiert"),
                          _("Faktor"), _("Gleichnamiger Fluss mit Faktor"), _("Schätzung, falls gleich bewertet")], inv),

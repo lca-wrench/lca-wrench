@@ -456,3 +456,109 @@ def source_info(ids) -> dict[int, dict]:
             if str(price.get("unit", "")).upper().startswith("EUR") and price.get("amount"):
                 out[nid]["price"] = float(price["amount"])
     return out
+
+
+# ---------- output by country: the weights of a region's countries (regional.py) ----------
+
+REST = {"Europe": "WE", "Africa": "WF", "Latin America": "WL", "Northern America": "WL", "Western Asia": "WM",
+        "Asia": "WA", "Oceania": "WA"}  # EXIOBASE's five rest-of-world regions, by continent
+
+
+@lru_cache(maxsize=20000)
+def proxy_industries(name: str, product: str, cat: str, isic_code: str | None) -> tuple[str, ...]:
+    """The EXIOBASE industries of a dataset for weighting a region: found by ISIC class, a rule or the category; none
+    when only the words of the name point to some (too unsure to weigh countries by)."""
+    cands, how, _clear = industries(name or "", product or "", cat or "", isic_code)
+    return tuple(cands) if how in ("isic", "rule", "category") else ()
+
+
+class OutputWeights:
+    """Country weights from EXIOBASE: the gross output of a dataset's industries in each country, in million euro.
+
+    bw2io keeps the output of every EXIOBASE sector and region as "production volume" (from x.txt). A country EXIOBASE
+    lists gets its own; a country of one of the five rest-of-world regions (RoW Europe, Africa, America, Asia and
+    Pacific, Middle East; the region matching of Peng & Pfister, else the continent) a share of its region's by GDP
+    (World Bank, regions.gdp). A member without a GDP value gets none; a region without any, equal shares. In a
+    product table an industry's output is the sum of its products'."""
+
+    def __init__(self, database: str, rows: dict[int, dict]):
+        self.database = database
+        sec = Sectors(rows)
+        self.system = sec.system
+        d = data()
+        self.output: dict[tuple[str, str], float] = {}
+        codes = ([(ind, p) for ind, prods in d["industry_products"].items() for p in prods] if sec.system == "pxp"
+                 else [(c, c) for c in sec.by_code if c in d["exiobase_sectors"]])
+        for ind, code in codes:
+            for loc, r in sec.by_code.get(code, {}).items():
+                v = r.get("volume")
+                if isinstance(v, (int, float)) and v > 0:
+                    self.output[(ind, loc)] = self.output.get((ind, loc), 0.0) + float(v)
+        # every region of the table, also one where this or that sector produces nothing
+        self.regions = {r["location"] for r in rows.values() if r.get("location")}
+        self.rest = {r for r in REST.values() if r in self.regions}
+        everyone = regions.all_countries() | {k for k in d["location_to_regions"] if regions.is_country(k)}
+        self.members: dict[str, list[str]] = {}  # rest-of-world region -> its countries
+        for c in sorted(everyone):
+            r = self.region_of(c)
+            if r in self.rest:
+                self.members.setdefault(r, []).append(c)
+        self.share: dict[str, float] = {}  # a country's share of its rest-of-world region's output
+        for members in self.members.values():
+            g = {c: regions.gdp(c) or 0.0 for c in members}
+            total = sum(g.values())
+            for c in members:
+                self.share[c] = g[c] / total if total else 1.0 / len(members)
+        self._memo: dict = {}
+
+    def region_of(self, country: str) -> str | None:
+        """The EXIOBASE region a country belongs to."""
+        if country in self.regions and country not in self.rest:
+            return country
+        hit = data()["location_to_regions"].get(country)
+        if hit and len(hit) == 1 and hit[0] in self.rest:
+            return hit[0]
+        r = REST.get(regions.continent(country) or "")
+        return r if r in self.rest else None
+
+    def weights(self, industries_: tuple[str, ...], countries) -> dict[str, float] | None:
+        """{country: output} of these industries for the countries of a region; None when none of them produces."""
+        k = (industries_, frozenset(countries))
+        if k not in self._memo:
+            out = {}
+            for c in countries:
+                r = self.region_of(c)
+                if r is None:
+                    continue
+                v = sum(self.output.get((s, r), 0.0) for s in industries_)
+                if r in self.rest:
+                    v *= self.share.get(c, 0.0)
+                if v > 0:
+                    out[c] = v
+            self._memo[k] = out or None
+        return self._memo[k]
+
+
+_weights: dict = {}
+
+
+def output_weights() -> OutputWeights | None:
+    """The country weights of the project's EXIOBASE (an industry table first, else a product table); None without
+    one, or when its datasets carry no output."""
+    import bw2data as bd
+
+    from . import backgrounds
+
+    k = (bd.projects.current, tuple(sorted((n, str(m.get("modified"))) for n, m in bd.databases.items())))
+    if k in _weights:
+        return _weights[k]
+    _weights.clear()
+    best = None
+    for db in sorted((n for n in bd.databases if backgrounds.kind(n) == "mrio"), reverse=True):
+        rows = {nid: {"name": d.get("name", ""), "location": d.get("location") or "", "volume": d.get("production volume")}
+                for nid, d in AD.select(AD.id, AD.data).where(AD.database == db).tuples().iterator()}
+        w = OutputWeights(db, rows)
+        if w.output and (best is None or (w.system == "ixi" and best.system != "ixi")):
+            best = w
+    _weights[k] = best
+    return best

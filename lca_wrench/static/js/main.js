@@ -535,6 +535,16 @@ const A = {
     const d = await api('/api/completion/factors', { method: S.method });
     csvDownload(`${t('Ergänzte Faktoren')} ${S.method.join(' - ')}.csv`, [[t('Stoff'), t('Kompartiment'), t('Einheit'), t('Faktor'), t('Übernommen von')], ...d.rows.map(r => [r.name, r.categories, r.unit, r.factor, r.source])]);
   },
+  async 'csv-regional'() {
+    const d = await api('/api/regional/factors', { method: S.method });
+    csvDownload(`${t('Faktoren nach Ort')} ${S.method.join(' - ')}.csv`, [[t('Stoff'), t('Kompartiment'), t('Einheit'), t('Ort'), t('Faktor'), t('Normaler Faktor'), t('Herkunft')],
+      ...d.rows.map(r => [r.name, r.categories, r.unit, r.location, r.factor, r.normal, r.source === 'copy' ? t('Länderkopie «{name}»', { name: r.copy || '' }) : r.source === 'file' ? t('Datei «{name}»', { name: r.file || '' }) : t('Zeile mit Ort')])]);
+  },
+  'contrib-loc'() { S.tab = 'beitraege'; S.contrib = 'loc'; render(); },
+  async 'reg-unload'(k) {
+    S.st.regional = await api('/api/regional/unload', { name: k });
+    resetErgebnis(); S.setupRes = null; await loadView(); render();
+  },
   async 'inv-filter'(k) { S.tab = 'inventar'; S.invF = k; S.invQ = ''; render(); await loadErgebnis(); render(); document.getElementById('invTbl')?.scrollIntoView({ block: 'nearest' }); },
 
   // opening a project: one that Brightway would convert on opening (older Brightway 2.5, e.g. from the Activity Browser 3)
@@ -794,6 +804,20 @@ document.addEventListener('change', ev => {
     else if (el.id === 'complChk') {
       S.st.completion = await api('/api/completion', { enabled: el.checked });
       if (S.invF === 'completed') S.invF = '';
+      resetErgebnis(); S.setupRes = null; await loadView(); render();
+    }
+    else if (el.id === 'regChk') {
+      S.st.regional = await api('/api/regional', { enabled: el.checked });
+      resetErgebnis(); S.setupRes = null; await loadView(); render();
+    }
+    else if (el.id === 'regFile') {
+      const f = el.files[0]; el.value = ''; if (!f) return;
+      toast(t('Lese «{name}» … (etwa eine halbe Minute)', { name: f.name }));
+      const r = await fetch(`/api/regional/load?name=${encodeURIComponent(f.name)}`, { method: 'POST', headers: { 'Content-Type': 'application/octet-stream', ...langHeader() }, body: await f.arrayBuffer() });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(typeof d.detail === 'string' ? d.detail : t('Der Import ist fehlgeschlagen.'));
+      await loadState(d.state);
+      toast(t('Länderfaktoren geladen: {list}.', { list: Object.entries(d.methods).map(([n, m]) => t('{name} ({k} Orte)', { name: n, k: m.locations })).join(', ') }));
       resetErgebnis(); S.setupRes = null; await loadView(); render();
     }
     else if (el.id === 'invF') { S.invF = el.value; render(); }

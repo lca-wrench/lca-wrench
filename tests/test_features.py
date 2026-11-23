@@ -66,7 +66,7 @@ def test_categories_and_exports(client):
     x = client.post("/api/export/result", json={**body, "format": "xlsx", "families": [fam]})
     assert x.status_code == 200 and "xlsx" in x.headers["content-disposition"]
     wb = openpyxl.load_workbook(io.BytesIO(x.content))
-    assert len(wb.sheetnames) == 5
+    assert len(wb.sheetnames) == 6  # result, by activity, by flow, by location, all categories, inventory
     score = wb[wb.sheetnames[0]].cell(2, 7).value
     assert score == pytest.approx(s.calculate(aid, 2, s.CLIMATE_METHOD)["score"], rel=1e-9)
     c = client.post("/api/export/result", json={**body, "format": "csv"})
