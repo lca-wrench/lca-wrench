@@ -61,6 +61,7 @@ Options: `python -m lca_wrench --port 8790 --no-browser`. `./start.sh` still wor
 | Parameters | Project, model and activity parameters with formulas, stored as in the Activity Browser ([docs](docs/features.md#parameters-and-formulas)) |
 | Calculate | Calculation setups with several products × methods, stored in the Activity Browser format; cross-check with bw2calc; export as Excel or CSV |
 | Result | Contributions by activity or flow; all categories of one or two methods, or one kind of impact across methods; Sankey; supply chain tree; inventory with filter and CSV; environmental profile in UBP; Excel/CSV export |
+| Single scores | EF 3.1 normalized and weighted (mPt), ReCiPe 2016 endpoint points with the Eco-indicator 99 weighting sets (I/I, H/A, H/H, E/E), total UBP of Ecological Scarcity 2021; each category's weighted share ([docs](docs/features.md#single-scores)) |
 | Compare | Products across projects, for example original against working copy; calculation on every background database or scenario |
 | Excel exchange | Export and import of own models in the bw2io format, with parameters, exact linking of partners ([docs](docs/features.md#excel-exchanging-your-own-models)) |
 | Why different? | Difference between a working copy and its original, split exactly onto the changed exchanges |

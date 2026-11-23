@@ -317,3 +317,35 @@ takes the factor of the flow with the same name, the same top-level compartment,
 unit. Existing factors, including explicit zeros, are never overwritten; long-term sub-compartments are never completed;
 stored methods are not modified. The completion is on by default, visibly marked in the result, and can be switched off.
 The list of added factors is shown and can be exported. Details: [completed-factors.md](completed-factors.md).
+
+## Single scores
+
+Result, Single score sums up the impact categories of a method family in one number, with the weighted share of each
+category (bars and a table with result, normalization, weight and score; a click on a category shows its
+contributions). The sets the project's methods allow are listed; a set names the categories the project lacks.
+
+- **EF 3.1, normalized and weighted** (mPt): each of the 16 categories divided by its normalization factor (global, per
+  person and year) times its weight in %, × 1000. Works with sentier's EF 3.1 (BAFU 2026), ecoinvent's "EF v3.1" with
+  and without long-term emissions, and "EF v3.1 PEF".
+- **ReCiPe 2016 endpoint, points** (Pt; 1000 Pt = the yearly impact of one person): human health, ecosystem quality
+  and natural resources, each divided by RIVM's normalization (world 2010, per person) and weighted with a set of the
+  Eco-indicator 99 panel: by default I/I for the Individualist, H/A for the Hierarchist and E/E for the Egalitarian
+  perspective, as in SimaPro; H/H and the others can be chosen. Where a family has categories, the parts are the
+  categories, and a note appears if they do not add up to the area's total.
+- **Ecological Scarcity 2021, total UBP**: the eco-factors already weight, so the single score is the total: the
+  family's total method (ecoinvent's "total", LCA Wrench's derived total for the BAFU 2025 template), else the sum of
+  the categories.
+
+All numbers come from one inventory of the product, characterized with each method (including flow mapping and
+completed factors), so they are the same as calculating each method on its own. The factors, their sources and the
+points to check (mineral resources dominate RIVM's resource normalization) are in
+[../lca_wrench/data/nw/README.md](../lca_wrench/data/nw/README.md).
+
+A set whose methods are implemented on another list of elementary flows than the product's (sentier's EF 3.1 or the
+PEF methods on an ecoinvent product) gets 0 for the categories the flow mapping does not fill: particulate matter,
+toxicity, water use and resources (see [flow-mapping.md](flow-mapping.md)). Its single score would be too low, so the
+list marks such a set "incomplete for this product" and picks a complete one by default; chosen anyway, the result
+warns and marks the categories "not characterized".
+
+API: `GET /api/singlescore/sets` (with `?id=<product>`: a `coverage` per set: native, mapped or missing),
+`POST /api/singlescore` with `{"id", "amount", "set", "weighting"}`.

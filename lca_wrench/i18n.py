@@ -343,4 +343,23 @@ EN = {
     "Schätzung, falls gleich bewertet": "Estimate if assessed alike",
     "Ergänzte Faktoren": "Completed factors",
     "Übernommen von": "Taken from",
+    # single scores (singlescore.py)
+    "EF 3.1, normalisiert und gewichtet": "EF 3.1, normalized and weighted",
+    "ReCiPe 2016 Endpoint ({p}), Punkte": "ReCiPe 2016 endpoint ({p}), points",
+    "Ökologische Knappheit 2021, UBP gesamt": "Ecological Scarcity 2021, total UBP",
+    "Diesen Einzelwert gibt es in diesem Projekt nicht.": "This single score does not exist in this project.",
+    "Ohne {n} Kategorie(n), die in diesem Projekt fehlen: {names}.":
+        "Without {n} category(ies) that this project lacks: {names}.",
+    "Die Kategorien von «{area}» ergeben {part} statt {total}.": "The categories of “{area}” add up to {part} instead of {total}.",
+    "Gewichtung {ws}: Menschliche Gesundheit {hh}, Ökosysteme {eq}, Ressourcen {res} (Panel von Eco-indicator 99, wie in SimaPro). Normalisierung: RIVM, ReCiPe 2016 v1.1, Welt 2010, pro Person.":
+        "Weighting {ws}: human health {hh}, ecosystems {eq}, resources {res} (Eco-indicator 99 panel, as in SimaPro). Normalization: RIVM, ReCiPe 2016 v1.1, world 2010, per person.",
+    "Die mineralischen Ressourcen machen fast die ganze Ressourcen-Normalisierung von RIVM aus (bitte prüfen).":
+        "Mineral resources make up almost all of RIVM's resource normalization (please check).",
+    "Die Kategorien ergeben {part} UBP, die Methode «gesamt» {total} UBP.": "The categories add up to {part} UBP, the “total” method to {total} UBP.",
+    "{n} Kategorie(n) ohne Faktoren für die Elementarflüsse dieses Produkts: {names}. Die Methode ist auf einer anderen Liste von Elementarflüssen umgesetzt, und die Flusszuordnung deckt diese Wirkungen nicht ab. Sie zählen als 0, der Einzelwert ist also zu tief: besser einen Einzelwert auf der Flussliste des Produkts wählen.":
+        "{n} category(ies) without factors for this product's elementary flows: {names}. The method is implemented on another list of elementary flows, and the flow mapping does not cover these impacts. They count as 0, so the single score is too low: better choose a single score on the product's flow list.",
+    "Über die Flusszuordnung (ecoinvent ↔ EF 3.1) bewertet: {names}.": "Assessed through the flow mapping (ecoinvent ↔ EF 3.1): {names}.",
+    "Menschliche Gesundheit": "Human health",
+    "Ökosystemqualität": "Ecosystem quality",
+    "Natürliche Ressourcen": "Natural resources",
 }

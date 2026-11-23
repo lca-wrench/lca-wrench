@@ -736,6 +736,32 @@ def allocation_compare(activity_id: int | str, method: tuple) -> dict:
 
 # ---------- results ----------
 
+def single_score_sets(activity_id: int | str | None = None, amount: float = 1.0) -> dict:
+    """The single scores this project's methods allow (singlescore.py): EF 3.1, ReCiPe 2016 endpoint, UBP. With a
+    product, each says whether its methods cover the product's elementary flows ("coverage": native, mapped, missing)."""
+    from . import singlescore
+
+    sets = singlescore.sets()
+    out = [singlescore.summary(x) for x in sets]
+    if activity_id is not None and sets:
+        S = models.system_for(activity_id)
+        lists = singlescore.flow_lists(S, S.inventory(S.supply({int(activity_id): float(amount)})))
+        for o, x in zip(out, sets):
+            o["coverage"] = singlescore.coverage(x, lists)
+    return {"sets": out}
+
+
+def single_score(activity_id: int | str, amount: float, set_id: str, weighting: str | None = None) -> dict:
+    """One product's single score with its parts by category; weighting: another ReCiPe set (e.g. "H/H")."""
+    from . import singlescore
+
+    s = singlescore.find(set_id)
+    S = models.system_for(activity_id)
+    out = singlescore.compute(S, {int(activity_id): float(amount)}, s, weighting)
+    a = bd.get_node(id=int(activity_id))
+    return {**out, "id": str(a.id), "name": a["name"], "amount": float(amount), "unit_product": short_unit(a.get("unit"))}
+
+
 def calculate(activity_id: int | str, amount: float, method: tuple, top: int = 12) -> dict:
     """Score, contributions and environmental profile for one product, from the engine."""
     method = tuple(method)
