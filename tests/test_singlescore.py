@@ -178,7 +178,7 @@ def test_ubp_total_and_categories(methods, climate):
 
 def test_api(methods, electricity):
     bd.projects.set_current(TEST_PROJECT)  # as the user would choose it
-    client = TestClient(app, base_url="http://127.0.0.1")
+    client = TestClient(app, base_url="http://127.0.0.1", headers={"X-LCA-Wrench": "1"})
     sets = client.get("/api/singlescore/sets").json()["sets"]
     assert {"ef31", "recipe2016", "es2021"} <= {x["kind"] for x in sets}
     sid = next(x["id"] for x in sets if x["kind"] == "recipe2016" and x["perspective"] == "H")

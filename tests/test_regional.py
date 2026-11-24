@@ -316,9 +316,7 @@ def test_monte_carlo_matches_bw2calc_same_seed(methods, co2):
     n, seed = 3, 11
     draws = mc.run_chunk(TEST_PROJECT, [(el, 1.0)], [M_ROWS], n, seed)
     bd.projects.set_current(TEST_PROJECT)
-    lca = bc.LCA({bd.get_node(id=el): 1.0}, M_ROWS, use_distributions=True, seed_override=seed)
-    lca.lci()
-    lca.lcia()
+    lca = mc.mc_lca({bd.get_node(id=el): 1.0}, M_ROWS, seed)  # bw2calc with the run's seeds (one per resource group)
     acts = {i: a for a, i in lca.dicts.activity.items()}
     flows = {i: f for f, i in lca.dicts.biosphere.items()}
     loc = dict(AD.select(AD.id, AD.location).where(AD.id << list(acts.values())).tuples())
@@ -372,7 +370,7 @@ def test_versions_split_a_move_to_another_place(methods, co2):
 
 def test_api(methods, co2, switch):
     el = bafu("Electricity, low voltage, at grid", "CH")
-    with TestClient(app, base_url="http://127.0.0.1") as client:
+    with TestClient(app, base_url="http://127.0.0.1", headers={"X-LCA-Wrench": "1"}) as client:
         r = client.post("/api/calc", json={"id": str(el), "amount": 1, "method": list(M_ROWS)}).json()
         g = r["regional"]
         assert g["available"] and g["enabled"] and g["flows"] == len(co2) and g["locations"] == len(TABLE) and g["processes"]
@@ -472,7 +470,7 @@ def test_ef_workbook_read_matched_and_removed(methods, co2, file_methods):
 
 
 def test_ef_workbook_api(methods, co2, file_methods):
-    with TestClient(app, base_url="http://127.0.0.1") as client:
+    with TestClient(app, base_url="http://127.0.0.1", headers={"X-LCA-Wrench": "1"}) as client:
         bad = client.post("/api/regional/load?name=x.xlsx", content=b"not a workbook",
                           headers={"Content-Type": "application/octet-stream"})
         assert bad.status_code == 400

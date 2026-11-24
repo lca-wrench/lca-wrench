@@ -146,9 +146,9 @@ def test_test_projects_hidden_and_source_protected():
 
 
 def test_removing_a_copy_closes_its_files_and_frees_the_name():
-    """Windows cannot delete open files (WinError 32): a copy the engine has calculated in keeps its processed
-    datapackages open until engine.forget. remove_project closes them and leaves no folder; a folder left over by
-    an earlier failed deletion does not block the next copy."""
+    """Windows cannot delete open files (WinError 32): the engine closes a calculation's processed datapackages once
+    it has read them (engine.close_files), and remove_project drops the cached calculations (engine.forget) and
+    leaves no folder; a folder left over by an earlier failed deletion does not block the next copy."""
     from bw2data.project import ProjectDataset
 
     from lca_wrench import engine
@@ -160,7 +160,7 @@ def test_removing_a_copy_closes_its_files_and_frees_the_name():
         bgs = [bg for (p, _v, _d), bg in engine._backgrounds.items() if p == name]
         assert bgs and bgs[0].lca.packages
         zips = [dp.fs.zip for dp in bgs[0].lca.packages if hasattr(getattr(dp, "fs", None), "zip")]
-        assert zips and all(z.fp is not None for z in zips)
+        assert zips and all(z.fp is None for z in zips)  # closed once read, though the calculation stays cached
         folder = bd.projects._project_dir(ProjectDataset.get(ProjectDataset.name == name))
         bd.projects.set_current(PROJECT)
         s.remove_project(name)
