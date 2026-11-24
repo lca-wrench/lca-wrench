@@ -5,17 +5,20 @@
 - Databases not made in LCA Wrench are calculated, but changed only in a copy of the project.
 - Undo never overwrites a change another program made in the meantime.
 - Other websites in the browser cannot send requests; a project deleted from outside is not created again.
+- A project left keeps no file open (Windows cannot delete open files).
 """
 
+import os
 import pickle
 import shutil
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import bw2data as bd
 import pytest
 from bw2data.backends.proxies import Exchange
 from bw2data.backends.schema import ExchangeDataset
-from bw2data.parameters import DatabaseParameter
+from bw2data.parameters import DatabaseParameter, ProjectParameter
 from bw2data.project import ProjectDataset
 from fastapi.testclient import TestClient
 
@@ -285,7 +288,27 @@ def test_project_deleted_from_outside_is_not_created_again():
     s.acknowledge()
     d = _dir(name)
     ProjectDataset.delete().where(ProjectDataset.name == name).execute()  # what another program's delete does
+    # Windows deletes no open file: another program can delete the folder only once we have let go of its SQLite files
+    for _, sqlite_db in bd.config.sqlite3_databases:
+        sqlite_db.db.close()
     shutil.rmtree(d)
     assert s.sync_external() is True
     assert not s.project_open() and name not in bd.projects and not d.exists()
     _cleanup()
+
+
+def test_project_left_keeps_no_file_open():
+    """A request thread that read a project keeps its parameters database open after the switch until Python's cycle
+    collector runs (Brightway). Opening another project lets go at once: on Windows the project left can be deleted."""
+    psutil = pytest.importorskip("psutil")
+    _cleanup()
+    name = f"{PREFIX}-verlassen"
+    bd.projects.set_current(name)  # new and empty
+    d = os.path.normcase(str(bd.projects.dir))
+    try:
+        with ThreadPoolExecutor(max_workers=1) as ex:  # the thread stays alive, like the server's
+            ex.submit(lambda: ProjectParameter.select().count()).result()
+            s.set_project(TEST_PROJECT)
+            assert not [f.path for f in psutil.Process().open_files() if os.path.normcase(f.path).startswith(d)]
+    finally:
+        _cleanup()

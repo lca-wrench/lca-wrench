@@ -15,6 +15,7 @@ Rules:
 
 from __future__ import annotations
 
+import gc
 import json
 import logging
 import pickle
@@ -205,7 +206,10 @@ def remove_background(name: str) -> dict:
         if db in bd.databases:
             raise ValueError(_("«{name}» liess sich nicht löschen. Einzelheiten in lca-wrench.log.", name=db))
         if processed:
-            Path(processed).unlink(missing_ok=True)  # Brightway leaves the matrix file (EXIOBASE: several hundred MB)
+            try:
+                Path(processed).unlink(missing_ok=True)  # Brightway leaves the matrix file (EXIOBASE: several hundred MB)
+            except OSError as e:  # Windows: still open in another program; the database is gone all the same
+                log.warning("Matrix file of %s not deleted: %s", db, e)
     backgrounds.forget(name)
     engine.bump_background(project)
     return state()
@@ -267,12 +271,21 @@ def set_project(name: str, rebuild: bool = False) -> None:
         raise ValueError(_("Brightway baut «{name}» beim ersten Öffnen um (alle Rechendaten neu). Lege lieber eine "
                            "Testkopie an oder bestätige das Öffnen des Originals.", name=name))
     bd.projects.set_current(name)
+    release_files()  # of the project left
     OPEN["project"] = name
     reg = registry.load()
     if reg.get("last_project") != name:
         reg["last_project"] = name
         registry.save(reg)
     sync_external()  # the project may have been changed by another program while we were elsewhere
+
+
+def release_files() -> None:
+    """Close what other threads still have open of a project left. Brightway replaces its SQLite connections on a
+    switch, but the old parameters database sits in a reference cycle: until the cycle collector runs, the server's
+    request threads keep its file open, and on Windows the project cannot be deleted meanwhile (by LCA Wrench or by
+    another program). About 0.1 s."""
+    gc.collect()
 
 
 def pick_start_project(preferred: str | None = None) -> str | None:
@@ -386,6 +399,7 @@ def copy_project_files(name: str) -> str:
             # leave the copy first: deleting the current project would switch to "default" with its automatic updates
             bd.projects.set_current(before if before and before in bd.projects else "default", update=False)
         if new in bd.projects:
+            release_files()
             bd.projects.delete_project(new, delete_dir=True)
         elif dst_dir.exists():
             shutil.rmtree(dst_dir)

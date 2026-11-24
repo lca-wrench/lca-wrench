@@ -35,6 +35,7 @@ import numpy as np
 from bw2data.backends.schema import ActivityDataset as AD
 from bw2data.backends.schema import ExchangeDataset as ED
 from bw2data.configuration import labels
+from fsspec.implementations.zip import ZipFileSystem
 from scipy import sparse
 from scipy.linalg import lu_factor, lu_solve
 from scipy.sparse.linalg import splu
@@ -59,6 +60,19 @@ _lock = threading.RLock()
 
 class ModelError(ValueError):
     """The user's model cannot be solved (missing production, singular, broken link)."""
+
+
+def close_files(lca: bc.LCA) -> None:
+    """Close the matrix files (processed/*.zip) a bw2calc LCA has opened. bw_processing reads every array when it opens
+    a file, so nothing reads them again, but bw2calc leaves them open as long as the LCA lives. Windows cannot delete
+    an open file: with the cached backgrounds holding them, removing a background database or deleting a project failed
+    there ("being used by another process")."""
+    for pkg in lca.packages:
+        fs = getattr(pkg, "fs", None)
+        if isinstance(fs, ZipFileSystem):
+            fs.close()  # the archive ...
+            if hasattr(getattr(fs, "of", None), "close"):
+                fs.of.close()  # ... and the file under it, which the archive leaves open
 
 
 # ---------- database roles ----------
@@ -135,6 +149,7 @@ class Background:
         else:
             lca = bc.LCA(demand)
             lca.load_lci_data()
+            close_files(lca)  # all read; kept open, the cache would lock them (Windows)
             self.lca = lca
             self.A = lca.technosphere_matrix.tocsc()
             self.B = lca.biosphere_matrix.tocsc()
@@ -167,6 +182,7 @@ class Background:
                 self._cvec[method] = np.zeros(0)
             else:
                 self.lca.switch_method(method)
+                close_files(self.lca)  # the method's file, read now
                 c = np.asarray(self.lca.characterization_matrix.diagonal()).ravel().copy()
                 add = extra_vector(method, self.bio_ids)  # factors the method lacks: flow mapping, completion
                 self._cvec[method] = c + add if add is not None else c

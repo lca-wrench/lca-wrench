@@ -358,6 +358,7 @@ def _undo(name: str, created: bool, before: str | None, dbs0: set, methods0: set
                 # leave it first: deleting the current project would switch to "default" with its automatic updates
                 back = before if before and before in bd.projects and before != name else "default"
                 bd.projects.set_current(back, update=False)
+            s.release_files()  # Windows: what other threads opened of it would keep the folder from being deleted
             bd.projects.delete_project(name, delete_dir=True)
         else:
             bd.projects.set_current(name)

@@ -51,10 +51,20 @@ def server():
                 raise RuntimeError(f"Server ist abgestürzt: {proc.stderr.read().decode()}")
             time.sleep(0.5)
     else:
-        proc.kill()
+        _stop(proc)
         raise RuntimeError("Server startet nicht")
     yield URL
-    os.killpg(proc.pid, signal.SIGTERM)  # the server and any Monte-Carlo workers it started
+    _stop(proc)
+
+
+def _stop(proc: subprocess.Popen) -> None:
+    """End the server and any Monte-Carlo workers it started. Windows has no process groups to signal (no os.killpg)
+    and proc.kill() would end only the venv's python.exe, not the interpreter it starts: taskkill ends the whole tree.
+    Left running, the server keeps the test project's files open and the next run fails on them."""
+    if os.name == "nt":
+        subprocess.run(["taskkill", "/F", "/T", "/PID", str(proc.pid)], capture_output=True)
+    else:
+        os.killpg(proc.pid, signal.SIGTERM)
     proc.wait(timeout=15)
 
 

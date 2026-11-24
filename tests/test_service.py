@@ -32,6 +32,15 @@ def sample_activities(n=20, seed=42):
     return ids[:n]
 
 
+def bw2calc_score(aid, method) -> float:
+    """Plain bw2calc. Its LCA keeps the matrix files open while it lives; here it is gone before a test deletes the
+    project (Windows cannot delete an open file)."""
+    lca = bc.LCA({bd.get_node(id=int(aid)): 1}, method)
+    lca.lci()
+    lca.lcia()
+    return lca.score
+
+
 @pytest.mark.parametrize("method", METHODS)
 def test_unit_scores_match_bw2calc(method):
     for aid in sample_activities():
@@ -104,11 +113,8 @@ def test_working_copy_edit_undo_and_compare():
         top = a["technosphere"][0]
         s.edit_exchange(top["exchange"], top["amount"] * 0.5)
 
-        lca = bc.LCA({bd.get_node(id=int(aid)): 1}, s.CLIMATE_METHOD)
-        lca.lci()
-        lca.lcia()
         after = s.unit_score(aid, s.CLIMATE_METHOD)
-        assert after == pytest.approx(lca.score, rel=1e-6)
+        assert after == pytest.approx(bw2calc_score(aid, s.CLIMATE_METHOD), rel=1e-6)
         assert after < before
 
         cmp = s.compare([{"project": PROJECT, "id": aid, "amount": 1}, {"project": name, "id": aid, "amount": 1}],

@@ -51,6 +51,15 @@ def _drop(*names):
             del bd.databases[n]
 
 
+def _bw2calc_score(node, method) -> float:
+    """Plain bw2calc. Its LCA keeps the matrix files open while it lives; here it is gone before a test removes the
+    database (Windows cannot delete an open file)."""
+    lca = bc.LCA({node: 1}, method)
+    lca.lci()
+    lca.lcia()
+    return lca.score
+
+
 @pytest.fixture(scope="module")
 def world():
     bd.projects.set_current(TEST_PROJECT)
@@ -427,10 +436,7 @@ def test_exiobase_import_dense_solver_and_hybrid(world, tmp_path):
         x = np.linalg.solve(np.eye(4) - A, np.eye(4)[1])
         want = float(c @ Sm @ x)
         assert Sy.score({serv.id: 1}, GWP) == pytest.approx(want, rel=1e-6)
-        lca = bc.LCA({serv: 1}, GWP)
-        lca.lci()
-        lca.lcia()
-        assert lca.score == pytest.approx(want, rel=1e-6)
+        assert _bw2calc_score(serv, GWP) == pytest.approx(want, rel=1e-6)
         # before any model uses the table: search finds its sectors (also by "money"), and a sector outside the chosen
         # background is calculated on its table alone (data sheet, result)
         backgrounds.set_choice("auto", [], roles)

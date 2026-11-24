@@ -5,6 +5,8 @@ processes, an avoided product, a flow no background process emits) and
 deletes it afterwards. Needs the BAFU project from setup_daten.py.
 """
 
+import os
+
 import bw2calc as bc
 import bw2data as bd
 import numpy as np
@@ -303,6 +305,19 @@ def test_unit_scores_are_refined():
     m = (s.PROFILE_FAMILY, "Main air pollutants and PM")
     lca = bw2calc_lca(aid, 1.0, m)
     assert models.system().score({aid: 1.0}, m) == pytest.approx(lca.score, rel=1e-10)
+
+
+def test_cached_background_keeps_no_file_open():
+    """bw2calc keeps its matrix files (processed/*.zip) open while the LCA lives, and the engine caches it: closed once
+    read, or the cache locks them on Windows, where an open file cannot be deleted (removing a background database,
+    deleting a project)."""
+    psutil = pytest.importorskip("psutil")
+    bd.projects.set_current(PROJECT)
+    S = models.system()
+    S.score({bafu("Packing, lime products", "CH"): 1.0}, s.CLIMATE_METHOD)  # the matrices and a method read
+    assert S.bg.lca is not None
+    processed = os.path.normcase(str(bd.projects.dir / "processed"))
+    assert not [f.path for f in psutil.Process().open_files() if os.path.normcase(f.path).startswith(processed)]
 
 
 def test_fast_lu_matches_default_and_falls_back():
