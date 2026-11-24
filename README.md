@@ -8,7 +8,7 @@ LCA Wrench is a local web interface for [Brightway](https://docs.brightway.dev) 
 (Python 3.12, FastAPI, plain JavaScript). It builds product models, calculates several products and methods at once,
 and shows results as contributions, Sankey diagram, supply chain tree and inventory. It runs in the browser on the
 local computer only (127.0.0.1) and works on ordinary Brightway projects, so models and calculation setups can be
-opened in the [Activity Browser](https://github.com/LCA-ActivityBrowser/activity-browser) as well. Version 0.1.0.
+opened in the [Activity Browser](https://github.com/LCA-ActivityBrowser/activity-browser) as well. Version 0.1.1.
 
 ![Result view: climate impact of a product with contributions](docs/screenshots/result.png)
 
@@ -21,13 +21,23 @@ opened in the [Activity Browser](https://github.com/LCA-ActivityBrowser/activity
   then start **LCA Wrench** from the Desktop.
 - **Windows:** download `LCA-Wrench-Windows.zip`, unpack, run **Install LCA Wrench**, then **Start LCA Wrench**.
   Windows warns the first time because the script is not signed ("More info" → "Run anyway").
+- **Linux:** download `LCA-Wrench-Linux.tar.gz`, unpack it (e.g. `tar -xzf LCA-Wrench-Linux.tar.gz -C ~`), run
+  `./install.sh` in the folder, then start **LCA Wrench** from the applications menu or with `./start.sh`.
 
-The installers run only from these packages. "Source code (zip)" on the releases page and the `mac/` and `windows/`
-folders of a clone are not installers; to run from a clone, see **From source** below.
+The installers run only from these packages. "Source code (zip)" on the releases page and the `mac/`, `windows/`
+and `linux/` folders of a clone are not installers; to run from a clone, see **From source** below.
 
 The installer sets up its own Python and the packages inside the LCA Wrench folder (no administrator rights, internet
-needed, 3 to 5 minutes). The Windows package is less tested than the macOS one. Details:
+needed, 3 to 5 minutes). The Windows and Linux packages are less tested than the macOS one. Details:
 [docs/install.md](docs/install.md).
+
+**Updating** (e.g. from 0.1.0). Close LCA Wrench, then install the new package over the old folder: on macOS open the
+new **Install LCA Wrench** and choose the same folder; on Windows and Linux delete the folder `lca_wrench` inside the
+LCA Wrench folder (the old program code), unpack the new package over the folder and run the installer again. Your
+projects, models, calculation setups and settings stay: they are in the Brightway folder, not in the LCA Wrench
+folder. The Python and the packages stay too. The file `VERSION` in the folder then shows the new version. Step by
+step: "Updating to a newer version" in the `README.txt` of each package. The automatic tests do the same update from
+the last release on all three systems ([docs/ci.md](docs/ci.md)).
 
 **Which data with which installation.** With the release package, a project with BAFU 2026 (EF 3.1 methods) is
 created in the app under "New project", and ecoinvent can be imported there with your own licence. BAFU 2025 with the
@@ -129,13 +139,13 @@ flows without sub-compartment, so emissions into sub-compartments count as zero 
 - [Completed factors](docs/completed-factors.md), [Factors by location](docs/regional-factors.md), [Validation](docs/validation.md),
   [Comparison with other tools](COMPARISON.md)
 - [Demo walkthrough](docs/demo.md), [Development](docs/development.md), [Contributing](CONTRIBUTING.md),
-  [Security](SECURITY.md)
+  [Security](SECURITY.md), [Changelog](CHANGELOG.md)
 
 ## Citation
 
 See [CITATION.cff](CITATION.cff). In plain text:
 
-Pfister, K. and Pfister, S. (2026). LCA Wrench (version 0.1.0). https://github.com/lca-wrench/lca-wrench
+Pfister, K. and Pfister, S. (2026). LCA Wrench (version 0.1.1). https://github.com/lca-wrench/lca-wrench
 
 ## Licence
 

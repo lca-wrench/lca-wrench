@@ -44,7 +44,7 @@ def setup():
                if f["name"] == "Carbon dioxide, fossil" and f["categories"] == ("emissions to air", "low. pop."))
     # the other project: an ecoinvent-like database and an EF 3.1 method in ecoinvent's spelling
     if OTHER in bd.projects:
-        bd.projects.delete_project(OTHER, delete_dir=True)
+        s.remove_project(OTHER)
     bd.projects.create_project(OTHER)
     bd.projects.set_current(OTHER)
     bd.Database(EI_BIO).write({(EI_BIO, "co2"): {"name": "Carbon dioxide, fossil", "categories": ("air", "urban air close to ground"),
@@ -78,7 +78,7 @@ def setup():
     bd.projects.set_current(TEST_PROJECT)
     if MODEL in bd.databases:
         models.delete_database(MODEL)
-    bd.projects.delete_project(OTHER, delete_dir=True)
+    s.remove_project(OTHER)
     bd.projects.set_current(TEST_PROJECT)
 
 
@@ -241,7 +241,7 @@ def test_methods_and_units():
 
 
 def test_api(setup):
-    c = TestClient(app, base_url="http://127.0.0.1")
+    c = TestClient(app, base_url="http://127.0.0.1", headers={"X-LCA-Wrench": "1"})
     t = c.get("/api/crosswalk/targets", params={"project": OTHER}).json()
     assert [d["name"] for d in t["databases"]] == [EI] and list(EI_METHOD) in t["methods"]
     r = c.post("/api/crosswalk", json={"id": str(setup["model"]), "amount": 1.0, "method": list(s.CLIMATE_METHOD),

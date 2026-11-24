@@ -11,6 +11,7 @@
 import os
 import pickle
 import shutil
+import sys
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -43,7 +44,7 @@ def _files(d: Path) -> dict:
 def _cleanup():
     bd.projects.set_current(TEST_PROJECT)
     for name in [p.name for p in bd.projects if p.name.startswith(PREFIX)]:
-        bd.projects.delete_project(name, delete_dir=True)
+        s.remove_project(name)
 
 
 def _electricity() -> int:
@@ -225,7 +226,7 @@ def test_undo_of_a_deleted_input_needs_its_process(model):
 @pytest.fixture()
 def client():
     bd.projects.set_current(TEST_PROJECT)
-    with TestClient(app, base_url="http://127.0.0.1") as c:
+    with TestClient(app, base_url="http://127.0.0.1", headers={"X-LCA-Wrench": "1"}) as c:
         yield c
     bd.projects.set_current(TEST_PROJECT)
 
@@ -275,11 +276,18 @@ def test_a_project_that_fails_to_load_is_reported_and_not_reopened(client, monke
 def test_requests_from_other_websites_are_rejected(client):
     assert client.post("/api/copy", json={}, headers={"Origin": "https://evil.example"}).status_code == 403
     assert client.post("/api/beispiel", headers={"Sec-Fetch-Site": "cross-site"}).status_code == 403
-    assert client.get("/api/state", headers={"Origin": "http://127.0.0.1:8787", "Sec-Fetch-Site": "same-origin"}).status_code == 200
+    assert client.get("/api/state", headers={"Origin": "http://127.0.0.1", "Sec-Fetch-Site": "same-origin"}).status_code == 200
+    # another local port is another website; "null" origins and requests without the UI header may change nothing
+    assert client.post("/api/copy", json={}, headers={"Origin": "http://127.0.0.1:3000"}).status_code == 403
+    assert client.post("/api/copy", json={}, headers={"Origin": "null"}).status_code == 403
+    assert client.post("/api/beispiel", headers={"X-LCA-Wrench": ""}).status_code == 403
+    assert client.post("/api/models/import", content=b"x", headers={"X-LCA-Wrench": "", "Content-Type": "text/plain"}).status_code == 403
+    assert client.get("/api/state", headers={"X-LCA-Wrench": ""}).status_code == 200  # reading needs no header
     big = client.post("/api/models/import", content=b"x", headers={"Content-Length": str(30 * 1024 * 1024)})
     assert big.status_code == 413
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows does not let another program delete the folder of an open project")
 def test_project_deleted_from_outside_is_not_created_again():
     _cleanup()
     name = f"{PREFIX}-weg"

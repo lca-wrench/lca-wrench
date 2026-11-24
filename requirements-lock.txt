@@ -1,7 +1,3 @@
-# Exactly the versions LCA Wrench is tested with (Python 3.12), for macOS, Windows and Linux, with the SHA-256
-# checksum of every package file: the installers (mac/Install LCA Wrench.command, windows/install.ps1) install with
-# --require-hashes, so only files that were checked like this. requirements-app.txt is the fallback without checksums.
-# To regenerate (same versions, only the checksums): see docs/install.md.
 annotated-doc==0.0.5 \
     --hash=sha256:117bac03a25ede5df5440e855b32d556049ca169ead221505badf432fed4b101 \
     --hash=sha256:c7e58ce09192557605d8bbd92836d7e1d520ac9580096042c0bfd197efacf1bb
@@ -295,9 +291,9 @@ bw-processing==1.6 \
 bw2calc==2.5.0 \
     --hash=sha256:2c26420e223871a50d45532e63a1506116cfede0a8fc071cbd043fc347f4beee \
     --hash=sha256:533df462fcc45369535d60b7b85a00f8db04cbe6486ba2f4104bf052af9878cd
-bw2data==4.7 \
-    --hash=sha256:3798db3776ead63b63cbf88fd9051032bf6f7c0f03ddc7b11c8600dee51b4cd8 \
-    --hash=sha256:e88f1ccd8266fb7a8d1ecd14abfe163a4533b1cd4b4b88269a569da1f8a2021c
+bw2data==4.8 \
+    --hash=sha256:64fb8e8d08033ccdfff2cbd8af9430a7ea894a784c21a55dcd4db087e4d791fe \
+    --hash=sha256:ea6dbea8f6dba428ef318b5ae43671e53fa66db7caf269838401f941131efadf
 bw2io==0.9.17 \
     --hash=sha256:1aa66ad9eada0baeee3a0b08a548e84ef79f41248d245deaa8a1ab6ca038a4e6 \
     --hash=sha256:974588746b9019de3807d5269107b56ae73b723efdd5184cb9d737133c1ed7d3
@@ -587,9 +583,9 @@ click==8.5.0 \
 colorama==0.4.6 ; sys_platform == 'win32' \
     --hash=sha256:08695f5cb7ed6e0531a20572697297273c47b8cae5a63ffc6d6ed5c201be6e44 \
     --hash=sha256:4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6
-deepdiff==7.0.1 \
-    --hash=sha256:260c16f052d4badbf60351b4f77e8390bee03a0b516246f6839bc813fb429ddf \
-    --hash=sha256:447760081918216aa4fd4ca78a4b6a848b81307b2ea94c810255334b759e1dc3
+deepdiff==8.6.2 \
+    --hash=sha256:186dcbd181e4d76cef11ab05f802d0056c5d6083c5a6748c1473e9d7481e183e \
+    --hash=sha256:4d22034a866c3928303a9332c279362f714192d9305bac17c498720d095fd1b4
 deprecated==3.0.0 \
     --hash=sha256:16850204d3a1e6bb0acd06bff48d96e8b0a0d25d1c52f71705405a0f4894192d \
     --hash=sha256:58204cf4a7f6270d547af5c278ee7a6bb56045a4b3d8441a1cd11660f41b7939
@@ -1082,6 +1078,9 @@ opentelemetry-api==1.45.2 \
 ordered-set==4.1.0 \
     --hash=sha256:046e1132c71fcf3330438a539928932caf51ddbc582496833e23de611de14562 \
     --hash=sha256:694a8e44c87657c59292ede72891eb91d34131f6531463aab3009191c77364a8
+orderly-set==5.5.0 \
+    --hash=sha256:46f0b801948e98f427b412fcabb831677194c05c3b699b80de260374baa0b1e7 \
+    --hash=sha256:e87185c8e4d8afa64e7f8160ee2c542a475b738bc891dc3f58102e654125e6ce
 packaging==26.3 \
     --hash=sha256:94edc256424af38762eb31306eed28beb9f0efc50a8837492c9d6fd6004aed79 \
     --hash=sha256:d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c

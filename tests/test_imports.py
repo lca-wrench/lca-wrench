@@ -30,7 +30,7 @@ def _drop_all():
     for p in [p.name for p in bd.projects if p.name.startswith(PREFIX)]:
         if bd.projects.current == p:
             bd.projects.set_current(TEST_PROJECT)
-        bd.projects.delete_project(p, delete_dir=True)
+        s.remove_project(p)
     bd.projects.set_current(TEST_PROJECT)
 
 
@@ -191,7 +191,7 @@ def test_checks_before_starting(files):
 
 
 def test_api(files):
-    c = TestClient(app, base_url="http://127.0.0.1")
+    c = TestClient(app, base_url="http://127.0.0.1", headers={"X-LCA-Wrench": "1"})
     o = c.get("/api/import/options").json()
     assert o["ecoinvent"] is True and "cutoff" in o["system_models"]
     r = c.post("/api/project/new", json={"name": PREFIX + "-api"})

@@ -20,31 +20,42 @@ The script works in a temporary copy of the project (`lca-wrench-validation`, de
 
 ## Results
 
-Output of `scripts/validate.py` as run for this release (relative gap = |a − b| / max(|a|, |b|)):
+Output of `scripts/validate.py` (relative gap = |a − b| / max(|a|, |b|)), on the same data on every platform:
+BAFU-2025-v2 from files.brightway.dev with 11,747 activities, 2,678 elementary flows, 113,945 entries in A and 274,766
+in B. Versions besides bw2data: bw2calc 2.5.0, numpy 2.5.4, scipy 1.18.1, Python 3.12.
 
-### Environment
+### Runs
 
-- 2026-11-17, Darwin arm64, Python 3.12.11
-- LCA Wrench 0.1.0, bw2data 4.7, bw2calc 2.5.0, numpy 2.5.4, scipy 1.18.1
-- Data: 11,747 activities, 2,678 elementary flows, 113,945 entries in A, 274,766 in B (BAFU-2025-v2 from files.brightway.dev)
-- Independent solver: largest relative residual |b − A x| / |b| after refinement 2.2e-15
+| Platform | Date | LCA Wrench | bw2data | Outcome |
+|---|---|---|---|---|
+| macOS, Darwin arm64, Python 3.12.11 | 2026-11-17 | 0.1.0 | 4.7 | All cases within the bounds below; independent solver residual 2.2e-15 after refinement |
+| Linux x86_64, Python 3.12.16 | 2026-11-19 | 0.1.1 candidate (version string still 0.1.0) | 4.8 | Same; residual 2.1e-15 |
+| Windows AMD64, Python 3.12.12 | 2026-11-19 | pre-release (version string 0.1.0) | 4.8 | Same values as on Linux. At the end the script could not delete its temporary project copy (WinError 32, the file lock fixed in 0.1.1) |
+| macOS, Darwin arm64 | **TODO** | 0.1.1 | 4.8 | All checks passed (reported by the Mac run). **TODO before the release: date, Python version, residual and the column below from that run's report** |
 
-### Results
+> **TODO before the release:** fill in the macOS 0.1.1 row above and the last column below from the report of the Mac
+> run (`scripts/validate.py --output validation-report.md`). The values are not on hand yet and are not filled in from
+> the other runs.
 
-| Case | Compared | Values | Largest relative gap |
-|---|---|---:|---:|
-| Scores: 4 products × 23 methods, methods as stored | LCA Wrench (HTTP) vs bw2calc | 92 | 2.3e-09 |
-| Scores: 4 products × 23 methods, methods as stored | LCA Wrench vs independent solver, amounts rounded to float32 | 92 | 4.5e-08 |
-| Scores: 4 products × 23 methods, methods as stored | bw2calc vs independent solver, amounts rounded to float32 | 92 | 4.5e-08 |
-| Scores: 4 products × 23 methods, methods as stored | LCA Wrench vs independent solver, amounts as in SQLite (float64) | 92 | 1.9e-07 |
-| Contributions by activity and by flow add up to the score | sum of the parts vs score | 168 | 1.7e-15 |
-| Inventory of 250 tkm lorry transport: 2147 flows | LCA Wrench vs bw2calc | 1242 | 4.0e-08 |
-| Inventory of 250 tkm lorry transport: 2147 flows | LCA Wrench vs independent solver (float32) | 1242 | 5.6e-08 |
-| Calculation setup, 4 products × 4 methods | every cell vs bw2calc | 16 | 6.1e-11 |
-| The app's own cross-check on that setup (relative to the gross impact) | ok | 16 | 6.1e-11 |
-| Own model on the background (“E-bike, assembled”, 5 activities) | LCA Wrench vs bw2calc | 2 | 2.1e-08 |
-| Own model on the background (“E-bike, assembled”, 5 activities) | LCA Wrench vs independent solver (float32) | 2 | 2.1e-08 |
-| Completed factors: 4 products × 22 methods, and UBP total = sum of the categories | LCA Wrench vs independent solver with its own completion (float32) | 92 | 2.2e-08 |
+### Largest relative gap per case
+
+| Case | Compared | Values | macOS, 0.1.0, bw2data 4.7 | Linux, bw2data 4.8 | Windows, bw2data 4.8 | macOS, 0.1.1, bw2data 4.8 |
+|---|---|---:|---:|---:|---:|---:|
+| Scores: 4 products × 23 methods, methods as stored | LCA Wrench (HTTP) vs bw2calc | 92 | 2.3e-09 | 2.7e-09 | 2.7e-09 | TODO |
+| Scores: 4 products × 23 methods, methods as stored | LCA Wrench vs independent solver, amounts rounded to float32 | 92 | 4.5e-08 | 4.5e-08 | 4.5e-08 | TODO |
+| Scores: 4 products × 23 methods, methods as stored | bw2calc vs independent solver, amounts rounded to float32 | 92 | 4.5e-08 | 4.5e-08 | 4.5e-08 | TODO |
+| Scores: 4 products × 23 methods, methods as stored | LCA Wrench vs independent solver, amounts as in SQLite (float64) | 92 | 1.9e-07 | 1.9e-07 | 1.9e-07 | TODO |
+| Contributions by activity and by flow add up to the score | sum of the parts vs score | 168 | 1.7e-15 | 2.1e-15 | 2.1e-15 | TODO |
+| Inventory of 250 tkm lorry transport: 2147 flows | LCA Wrench vs bw2calc | 1242 | 4.0e-08 | 1.3e-08 | 1.3e-08 | TODO |
+| Inventory of 250 tkm lorry transport: 2147 flows | LCA Wrench vs independent solver (float32) | 1242 | 5.6e-08 | 5.6e-08 | 5.6e-08 | TODO |
+| Calculation setup, 4 products × 4 methods | every cell vs bw2calc | 16 | 6.1e-11 | 1.3e-11 | 1.3e-11 | TODO |
+| The app's own cross-check on that setup (relative to the gross impact) | ok | 16 | 6.1e-11 | 1.3e-11 | 1.3e-11 | TODO |
+| Own model on the background (“E-bike, assembled”, 5 activities) | LCA Wrench vs bw2calc | 2 | 2.1e-08 | 2.1e-08 | 2.1e-08 | TODO |
+| Own model on the background (“E-bike, assembled”, 5 activities) | LCA Wrench vs independent solver (float32) | 2 | 2.1e-08 | 2.1e-08 | 2.1e-08 | TODO |
+| Completed factors: 4 products × 22 methods, and UBP total = sum of the categories | LCA Wrench vs independent solver with its own completion (float32) | 92 | 2.2e-08 | 2.2e-08 | 2.2e-08 | TODO |
+
+bw2data 4.7 and 4.8 give the same picture: the gaps differ only in the last digits of numbers near the solvers'
+precision (in both directions), and the cases that compare with the independent solver are identical.
 
 ## Reading the results
 

@@ -8,7 +8,7 @@ LCA Wrench – installation on the Mac
    "Install LCA Wrench" in it: a Terminal window shows the progress. Takes about 3 to 5 minutes, needs internet.
    Everything is installed inside this folder only. The Activity Browser, conda and the
    Brightway projects are not changed. No administrator password needed.
-   To update, run a newer installer into the same folder: the Python and the packages stay.
+   To update to a newer version, see "Updating to a newer version" below.
 3. Start: double-click the app "LCA Wrench" on the desktop (the installer puts it there), or "Start LCA Wrench" in this
    folder.
    A package built without a signature is this folder alone: put it in a permanent place and double-click
@@ -17,6 +17,22 @@ LCA Wrench – installation on the Mac
    The browser opens LCA Wrench (Google Chrome works best). Keep the Terminal window open,
    closing it stops LCA Wrench.
 4. The interface is in English. "Deutsch" at the top right switches it to German.
+
+Updating to a newer version (e.g. from 0.1.0)
+Your projects, with your models, calculation setups and the settings of LCA Wrench, stay as they are: they are in
+~/Library/Application Support/Brightway3, not in the folder LCA-Wrench, and the update does not touch them. The
+Python and the packages in LCA-Wrench stay too; the installation only replaces what changed.
+1. Close LCA Wrench: close its Terminal window. Let an import that is still running finish first.
+2. Open "Install LCA Wrench" from the new zip and choose the same folder as before (the suggestion, if you kept
+   it). The installer sees that it is an LCA Wrench folder: it replaces the program code of the old version (the
+   folder "lca_wrench", none of your data is in it) and runs "Install LCA Wrench" there.
+   A package without a signature is the folder alone: delete the folder "lca_wrench" in your LCA-Wrench folder,
+   select everything in the new folder (Cmd+A), drag it into your LCA-Wrench folder and choose "Replace", then
+   double-click "Install LCA Wrench" there.
+3. Check: the file "VERSION" in LCA-Wrench begins with the new version number. Start LCA Wrench: your projects are
+   in the list at the top, and the file "lca-wrench.log" in the folder has a line "Start, version <new number>".
+If the installation says the folder is incomplete, do step 2 again. Installing into a new, empty folder works as
+well: LCA Wrench finds the projects again, as they are not in its folder.
 
 Data: a new project with BAFU 2026 or ecoinvent
 On the start page "New project": empty, or right away with background data. Other projects stay untouched.
@@ -65,7 +81,7 @@ LCA Wrench – Installation auf dem Mac (Deutsch)
    zeigt den Fortschritt. Dauer: etwa 3 bis 5 Minuten, Internet nötig.
    Alles wird nur in diesen Ordner installiert. Der Activity Browser, conda und die
    Brightway-Projekte werden nicht verändert. Kein Administrator-Passwort nötig.
-   Zum Aktualisieren eine neuere Installation in denselben Ordner laufen lassen: Python und Pakete bleiben.
+   Zum Aktualisieren auf eine neuere Version siehe «Auf eine neuere Version aktualisieren» weiter unten.
 3. Starten: Doppelklick auf die App «LCA Wrench» auf dem Schreibtisch (legt die Installation dorthin) oder auf «Start LCA Wrench»
    in diesem Ordner.
    Ein Paket ohne Signatur ist nur dieser Ordner: an einen festen Ort legen und «Install LCA Wrench»
@@ -74,6 +90,22 @@ LCA Wrench – Installation auf dem Mac (Deutsch)
    Der Browser öffnet LCA Wrench (am besten Google Chrome). Das Terminal-Fenster offen lassen,
    Schliessen beendet LCA Wrench.
 4. Die Oberfläche ist englisch. «Deutsch» oben rechts schaltet auf Deutsch um (der Browser merkt es sich).
+
+Auf eine neuere Version aktualisieren (z.B. von 0.1.0)
+Die Projekte, mit den eigenen Modellen, Rechnungen und den Einstellungen von LCA Wrench, bleiben wie sie sind: Sie
+liegen in ~/Library/Application Support/Brightway3, nicht im Ordner LCA-Wrench, und das Update verändert sie nicht.
+Auch Python und die Pakete in LCA-Wrench bleiben; die Installation ersetzt nur, was sich geändert hat.
+1. LCA Wrench beenden: sein Terminal-Fenster schliessen. Einen laufenden Import vorher fertig laufen lassen.
+2. «Install LCA Wrench» aus dem neuen Zip öffnen und denselben Ordner wie beim letzten Mal wählen (den Vorschlag,
+   falls er übernommen wurde). Die Installation erkennt den LCA-Wrench-Ordner: Sie ersetzt den Programmcode der alten
+   Version (den Ordner «lca_wrench», darin sind keine eigenen Daten) und startet dort «Install LCA Wrench».
+   Ein Paket ohne Signatur ist nur der Ordner: im eigenen LCA-Wrench-Ordner den Ordner «lca_wrench» löschen, im
+   neuen Ordner alles auswählen (Cmd+A), in den eigenen LCA-Wrench-Ordner ziehen und «Ersetzen» wählen, dann dort
+   «Install LCA Wrench» doppelklicken.
+3. Prüfen: Die Datei «VERSION» in LCA-Wrench beginnt mit der neuen Versionsnummer. LCA Wrench starten: Die Projekte
+   stehen oben in der Liste, und die Datei «lca-wrench.log» im Ordner hat eine Zeile «Start, version <neue Nummer>».
+Meldet die Installation, der Ordner sei unvollständig, Schritt 2 nochmals machen. Auch eine Installation in einen
+neuen, leeren Ordner geht: LCA Wrench findet die Projekte wieder, denn sie liegen nicht in seinem Ordner.
 
 Daten: neues Projekt mit BAFU 2026 oder ecoinvent
 Auf der Startseite «Neues Projekt»: leer, oder gleich mit Hintergrunddaten. Andere Projekte bleiben unberührt.

@@ -1,6 +1,6 @@
 # LCA Wrench, Activity Browser and Brightway compared
 
-Compared: LCA Wrench 0.1.0, Activity Browser 3.0, Brightway 2.5 (bw2data 4.7, bw2calc 2.5.0). Feature rows describe
+Compared: LCA Wrench 0.1.1, Activity Browser 3.0, Brightway 2.5 (bw2data 4.8, bw2calc 2.5.0). Feature rows describe
 the documented feature sets as of November 2026.
 
 All three work on the same thing: a **Brightway 2.5 project** (bw2data 4, bw2calc 2) in the Brightway folder on

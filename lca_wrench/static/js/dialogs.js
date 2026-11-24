@@ -27,8 +27,10 @@ export function openChooser({ title, text, options, newLabel, newPlaceholder, ch
 // a question with one action; while the action runs the dialog says so and cannot be closed
 // alt/altRun: an optional second choice (e.g. «open the original anyway» next to «make a test copy»)
 let onAlt = null;
-export function openConfirm({ title, text, ok, run, alt, altRun }) {
-  S.confirm = { title, text, ok, alt, running: false };
+// danger: something is deleted for good; the red button, and the focus starts on "Cancel" (Enter does not delete)
+// busy: what the dialog says while it runs (default: a copy that takes minutes)
+export function openConfirm({ title, text, ok, run, alt, altRun, danger = false, busy = null }) {
+  S.confirm = { title, text, ok, alt, danger, busy, running: false };
   S.picker = S.mpicker = S.chooser = null; onConfirm = run; onAlt = altRun || null;
   renderDialog(); showDlg();
 }
@@ -53,7 +55,7 @@ export function openNewProject(np) {
 }
 
 function showDlg() { const d = $('dlg'); if (!d.open) d.showModal(); }
-export function closeDialog() { const d = $('dlg'); if (d.open) d.close(); S.picker = S.mpicker = S.chooser = S.confirm = S.newp = null; onPick = onChoose = onConfirm = onAlt = null; }
+export function closeDialog() { const d = $('dlg'); if (d.open) d.close(); d.removeAttribute('role'); S.picker = S.mpicker = S.chooser = S.confirm = S.newp = null; onPick = onChoose = onConfirm = onAlt = null; }
 
 export function renderDialog() {
   const body = $('dlgBody');
@@ -62,6 +64,11 @@ export function renderDialog() {
   else if (S.chooser) body.innerHTML = chooserHtml();
   else if (S.confirm) body.innerHTML = confirmHtml();
   else if (S.newp) body.innerHTML = newProjectHtml();
+  // screen readers announce the dialog by its heading and, for a question, its text
+  const d = $('dlg'), h = body.querySelector('h2'), p = body.querySelector('.dlgtext');
+  if (h) { h.id = 'dlgTitle'; d.setAttribute('aria-labelledby', 'dlgTitle'); } else d.removeAttribute('aria-labelledby');
+  if (p) { p.id = 'dlgText'; d.setAttribute('aria-describedby', 'dlgText'); } else d.removeAttribute('aria-describedby');
+  if (S.confirm?.danger) d.setAttribute('role', 'alertdialog'); else d.removeAttribute('role');
 }
 
 const closeBtn = () => `<button class="iconbtn" data-act="dlg-close" aria-label="${t('Schliessen')}">×</button>`;
@@ -114,9 +121,9 @@ function chooserHtml() {
 function confirmHtml() {
   const c = S.confirm;
   return `<div class="dlghead"><h2>${esc(c.title)}</h2>${c.running ? '' : closeBtn()}</div>
-    <p style="font-size:14px">${c.text}</p>
-    ${c.running ? `<p class="busy" role="status">${t('Läuft … das kann einige Minuten dauern. Bitte dieses Fenster offen lassen.')}</p>`
-      : `<div class="row" style="justify-content:flex-end;gap:8px"><button class="btn" data-act="dlg-close">${t('Abbrechen')}</button>${c.alt ? `<button class="btn" data-act="confirm-alt">${esc(c.alt)}</button>` : ''}<button class="btn primary" data-act="confirm-ok">${esc(c.ok)}</button></div>`}`;
+    <p class="dlgtext" style="font-size:14px">${c.text}</p>
+    ${c.running ? `<p class="busy" role="status">${c.busy || t('Läuft … das kann einige Minuten dauern. Bitte dieses Fenster offen lassen.')}</p>`
+      : `<div class="row" style="justify-content:flex-end;gap:8px"><button class="btn" data-act="dlg-close" ${c.danger ? 'autofocus' : ''}>${t('Abbrechen')}</button>${c.alt ? `<button class="btn" data-act="confirm-alt">${esc(c.alt)}</button>` : ''}<button class="btn ${c.danger ? 'danger' : 'primary'}" data-act="confirm-ok">${esc(c.ok)}</button></div>`}`;
 }
 
 function newProjectHtml() {

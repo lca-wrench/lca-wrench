@@ -26,6 +26,7 @@ tests/test_engine.py checks every quantity against plain bw2calc, tests/test_reg
 
 from __future__ import annotations
 
+import gc
 import threading
 from collections import OrderedDict
 
@@ -168,10 +169,7 @@ class Background:
                 self.solver = None
                 self.solve = lambda b: refined(lu.solve, self.A, b)
                 self.solve_t = lambda b: refined(lambda v: lu.solve(v, trans="T"), AT, b)
-            diag = self.A.diagonal()
-            prod_row = dict(lca.dicts.product)
-            self.production = np.array([self.A[prod_row[a], c] if a in prod_row else diag[c]
-                                        for c, a in enumerate(self.act_ids)], dtype=float)
+            self.production = _production(self.A, self.act_ids, dict(lca.dicts.product), self.A.diagonal())
         self.act_col = {int(a): i for i, a in enumerate(self.act_ids)}
         self.prod_row = {int(p): i for i, p in enumerate(self.prod_ids)}
         self.bio_row = {int(f): i for i, f in enumerate(self.bio_ids)}
@@ -320,6 +318,17 @@ def refined(solve, M, b: np.ndarray, steps: int = 2) -> np.ndarray:
     return x
 
 
+def _production(A, act_ids, prod_row: dict, fallback: np.ndarray) -> np.ndarray:
+    """Production amount per activity column: A[prod_row[a], c] for activity a in column c, `fallback[c]` where a has
+    no own product row. One vectorized lookup instead of a scalar sparse index per column."""
+    rows = np.array([prod_row.get(int(a), -1) for a in act_ids], dtype=np.int64)
+    out = np.array(fallback, dtype=float, copy=True)
+    has = np.flatnonzero(rows >= 0)
+    if len(has):
+        out[has] = np.asarray(A[rows[has], has]).ravel()
+    return out
+
+
 def _ids_by_index(mapping) -> np.ndarray:
     items = sorted(dict(mapping).items(), key=lambda kv: kv[1])
     return np.array([k for k, _ in items], dtype=np.int64)
@@ -466,12 +475,7 @@ class Foreground:
                 self.lu = splu(self.A_ff.tocsc())
             except RuntimeError:
                 self.errors.append(msg("Das Modell ist nicht lösbar: Die Produktionsmengen heben sich gegenseitig auf (singuläre Matrix)."))
-        diag = {}
-        A = self.A_ff.tocsc()
-        for c, nid in enumerate(cols):
-            r = row.get(nid)
-            diag[c] = A[r, c] if r is not None else 0.0
-        self.production = np.array([diag[c] for c in range(nf)], dtype=float)
+        self.production = _production(self.A_ff.tocsc(), cols, row, np.zeros(nf))
 
     def _empty(self, nb, nbio):
         self.act_ids = self.prod_ids = np.zeros(0, dtype=np.int64)
@@ -794,6 +798,44 @@ def bump_all() -> None:
 def bump_foreground(project: str) -> None:
     with _lock:
         _fg_version[project] = _fg_version.get(project, 0) + 1
+
+
+def forget(project: str) -> None:
+    """Drop every cached calculation of `project` and close the processed datapackages they keep open.
+
+    A cached background holds its bw2calc LCA, whose datapackages keep the project's processed/*.zip files open.
+    Windows cannot delete an open file (WinError 32), so a project is forgotten before its folder is removed."""
+    with _lock:
+        gone = [_backgrounds.pop(k) for k in [k for k in _backgrounds if k[0] == project]]
+        for k in [k for k in _systems if k[0] == project]:
+            del _systems[k]
+        _bg_version[project] = _bg_version.get(project, 0) + 1
+        _fg_version[project] = _fg_version.get(project, 0) + 1
+    for bg in gone:
+        _close_packages(bg.lca)
+        bg.lca = None
+    gc.collect()  # what still refers to the packages elsewhere closes its files when it is freed
+
+
+def forget_others(project: str) -> None:
+    """forget() every other project with cached calculations. On Windows when another project is opened: its files
+    stay open otherwise, and another program (the Activity Browser) could not delete or rewrite that project."""
+    with _lock:
+        others = {k[0] for k in _backgrounds} | {k[0] for k in _systems}
+    for p in others - {project}:
+        forget(p)
+
+
+def _close_packages(lca) -> None:
+    for dp in getattr(lca, "packages", None) or []:
+        fs = getattr(dp, "fs", None)
+        try:
+            if hasattr(fs, "zip"):  # fsspec ZipFileSystem: the archive, then the file under it
+                fs.zip.close()
+            if hasattr(getattr(fs, "of", None), "__exit__"):
+                fs.of.__exit__(None, None, None)
+        except Exception:  # noqa: BLE001 - closing is best effort, the folder removal reports what stays open
+            pass
 
 
 def backgrounds_in_use(project: str) -> set[str]:

@@ -119,7 +119,7 @@ def test_flows_without_a_factor(electricity, switch):
 
 def test_api_switch_list_and_export(electricity, switch):
     body = {"id": str(electricity.id), "amount": 1.0, "method": list(s.CLIMATE_METHOD)}
-    with TestClient(app, base_url="http://127.0.0.1") as c:
+    with TestClient(app, base_url="http://127.0.0.1", headers={"X-LCA-Wrench": "1"}) as c:
         assert c.post("/api/completion", json={"enabled": True}).json() == {"enabled": True}
         assert c.get("/api/state").json()["completion"] == {"enabled": True}
         on = c.post("/api/calc", json=body).json()

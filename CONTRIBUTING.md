@@ -23,8 +23,9 @@ On Windows use `.venv\Scripts\python`. Run the app with `.venv/bin/python -m lca
 ./check.sh --no-browser    # skips the browser tests
 ```
 
-Or without the script: `python -m ruff check . && python -m pytest -q`. The workflow `.github/workflows/check.yml` runs
-the same on Linux and on Windows for every pull request and push to `main`.
+Or without the script: `python -m ruff check . && python -m pytest -q`. The workflow `.github/workflows/test.yml` runs
+the same on Linux, Windows and macOS for every pull request and push to `main`, after installing from the release
+package as a user does (see [docs/ci.md](docs/ci.md)).
 
 The tests never touch real projects. They need the project `bafu-2025` created by `setup_daten.py` and work in a copy,
 `lca-wrench-test`, which is created on the first run. `bafu-2025` cannot be opened by a test (`set_current` raises an

@@ -83,8 +83,15 @@ async def local_only(request: Request, call_next):
     if host not in ALLOWED_HOSTS:
         return JSONResponse({"detail": _("Nur lokal erreichbar.")}, status_code=403)
     origin = request.headers.get("origin")
-    if request.headers.get("sec-fetch-site") == "cross-site" or (
-            origin and origin != "null" and urlsplit(origin).hostname not in ALLOWED_HOSTS):
+    unsafe = request.method not in ("GET", "HEAD", "OPTIONS")
+    # Origin must be this server itself (scheme, host and port): another local port, e.g. a dev server or another
+    # tool on 127.0.0.1, is another site. "null" (sandboxed frames, file:// pages) may not change anything.
+    foreign = origin and (origin == "null" and unsafe or origin != "null" and (
+        urlsplit(origin).hostname not in ALLOWED_HOSTS or urlsplit(origin).netloc != request.headers.get("host")))
+    # Changes need the UI's own header: a page elsewhere cannot set it without a CORS preflight, which this server
+    # never answers. Covers browsers that send neither Origin nor Sec-Fetch-Site (e.g. Safari before 16.4).
+    if request.headers.get("sec-fetch-site") == "cross-site" or foreign or (
+            unsafe and request.headers.get("x-lca-wrench") != "1"):
         return JSONResponse({"detail": _("Nur lokal erreichbar.")}, status_code=403)
     return await call_next(request)
 

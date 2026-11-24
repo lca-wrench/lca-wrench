@@ -134,6 +134,66 @@ def test_single_scenario_takes_the_counterparts(world):
         backgrounds.set_choice("auto", [], roles)
 
 
+def test_working_copy_keeps_the_background_choice(world):
+    """Regression: the copy reverted to "auto" and calculated on today's data instead of the chosen scenario."""
+    roles = models.roles()
+    backgrounds.set_choice("single", [SC], roles)
+    name = None
+    try:
+        name = s.make_working_copy()
+        assert bd.projects.current == name
+        assert backgrounds.choice(models.roles()) == {"mode": "single", "databases": [SC]}
+        assert models.system().score({world: 1}, GWP) == pytest.approx(Y2040, rel=1e-6)
+        # a lognormal background amount set to 0: no distribution left (it sampled around the old amount);
+        # undo brings the distribution back exactly
+        exc = next(iter(bd.get_node(database=EI, code="elec").technosphere()))
+        exc.update({"uncertainty type": 2, "loc": float(np.log(0.001)), "scale": 0.3})
+        exc.save()
+        eid = exc._document.id
+        s.edit_exchange(eid, 0.0)
+        e = next(iter(bd.get_node(database=EI, code="elec").technosphere()))
+        assert e["amount"] == 0 and int(e.get("uncertainty type") or 0) == 0 and e.get("loc") is None
+        s.undo_change(eid)
+        e = next(iter(bd.get_node(database=EI, code="elec").technosphere()))
+        assert e["amount"] == pytest.approx(0.001) and e["uncertainty type"] == 2 and e["scale"] == 0.3
+        assert e["loc"] == pytest.approx(np.log(0.001)) and s.state()["changes"] == []
+    finally:
+        bd.projects.set_current(TEST_PROJECT)
+        if name:
+            s.remove_project(name)
+            reg = models.registry.load()
+            for key in ("copies", "backgrounds", "models"):
+                reg.get(key, {}).pop(name, None)
+            models.registry.save(reg)
+        backgrounds.set_choice("auto", [], roles)
+
+
+def test_reused_working_copy_name_is_not_served_from_the_cache(world):
+    """Regression: a new copy with the name of a deleted, edited one returned the deleted copy's cached score."""
+    names = []
+
+    def drop(name):
+        bd.projects.set_current(TEST_PROJECT)
+        s.remove_project(name)
+        reg = models.registry.load()
+        for key in ("copies", "backgrounds", "models"):
+            reg.get(key, {}).pop(name, None)
+        models.registry.save(reg)
+
+    try:
+        names.append(s.make_working_copy())
+        co2 = next(iter(bd.get_node(database=EI, code="elec").biosphere()))
+        s.edit_exchange(co2._document.id, 10.0)
+        assert models.system().score({world: 1}, GWP) > 50
+        drop(names.pop())
+        names.append(s.make_working_copy())
+        assert models.system().score({world: 1}, GWP) == pytest.approx(TODAY, rel=1e-6)
+    finally:
+        for name in names:
+            drop(name)
+        bd.projects.set_current(TEST_PROJECT)
+
+
 def test_combined_and_compare_per_item(world):
     roles = models.roles()
     st = backgrounds.set_choice("combined", [EI, SC], roles)
@@ -152,7 +212,7 @@ def test_combined_and_compare_per_item(world):
     sc_elec = bd.get_node(database=SC, code="elec").id
     assert models.system_for(sc_elec).score({sc_elec: 1}, GWP) == pytest.approx(0.02 + 0.001 * 2.28, rel=1e-6)
     assert s.activity(sc_elec, GWP)["calculated_alone"] == SC
-    with TestClient(app, base_url="http://127.0.0.1") as c:
+    with TestClient(app, base_url="http://127.0.0.1", headers={"X-LCA-Wrench": "1"}) as c:
         items = [{"project": TEST_PROJECT, "id": str(world), "amount": 2},
                  {"project": TEST_PROJECT, "id": str(world), "amount": 2, "background": [SC]},
                  {"project": TEST_PROJECT, "id": str(sc_elec), "amount": 1}]
@@ -180,7 +240,7 @@ def test_premise_job_with_stand_in(world, monkeypatch):
     scenarios.forget_constants()
     names = [scenarios.scenario_name(EI, "remind", "TEST-50", y) for y in (2030, 2050)]
     try:
-        with TestClient(app, base_url="http://127.0.0.1") as c:
+        with TestClient(app, base_url="http://127.0.0.1", headers={"X-LCA-Wrench": "1"}) as c:
             o = c.get("/api/import/options").json()
             assert o["premise"]["ei_versions"] == ["3.10"] and [x["name"] for x in o["premise_sources"]] == [EI]
             body = {"name": TEST_PROJECT, "source": "premise", "source_db": EI, "model": "remind", "pathway": "TEST-50",
@@ -220,6 +280,47 @@ def test_premise_job_with_stand_in(world, monkeypatch):
 
 
 
+def test_premise_job_keeps_databases_made_meanwhile(world, monkeypatch, tmp_path):
+    """The user keeps working while premise runs (the dialog says so). A database made meanwhile stays in
+    databases.json when the job succeeds (the worker used to write back its stale copy) and is not deleted when the
+    job fails (the cleanup used to remove every database newer than the job)."""
+    monkeypatch.setenv("LCA_WRENCH_PREMISE_PYTHON", sys.executable)
+    monkeypatch.setenv("LCA_WRENCH_PREMISE_PATH", str(Path(__file__).parent / "fake_premise"))
+    monkeypatch.setenv("FAKE_PREMISE_GATE", str(tmp_path))
+    scenarios.forget_constants()
+    names = [scenarios.scenario_name(EI, "remind", "TEST-50", y) for y in (2030, 2050)]
+    mine = {"TEST-50": "Mein Modell waehrend premise", "TEST-FAIL": "Mein Modell waehrend premise (Fehler)"}
+    try:
+        with TestClient(app, base_url="http://127.0.0.1", headers={"X-LCA-Wrench": "1"}) as c:
+            body = {"name": TEST_PROJECT, "source": "premise", "source_db": EI, "model": "remind",
+                    "years": [2050, 2030], "key": "x" * 44}
+            for pathway, state in (("TEST-50", "fertig"), ("TEST-FAIL", "fehler")):
+                for f in tmp_path.iterdir():
+                    f.unlink()
+                job = c.post("/api/import/start", json={**body, "pathway": pathway}).json()
+                for _ in range(600):  # the worker has read the database list and is "running premise"
+                    if (tmp_path / "ready").exists():
+                        break
+                    time.sleep(0.1)
+                assert (tmp_path / "ready").exists()
+                db = mine[pathway]
+                with s.LOCK:
+                    bd.Database(db).register()
+                    bd.Database(db).write(_proc(db, "wp", "Waermepumpe", "heat", "CH", "megajoule"))
+                (tmp_path / "go").touch()
+                st = _wait(c, job)
+                assert st["state"] == state, st
+                listing = json.loads((Path(bd.projects.dir) / "databases.json").read_text())
+                assert db in listing and db in bd.databases, (pathway, sorted(listing))
+                assert len(bd.Database(db)) == 1
+                if state == "fertig":
+                    assert all(n in listing for n in names)
+            assert all(d in bd.databases for d in mine.values())
+    finally:
+        _drop(*names, *mine.values())
+        scenarios.forget_constants()
+
+
 def test_premise_offers_only_scenarios_in_its_archive(world, tmp_path, monkeypatch):
     """premise lists every pathway for every model, but its Zenodo archive has only some pairs (premise 2.5.2: no
     SSP2-Base at all, which failed with a 404). Offered are the pairs whose file is in the archive or on this computer."""
@@ -252,7 +353,7 @@ def test_premise_offers_only_scenarios_in_its_archive(world, tmp_path, monkeypat
         assert c["local"]["gcam"] == ["SSP2-Base"]
         assert scenarios.offered(c) == {"remind": ["SSP2-NPi", "SSP1-VLLO"], "image": ["SSP2-M", "SSP1-VLLO"],
                                         "gcam": ["SSP2-Base"]}
-        with TestClient(app, base_url="http://127.0.0.1") as cl:
+        with TestClient(app, base_url="http://127.0.0.1", headers={"X-LCA-Wrench": "1"}) as cl:
             o = cl.get("/api/import/options").json()
             assert o["premise_available"]["image"] == ["SSP2-M", "SSP1-VLLO"]
             body = {"name": TEST_PROJECT, "source": "premise", "source_db": EI, "model": "image", "pathway": "SSP2-Base",
@@ -297,7 +398,7 @@ def test_flow_mapping_fills_factors_across_flow_lists(world):
         assert models.system_for(ei).score({ei: 1}, GWP_EF) == pytest.approx(1.0)  # EF's factor on the ecoinvent flow
         assert models.system_for(ef).score({ef: 1}, WATER_EI) == 0.0  # water: never through the mapping
         assert models.system_for(ei).score({ei: 1}, GWP_EI) == pytest.approx(1.0)  # its own factors as they are
-        with TestClient(app, base_url="http://127.0.0.1") as c:
+        with TestClient(app, base_url="http://127.0.0.1", headers={"X-LCA-Wrench": "1"}) as c:
             items = [{"project": TEST_PROJECT, "id": str(ef), "amount": 1}, {"project": TEST_PROJECT, "id": str(ei), "amount": 1}]
             r = c.post("/api/compare", json={"items": items, "method": list(GWP_EI)}).json()
             assert [x["coverage"] for x in r] == ["mapped", "native"] and r[0]["score"] == pytest.approx(2.0)
@@ -473,7 +574,7 @@ def test_exiobase_import_dense_solver_and_hybrid(world, tmp_path):
         assert not any(o["removable"] for o in st["background"]["options"] if o["name"] != SC)
         backgrounds.set_choice("auto", [], models.roles())
         # the same as a job in its own process
-        with TestClient(app, base_url="http://127.0.0.1") as cl:
+        with TestClient(app, base_url="http://127.0.0.1", headers={"X-LCA-Wrench": "1"}) as cl:
             body = {"name": TEST_PROJECT, "source": "exiobase", "path": str(folder), "biosphere": BIO, "db_name": "EXIOBASE job"}
             assert cl.post("/api/import/start", json={**body, "biosphere": "nope"}).status_code == 400
             st = _wait(cl, cl.post("/api/import/start", json=body).json())

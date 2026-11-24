@@ -1,6 +1,6 @@
 // LCA Wrench UI: plain JS modules, talks to the local FastAPI service.
 'use strict';
-import { S, $, esc, nf, mKey, methodInfo, methodLabel, familyLabel, api, toast, guard, renderBusy, icon, views, loadPrefs, savePref, csvDownload, download, isModelDb, langHeader, t, LANG } from './core.js';
+import { S, $, esc, nf, mKey, methodInfo, methodLabel, familyLabel, api, request, toast, guard, renderBusy, icon, views, loadPrefs, savePref, csvDownload, download, isModelDb, langHeader, t, LANG } from './core.js';
 import { setLang } from './i18n.js';
 import { vStart } from './views/start.js';
 import { vDaten } from './views/daten.js';
@@ -44,10 +44,10 @@ async function followImport(job) {
     while (job.state === 'läuft') {
       if (S.newp) { S.newp.job = job; renderDialog(); }
       await new Promise(r => setTimeout(r, 1500));
-      job = (await (await fetch(`/api/import/status?id=${job.id}`, { headers: langHeader() })).json()).job || { ...job, state: 'fehler', error: '?' };
+      job = (await (await request(`/api/import/status?id=${job.id}`, { headers: langHeader() })).json()).job || { ...job, state: 'fehler', error: '?' };
     }
   } finally { S.importing = false; }
-  if (job.state === 'fehler') { if (S.newp) { S.newp.job = job; renderDialog(); } else toast(t('Fehlgeschlagen: {error}', { error: job.error })); await loadState(); render(); return; }
+  if (job.state === 'fehler') { if (S.newp) { S.newp.job = job; renderDialog(); } else toast(t('Fehlgeschlagen: {error}', { error: job.error }), null, true); await loadState(); render(); return; }
   if (job.source === 'premise-setup') {  // set up: on to the scenario itself
     toast(t('premise {v} ist eingerichtet.', { v: job.result?.premise || '' }));
     if (S.newp) { closeDialog(); await newProject({ source: 'premise', target: S.st.project, add: true }); }
@@ -89,7 +89,7 @@ async function submitNewProject() {
 async function afterProjectChange() {
   S.sopts = null; S.move = null; S.bgForm = null; S.cats = { a: null, b: '', topic: '', res: null };
   resetErgebnis(); S.setup = null; S.setupRes = null; S.msel = null; S.mact = null; S.mc = { ...S.mc, job: null, res: null, error: null }; S.sens = { j: 0, job: null, res: null, error: null };
-  try { await loadView(); } catch (e) { S.act = S.sel = S.fu = null; toast(t('Der gewählte Prozess existiert in diesem Projekt nicht.')); }
+  try { await loadView(); } catch (e) { S.act = S.sel = S.fu = null; toast(t('Der gewählte Prozess existiert in diesem Projekt nicht.'), null, true); }
   render();
 }
 
@@ -102,7 +102,7 @@ async function loadState(st) {
 }
 async function sheetFor(id) {
   try { return await api('/api/activity', { id, method: S.method }); }
-  catch (e) { toast(e.message); return null; }
+  catch (e) { toast(e.message, null, true); return null; }
 }
 async function loadView() {
   if (['daten', 'modell', 'rechnen', 'ergebnis'].includes(S.view) && !S.sopts && S.st.databases.length) S.sopts = await api('/api/search/options');
@@ -188,7 +188,7 @@ function renderTop() {
   text('methLabel', t('Wirkungskategorie'));
   $('railNav')?.setAttribute('aria-label', t('Ansichten'));
   text('tourBtn', t('Rundgang'));
-  text('undoBtn', '↶ ' + t('Rückgängig'));
+  text('undoBtn', '↶\u00a0' + t('Rückgängig'));  // the arrow stays with the word when the text wraps
   const lb = $('langBtn');
   if (lb) { lb.textContent = LANG === 'en' ? 'Deutsch' : 'English'; lb.lang = LANG === 'en' ? 'de' : 'en'; lb.title = LANG === 'en' ? 'Oberfläche auf Deutsch' : 'Switch the interface to English'; }
   $('projSel').innerHTML = (S.st.project ? '' : `<option value="" selected disabled>${t('– Projekt wählen –')}</option>`)
@@ -223,7 +223,15 @@ function renderTop() {
   $('undoBtn').hidden = !j.length;
   $('undoBtn').title = j.length ? t('Rückgängig: {label} (⌘Z / Ctrl+Z)', { label: j[0].label }) : '';
   const eb = $('explainBtn'); eb.setAttribute('aria-pressed', S.explain); eb.textContent = S.explain ? t('Erklärungen an') : t('Erklärungen aus');
-  $('rail').innerHTML = views().map(([k, l]) => `<button class="nav" data-act="view" data-k="${k}" ${S.view === k ? 'aria-current="page"' : ''}>${icon(k)}<span>${l}</span></button>`).join('');
+  const rail = $('rail');
+  rail.innerHTML = views().map(([k, l]) => `<button class="nav" data-act="view" data-k="${k}" ${S.view === k ? 'aria-current="page"' : ''}>${icon(k)}<span>${l}</span></button>`).join('');
+  keepInSight(rail, '[aria-current]');
+}
+// on a narrow screen the views and the result tabs are rows that scroll sideways: keep the open one in sight
+// (only sideways: the page itself must not move)
+function keepInSight(row, sel) {
+  const cur = row?.querySelector(sel);
+  if (cur && row.scrollWidth > row.clientWidth) row.scrollLeft += cur.getBoundingClientRect().left - row.getBoundingClientRect().left - (row.clientWidth - cur.offsetWidth) / 2;
 }
 function projectTag(p) {
   return p.copy ? ' ' + t('(Arbeitskopie)') : p.testcopy ? ' ' + t('(Testkopie)') : p.legacy ? ' ' + t('(Activity Browser 2, nur als Kopie)')
@@ -240,11 +248,17 @@ function render() {
   const el = typing && $(typing.id);
   if (el) { el.value = typing.value; el.focus(); el.setSelectionRange(typing.start, typing.end); }
   // the Sankey grows to the left; start at the product on the right
+  keepInSight(document.querySelector('.tabs'), '[aria-selected="true"]');
   const sk = document.querySelector('.gwrap.sankey');
   if (sk) sk.scrollLeft = sk.scrollWidth;
   const ph = $('pedHint');
   if (ph) ph.textContent = pedigreeHint();  // what the pedigree scores give, kept current while they change
   positionTour();
+}
+
+// on a narrow screen the list stands above the detail: after choosing, go down to it
+function showDetail() {
+  if (window.matchMedia('(max-width:760px)').matches) document.querySelector('.dataview > .detail')?.scrollIntoView({ block: 'start' });
 }
 
 // the tour moves through the views and makes sure each one shows something
@@ -270,7 +284,7 @@ async function followJob(store, job, onDone) {
   try {
     while (store.job === job && job.state === 'läuft') {
       await new Promise(r => setTimeout(r, 700));
-      const st = await (await fetch(`/api/mc/status?id=${job.id}`, { headers: langHeader() })).json();
+      const st = await (await request(`/api/mc/status?id=${job.id}`, { headers: langHeader() })).json();
       if (!st.state) throw new Error(typeof st.detail === 'string' ? st.detail : t('Der Hintergrundauftrag ist nicht mehr erreichbar.'));
       Object.assign(job, st);
       if (S.view === 'rechnen' && store.job === job) render();
@@ -304,8 +318,8 @@ const A = {
   },
   async tour() { if (!S.st.project || S.st.load_error) { toast(t('Bitte zuerst oben ein Projekt wählen.')); return; } await startTour(tourHooks); },
   async open(k, el) { await openNode(k, el.dataset.db); },
-  async 'open-here'(k) { S.sel = k; S.showAllTech = S.showAllBio = false; S.act = await sheetFor(k); render(); },
-  async 'open-proc'(k) { S.msel = k; S.uncFor = null; S.prevScore = null; S.showAllTech = S.showAllBio = false; S.mact = await sheetFor(k); render(); },
+  async 'open-here'(k) { S.sel = k; S.showAllTech = S.showAllBio = false; S.act = await sheetFor(k); render(); showDetail(); },
+  async 'open-proc'(k) { S.msel = k; S.uncFor = null; S.prevScore = null; S.showAllTech = S.showAllBio = false; S.mact = await sheetFor(k); render(); showDetail(); },
   async 'open-db'(k) { S.mdb = k; S.msel = null; S.mact = null; await go('modell'); },
   'all-tech'() { S.showAllTech = !S.showAllTech; render(); },
   'all-bio'() { S.showAllBio = !S.showAllBio; render(); },
@@ -338,10 +352,15 @@ const A = {
   'new-db-cancel'() { S.newDb = false; render(); },
   'new-proc'() { S.newProc = true; render(); $('npName')?.focus(); },
   'new-proc-cancel'() { S.newProc = false; render(); },
-  async 'del-db'(k) {
-    if (!confirm(t('Modell «{name}» mit allen Prozessen löschen? Das lässt sich nicht rückgängig machen.', { name: k }))) return;
-    await loadState(await api('/api/models/db/delete', { name: k }));
-    S.msel = null; S.mact = null; await loadView(); render(); toast(t('«{name}» gelöscht.', { name: k }));
+  'del-db'(k) {
+    openConfirm({
+      title: t('Modell löschen'), ok: t('Löschen'), danger: true, busy: t('Wird gelöscht …'),
+      text: t('Modell «{name}» mit allen Prozessen löschen? Das lässt sich nicht rückgängig machen.', { name: esc(k) }),
+      run: async () => {
+        await loadState(await api('/api/models/db/delete', { name: k }));
+        S.msel = null; S.mact = null; await loadView(); render(); toast(t('«{name}» gelöscht.', { name: k }));
+      },
+    });
   },
   async 'copy-to-model'(k) {
     const dbs = S.st.databases.filter(d => d.role === 'model');
@@ -420,11 +439,15 @@ const A = {
     if (!S.setup || S.setup.name !== k) { S.mc = { ...S.mc, job: null, res: null, error: null }; S.sens = { j: 0, job: null, res: null, error: null }; }
     const same = S.setup && S.setup.name === k;  // the same setup again: keep its numbers until the new ones are there
     S.setup = await api(`/api/setups/get?name=${encodeURIComponent(k)}`); if (!same) S.setupRes = null; S.setupVerify = null;
-    S.view = 'rechnen'; render(); if (S.setup.fus.length && S.setup.methods.length) { await runSetup(); render(); } else { S.setupRes = null; render(); }
+    S.view = 'rechnen'; render(); showDetail(); if (S.setup.fus.length && S.setup.methods.length) { await runSetup(); render(); } else { S.setupRes = null; render(); }
   },
-  async 'del-setup'() {
-    if (!confirm(t('Rechnung «{name}» löschen?', { name: S.setup.name }))) return;
-    await loadState(await api('/api/setups/delete', { name: S.setup.name })); S.setup = null; S.setupRes = null; render();
+  'del-setup'() {
+    const name = S.setup.name;
+    openConfirm({
+      title: t('Rechnung löschen'), ok: t('Löschen'), danger: true, busy: t('Wird gelöscht …'),
+      text: t('Rechnung «{name}» löschen?', { name: esc(name) }),
+      run: async () => { await loadState(await api('/api/setups/delete', { name })); S.setup = null; S.setupRes = null; render(); },
+    });
   },
   async 'run-setup'() { await runSetup(); render(); },
   async 'mc-start'() {
@@ -590,11 +613,16 @@ const A = {
     S.sopts = null; resetErgebnis(); S.setupRes = null; await loadView(); render();
     toast(t('Hintergrund: {list}', { list: S.st.background.used.join(', ') }));
   },
-  async 'bg-remove'(k) {
-    if (!confirm(t('Datenbank «{name}» aus dem Projekt entfernen? Das lässt sich nicht rückgängig machen; sie lässt sich aber neu importieren.', { name: k }))) return;
-    await loadState(await api('/api/background/remove', { name: k })); S.bgForm = null;
-    S.cmp = S.cmp.filter(c => !(c.background || []).includes(k));
-    S.sopts = null; resetErgebnis(); S.setupRes = null; await loadView(); render(); toast(t('«{name}» entfernt.', { name: k }));
+  'bg-remove'(k) {
+    openConfirm({
+      title: t('Datenbank entfernen'), ok: t('Entfernen'), danger: true, busy: t('Wird entfernt …'),
+      text: t('Datenbank «{name}» aus dem Projekt entfernen? Das lässt sich nicht rückgängig machen; sie lässt sich aber neu importieren.', { name: esc(k) }),
+      run: async () => {
+        await loadState(await api('/api/background/remove', { name: k })); S.bgForm = null;
+        S.cmp = S.cmp.filter(c => !(c.background || []).includes(k));
+        S.sopts = null; resetErgebnis(); S.setupRes = null; await loadView(); render(); toast(t('«{name}» entfernt.', { name: k }));
+      },
+    });
   },
   async 'cmp-each-bg'() {  // the last product in the comparison, once with every process or scenario database
     const last = S.cmp[S.cmp.length - 1]; if (!last) return;
@@ -711,6 +739,7 @@ const A = {
 
   // dialogs
   'dlg-close'() { closeDialog(); },
+  'toast-close'() { /* the click on the toast hides it */ },
   async 'pk-pick'(k) { const amt = parseFloat($('pkAmt')?.value ?? '1'); await picked(S.picker.results[+k], isFinite(amt) ? amt : 1); },
   async 'ch-pick'(k) { await chosen(k, false); },
   'mp-all'(k, el, ev) {
@@ -727,11 +756,18 @@ function addCmp(src) {
 }
 
 // ---------- events ----------
+// an action runs once at a time: a second click while it runs (impatient, or a double click) is ignored,
+// and a button that takes a while says so
+const running = new Set();
 document.addEventListener('click', ev => {
   const b = ev.target.closest('[data-act]'); if (!b || b.disabled) return;
   const fn = A[b.dataset.act]; if (!fn) return;
   if (b.closest('#toast')) $('toast').hidden = true;
-  guard(() => fn(b.dataset.k, b, ev));
+  const key = b.dataset.act + '|' + (b.dataset.k ?? '');
+  if (running.has(key)) return;
+  running.add(key);
+  const slow = setTimeout(() => b.setAttribute('aria-busy', 'true'), 300);
+  guard(() => fn(b.dataset.k, b, ev)).finally(() => { running.delete(key); clearTimeout(slow); b.removeAttribute('aria-busy'); });
 });
 document.addEventListener('keydown', ev => {
   if (tourKey(ev)) { ev.preventDefault(); return; }
@@ -829,7 +865,7 @@ document.addEventListener('change', ev => {
       await A['open-project'](name);
     }
     else if (el.dataset.ex) {
-      const v = parseFloat(el.value); if (!isFinite(v)) { toast(t('Bitte eine Zahl eingeben.')); render(); return; }
+      const v = parseFloat(el.value); if (!isFinite(v)) { toast(t('Bitte eine Zahl eingeben.'), null, true); render(); return; }
       const a = currentSheet(); if (a) S.prevScore = { id: a.id, v: a.score };
       await loadState(await api('/api/edit', { exchange: el.dataset.ex, amount: v }));
       await refreshSheet(); render();
@@ -856,7 +892,7 @@ document.addEventListener('change', ev => {
     else if (el.id === 'xlsxIn') {
       const f = el.files[0]; el.value = ''; if (!f) return;
       toast(t('Lese «{name}» …', { name: f.name }));
-      const r = await fetch('/api/models/import', { method: 'POST', headers: { 'Content-Type': 'application/octet-stream', ...langHeader() }, body: await f.arrayBuffer() });
+      const r = await request('/api/models/import', { method: 'POST', headers: { 'Content-Type': 'application/octet-stream', ...langHeader() }, body: await f.arrayBuffer() });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(typeof d.detail === 'string' ? d.detail : t('Der Import ist fehlgeschlagen.'));
       await loadState(d.state); S.mdb = d.database; S.msel = null; S.mact = null; S.view = 'modell'; await loadView(); render();
@@ -889,7 +925,7 @@ document.addEventListener('change', ev => {
     else if (el.id === 'cwFile') {
       const f = el.files[0]; el.value = ''; if (!f || !S.cw.res) return;
       const src = S.cw.res.rows[0]?.database || S.fu.database;
-      const r = await fetch(`/api/crosswalk/import?source_database=${encodeURIComponent(src)}&target_database=${encodeURIComponent(S.cw.database)}`, { method: 'POST', headers: { 'Content-Type': 'application/octet-stream', ...langHeader() }, body: await f.arrayBuffer() });
+      const r = await request(`/api/crosswalk/import?source_database=${encodeURIComponent(src)}&target_database=${encodeURIComponent(S.cw.database)}`, { method: 'POST', headers: { 'Content-Type': 'application/octet-stream', ...langHeader() }, body: await f.arrayBuffer() });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(typeof d.detail === 'string' ? d.detail : t('Der Import ist fehlgeschlagen.'));
       toast(t('{n} Zuordnungen aus «{name}» geladen.', { n: d.saved, name: f.name }));

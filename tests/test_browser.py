@@ -2,7 +2,8 @@
 
 The server runs in the test project `lca-wrench-test` with its own registry file.
 Skip with LCA_WRENCH_SKIP_BROWSER=1 (check.sh --no-browser).
-Uses the installed Google Chrome (no separate browser download).
+Uses the installed Google Chrome (no separate browser download); other browsers and the files kept when a test
+fails: see browser_support.py.
 """
 
 import os
@@ -18,11 +19,13 @@ import pytest
 pytest.importorskip("playwright")
 from playwright.sync_api import expect, sync_playwright  # noqa: E402
 
+import browser_support  # noqa: E402
 from conftest import TEST_PROJECT  # noqa: E402
 
 pytestmark = pytest.mark.skipif(os.environ.get("LCA_WRENCH_SKIP_BROWSER") == "1", reason="browser tests skipped (LCA_WRENCH_SKIP_BROWSER=1)")
 
 PORT = 8795
+WINDOWS = sys.platform == "win32"
 URL = f"http://127.0.0.1:{PORT}"
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -35,10 +38,17 @@ def num(text: str) -> float:
 
 @pytest.fixture(scope="module")
 def server():
+    import socket
+
+    with socket.socket() as sock:  # a server left over from an earlier run would answer in place of this one
+        if sock.connect_ex(("127.0.0.1", PORT)) == 0:
+            raise RuntimeError(f"Port {PORT} is in use (an LCA Wrench test server left over?): stop it first")
     env = {**os.environ, "LCA_WRENCH_PROJECT": TEST_PROJECT, "PYTHONWARNINGS": "ignore"}
+    # own process group (POSIX: session), so the server and its Monte-Carlo workers stop together
+    group = {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if WINDOWS else {"start_new_session": True}
     proc = subprocess.Popen(
         [sys.executable, "-m", "uvicorn", "lca_wrench.api:app", "--host", "127.0.0.1", "--port", str(PORT), "--log-level", "warning"],
-        cwd=ROOT, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, start_new_session=True,
+        cwd=ROOT, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, **group,
     )
     import urllib.request
 
@@ -61,7 +71,7 @@ def _stop(proc: subprocess.Popen) -> None:
     """End the server and any Monte-Carlo workers it started. Windows has no process groups to signal (no os.killpg)
     and proc.kill() would end only the venv's python.exe, not the interpreter it starts: taskkill ends the whole tree.
     Left running, the server keeps the test project's files open and the next run fails on them."""
-    if os.name == "nt":
+    if WINDOWS:
         subprocess.run(["taskkill", "/F", "/T", "/PID", str(proc.pid)], capture_output=True)
     else:
         os.killpg(proc.pid, signal.SIGTERM)
@@ -69,12 +79,11 @@ def _stop(proc: subprocess.Popen) -> None:
 
 
 @pytest.fixture(scope="module")
-def page(server):
+def page(server, request):
+    failed_before = request.session.testsfailed
     with sync_playwright() as p:
-        # the installed Google Chrome; LCA_WRENCH_CHROME=<path> uses another Chromium (e.g. on Linux)
-        chrome = os.environ.get("LCA_WRENCH_CHROME")
-        browser = p.chromium.launch(executable_path=chrome) if chrome else p.chromium.launch(channel="chrome")
-        ctx = browser.new_context(viewport={"width": 1440, "height": 900})
+        browser = browser_support.launch(p)
+        ctx = browser_support.new_context(browser, "test_browser", viewport={"width": 1440, "height": 900})
         pg = ctx.new_page()
         # the app is local: every request the page makes must go to its own server (checked in the last test)
         external = []
@@ -84,15 +93,18 @@ def page(server):
         errors = []
         pg.on("pageerror", lambda e: errors.append(str(e)))
         pg.errors = errors
-        pg.on("dialog", lambda d: d.accept())
+        # questions use the app's own dialog; a native one (confirm, alert) would be a regression
+        native = []
+        pg.on("dialog", lambda d: (native.append(d.message), d.dismiss()))
         pg.goto(server)
         # the tests read the German texts; English is the default (test_11)
         pg.evaluate("localStorage.setItem('wb-lang', 'de')")
         pg.reload()
         yield pg
-        ctx.close()
+        browser_support.finish(ctx, request.session.testsfailed > failed_before)
         browser.close()
     assert not errors, f"JavaScript-Fehler im Browser: {errors}"
+    assert not native, f"Browser-Dialog statt eigenem Dialog: {native}"
 
 
 def test_01_start_and_tour(page):
@@ -101,7 +113,7 @@ def test_01_start_and_tour(page):
     expect(tour).to_contain_text("1 / 10")
     for n in range(2, 11):
         page.click("[data-tour=next]")
-        expect(tour).to_contain_text(f"{n} / 10")
+        expect(tour).to_contain_text(f"{n} / 10", timeout=30_000)  # a step can wait for the app (slow PCs)
     page.click("[data-tour=skip]")
     expect(tour).to_have_count(0)
     page.click("#rail [data-k=start]")
@@ -362,6 +374,7 @@ def test_09_cleanup_example(page):
     expect(page.locator("[data-act=del-db]").first).to_be_visible()
     while page.locator("[data-act=del-db]").count():
         page.locator("[data-act=del-db]").first.click()
+        page.click("#dlg [data-act=confirm-ok]")
         page.wait_for_timeout(1500)
         page.click("#rail [data-k=start]")
         page.click("#rail [data-k=modell]")
@@ -380,6 +393,7 @@ def test_10_why_different_in_working_copy(page):
     import bw2data as bd
 
     from lca_wrench import registry
+    from lca_wrench import service as s
 
     page.click("#rail [data-k=daten]")
     page.locator("#q").press_sequentially("electricity low voltage", delay=20)  # right away: the redraw keeps the text
@@ -408,11 +422,11 @@ def test_10_why_different_in_working_copy(page):
     finally:
         copies = [p for p in registry.load()["copies"]]
         # let the server leave the copy before its folder is deleted
-        page.request.post(f"{URL}/api/project", data={"name": TEST_PROJECT})
+        page.request.post(f"{URL}/api/project", data={"name": TEST_PROJECT}, headers={"X-LCA-Wrench": "1"})
         bd.projects.set_current(TEST_PROJECT)
         for name in copies:
             if name in bd.projects:
-                bd.projects.delete_project(name, delete_dir=True)
+                s.remove_project(name)
             reg = registry.load()
             reg["copies"].pop(name, None)
             registry.save(reg)
@@ -443,6 +457,7 @@ def test_11_english_and_back(page):
     expect(page.locator("#toast")).to_contain_text("A database “Sprachtest” already exists.")
     page.click("[data-act=new-db-cancel]")
     page.click("[data-act=del-db]")
+    page.click("#dlg [data-act=confirm-ok]")
     expect(page.locator("#mdbSel option", has_text="Sprachtest")).to_have_count(0)
     page.click("#langBtn")
     expect(page.locator("#rail")).to_contain_text("Rechnen")

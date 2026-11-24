@@ -1,0 +1,229 @@
+# Before every release, on Linux, Windows and macOS (docs/ci.md):
+# - install LCA Wrench from its release package the way a user does, and check a known result
+#   (1 kWh Swiss electricity, climate change: 0.0142065 kg CO2-eq as stored, 0.0970550 with completed factors);
+# - lint and all tests on the installed packages, the browser tests in Chromium, on macOS also in WebKit (Safari);
+# - update from the last published release to this commit and check the result again.
+# Only free data: the BAFU 2025 template (setup_daten.py, 62 MB from files.brightway.dev). No ecoinvent, no secrets.
+name: test
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+concurrency:
+  group: test-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}  # a newer push to a pull request replaces its run
+permissions:
+  contents: read
+defaults:
+  run:
+    shell: bash  # the same commands everywhere (Git Bash on Windows)
+env:
+  PYTHONUTF8: "1"  # Windows: UTF-8 for files and subprocess output, as the release package sets it
+
+jobs:
+  packages:
+    name: release packages (Linux, Windows)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update -q && sudo apt-get install -y -q --no-install-recommends zsh  # pack_windows.sh is a zsh script
+      - run: bash pack_linux.sh && zsh pack_windows.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packages
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7
+
+  test:
+    name: install and test (${{ matrix.os }})
+    needs: packages
+    strategy:
+      fail-fast: false  # a failure on one system still shows the result of the others
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    steps:
+      - name: Folders
+        run: |
+          {
+            echo "BRIGHTWAY2_DIR=$RUNNER_TEMP/brightway"  # its own Brightway folder, nothing else on the runner
+            echo "APP=$RUNNER_TEMP/user/LCA-Wrench"       # the installation, outside the checkout as on a user's computer
+            echo "LCA_WRENCH_ARTIFACTS=$RUNNER_TEMP/artifacts"
+            echo "UV_CACHE_DIR=$RUNNER_TEMP/uv-cache"
+          } >> "$GITHUB_ENV"
+          mkdir -p "$RUNNER_TEMP/brightway"
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5  # only for scripts/ci_package.py; LCA Wrench gets its own Python
+        with:
+          python-version: "3.12"
+      - uses: actions/download-artifact@v4
+        if: runner.os != 'macOS'
+        with:
+          name: packages
+          path: dist
+      - name: Mac package (unsigned, the folder alone)
+        if: runner.os == 'macOS'
+        run: zsh pack_mac.sh
+      - name: Install from the package, as a user does
+        timeout-minutes: 20
+        run: |
+          case "$RUNNER_OS" in
+            Linux) PKG=LCA-Wrench-Linux.tar.gz ;; Windows) PKG=LCA-Wrench-Windows.zip ;; macOS) PKG=LCA-Wrench-Mac.zip ;;
+          esac
+          python scripts/ci_package.py install "dist/$PKG" "$APP"
+
+      - uses: actions/cache/restore@v4
+        id: data
+        with:
+          path: ${{ runner.temp }}/brightway
+          key: brightway-${{ runner.os }}-${{ hashFiles('setup_daten.py', 'requirements-lock.txt') }}
+      - name: Free demo data (BAFU 2025), set up by the installed version
+        timeout-minutes: 15
+        run: python scripts/ci_package.py data "$APP"
+      # saved right away: later the tests add their own project to this folder
+      - uses: actions/cache/save@v4
+        if: steps.data.outputs.cache-hit != 'true'
+        with:
+          path: ${{ runner.temp }}/brightway
+          key: ${{ steps.data.outputs.cache-primary-key }}
+      - name: Start with the package's start script, check the known result
+        timeout-minutes: 15
+        run: |
+          python scripts/ci_package.py start "$APP"
+          python scripts/ci_package.py reference
+          python scripts/ci_package.py stop "$APP"
+
+      - uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/uv-cache
+          key: uv-dev-${{ runner.os }}-${{ hashFiles('requirements-lock.txt', 'requirements-dev.txt') }}
+      - name: Test tools into the installation
+        id: dev
+        run: |
+          python scripts/ci_package.py dev "$APP"
+          PY=$(python scripts/ci_package.py python "$APP")
+          echo "py=$PY" >> "$GITHUB_OUTPUT"
+          echo "playwright=$("$PY" -m playwright --version | cut -d' ' -f2)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/ms-playwright
+            ~/Library/Caches/ms-playwright
+            ~/AppData/Local/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.dev.outputs.playwright }}
+      - name: Browsers (Chromium; WebKit on macOS)
+        timeout-minutes: 15
+        env:
+          PY: ${{ steps.dev.outputs.py }}
+        run: |
+          if [ "$RUNNER_OS" = macOS ]; then "$PY" -m playwright install chromium webkit ffmpeg
+          else "$PY" -m playwright install chromium ffmpeg; fi
+          if [ "$RUNNER_OS" = Linux ]; then "$PY" -m playwright install-deps chromium; fi
+
+      - name: Lint
+        run: '"${{ steps.dev.outputs.py }}" -m ruff check .'
+      - name: Tests (all, browser tests in Chromium)
+        timeout-minutes: 45
+        env:
+          LCA_WRENCH_BROWSER: chromium
+        run: '"${{ steps.dev.outputs.py }}" -m pytest -q -p no:cacheprovider'
+      - name: Browser tests in WebKit (Safari)
+        if: runner.os == 'macOS'
+        timeout-minutes: 20
+        env:
+          LCA_WRENCH_BROWSER: webkit
+        run: '"${{ steps.dev.outputs.py }}" -m pytest -q -p no:cacheprovider tests/test_browser.py tests/test_browser_ui.py'
+
+      - name: What a failure left behind
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: failure-${{ matrix.os }}
+          path: |
+            ${{ runner.temp }}/artifacts/
+            ${{ runner.temp }}/user/LCA-Wrench/installation-log.txt
+            ${{ runner.temp }}/user/LCA-Wrench/lca-wrench.log
+            ${{ runner.temp }}/user/LCA-Wrench/ci-server.log
+          if-no-files-found: ignore
+          retention-days: 14
+
+  update:
+    name: update from the last release (${{ matrix.os }})
+    needs: packages
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - name: Folders
+        run: |
+          {
+            echo "BRIGHTWAY2_DIR=$RUNNER_TEMP/brightway-update"  # empty: the old version sets up its data itself
+            echo "APP=$RUNNER_TEMP/user/LCA-Wrench"
+          } >> "$GITHUB_ENV"
+          mkdir -p "$RUNNER_TEMP/brightway-update"
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # the tags: setup_daten.py of the release, and its app for the Linux package below
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/download-artifact@v4
+        if: runner.os != 'macOS'
+        with:
+          name: packages
+          path: new
+      - name: Mac package of this commit
+        if: runner.os == 'macOS'
+        run: zsh pack_mac.sh && mkdir -p new && mv dist/LCA-Wrench-Mac.zip new/
+      - name: Package of the last release
+        run: |
+          # the public release pages, as a user downloads it: no token, no API
+          RELEASES="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases"
+          TAG=$(curl -fsSI "$RELEASES/latest" | tr -d '\r' | sed -n 's|^[Ll]ocation: .*/releases/tag/||p')
+          [ -n "$TAG" ] || { echo "No published release found at $RELEASES"; exit 1; }
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
+          case "$RUNNER_OS" in
+            Linux) PKG=LCA-Wrench-Linux.tar.gz ;; Windows) PKG=LCA-Wrench-Windows.zip ;; macOS) PKG=LCA-Wrench-Mac.zip ;;
+          esac
+          echo "PKG=$PKG" >> "$GITHUB_ENV"
+          mkdir -p old
+          if ! curl -fsSL --retry 3 -o "old/$PKG" "$RELEASES/download/$TAG/$PKG"; then
+            # v0.1.0 had no Linux package: its app with today's Linux scripts
+            [ "$RUNNER_OS" = Linux ] || exit 1
+            LCA_WRENCH_SCRIPTS_REF=HEAD bash pack_linux.sh "$TAG" && mv "dist/$PKG" old/
+          fi
+          git show "$TAG:setup_daten.py" > "$RUNNER_TEMP/setup_daten_release.py"
+          echo "Last release: $TAG ($PKG)"
+      - name: Install the last release, its data, the known result
+        timeout-minutes: 25
+        run: |
+          python scripts/ci_package.py install "old/$PKG" "$APP"
+          python scripts/ci_package.py data "$APP" --script "$RUNNER_TEMP/setup_daten_release.py"
+          python scripts/ci_package.py start "$APP"
+          python scripts/ci_package.py reference
+          python scripts/ci_package.py stop "$APP"
+      - name: Update to this commit, the same result on the same data
+        timeout-minutes: 15
+        run: |
+          python scripts/ci_package.py install "new/$PKG" "$APP"
+          python scripts/ci_package.py start "$APP"
+          python scripts/ci_package.py reference
+          python scripts/ci_package.py stop "$APP"
+      - name: What a failure left behind
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: update-failure-${{ matrix.os }}
+          path: |
+            ${{ runner.temp }}/user/LCA-Wrench/installation-log.txt
+            ${{ runner.temp }}/user/LCA-Wrench/lca-wrench.log
+            ${{ runner.temp }}/user/LCA-Wrench/ci-server.log
+          if-no-files-found: ignore
+          retention-days: 14

@@ -21,6 +21,7 @@ import logging
 import pickle
 import re
 import shutil
+import sys
 import threading
 import time
 from pathlib import Path
@@ -195,6 +196,7 @@ def remove_background(name: str) -> dict:
     if users:
         raise ValueError(_("«{name}» wird noch von {n} Prozess(en) in anderen Datenbanken verwendet.", name=name, n=len(users)))
     project = bd.projects.current
+    engine.forget(project)  # the cached calculations keep its processed file open (Windows cannot delete it then)
     if own_bio:
         _strip_methods(bio)
     for db in ([name, bio] if own_bio else [name]):
@@ -207,8 +209,8 @@ def remove_background(name: str) -> dict:
             raise ValueError(_("«{name}» liess sich nicht löschen. Einzelheiten in lca-wrench.log.", name=db))
         if processed:
             try:
-                Path(processed).unlink(missing_ok=True)  # Brightway leaves the matrix file (EXIOBASE: several hundred MB)
-            except OSError as e:  # Windows: still open in another program; the database is gone all the same
+                remove_file(Path(processed))  # Brightway leaves the matrix file (EXIOBASE: several hundred MB)
+            except OSError as e:  # still open after the retries (another program): the database is gone all the same
                 log.warning("Matrix file of %s not deleted: %s", db, e)
     backgrounds.forget(name)
     engine.bump_background(project)
@@ -273,6 +275,8 @@ def set_project(name: str, rebuild: bool = False) -> None:
     bd.projects.set_current(name)
     release_files()  # of the project left
     OPEN["project"] = name
+    if sys.platform == "win32":
+        engine.forget_others(name)  # Windows: release the other projects' files (WinError 32 for other programs)
     reg = registry.load()
     if reg.get("last_project") != name:
         reg["last_project"] = name
@@ -373,6 +377,56 @@ def pending_updates(name: str) -> list[str]:
     return sorted(k for k, u in Updates.UPDATES.items() if u["automatic"] and not done.get(k))
 
 
+def remove_project(name: str) -> None:
+    """Delete a project with its folder, also on Windows.
+
+    The project's cached calculations keep its processed files open, and Windows cannot delete an open file
+    (WinError 32): they are dropped first (engine.forget). bw2data unregisters the project before it removes the
+    folder, so a folder that is still locked, e.g. by a virus scanner or the search indexer for a moment, is removed
+    afterwards with a few retries; a left-over folder would block a new project of the same name."""
+    if bd.projects.current == name:
+        # leave it first: deleting the current project would switch to "default" with its automatic updates
+        bd.projects.set_current("default", update=False)
+    engine.forget(name)
+    folder = bd.projects._project_dir(ProjectDataset.get(ProjectDataset.name == name)) if name in bd.projects else None
+    try:
+        if name in bd.projects:
+            bd.projects.delete_project(name, delete_dir=True)
+    except OSError:
+        log.warning("Project %s unregistered, its folder is removed again", name)
+    remove_folder(folder)
+
+
+def _folder_taken(name: str, full_hash: bool) -> bool:
+    """A folder of that name without a registered project: left over where a deletion failed (on Windows before
+    0.1.1). A new copy takes the next name instead of failing with "Project directory already exists"."""
+    return (Path(bd.projects._base_data_dir) / safe_filename(name, full=full_hash)).exists()
+
+
+def remove_folder(folder: Path | None) -> None:
+    """shutil.rmtree, retried while Windows still reports files of it as open."""
+    _retry(folder, shutil.rmtree)
+
+
+def remove_file(path: Path) -> None:
+    """Path.unlink, retried while Windows still reports the file as open."""
+    _retry(path, Path.unlink)
+
+
+def _retry(path: Path | None, remove) -> None:
+    for wait in (0.2, 0.5, 1.0, 2.0, None):
+        if path is None or not Path(path).exists():
+            return
+        try:
+            remove(Path(path))
+            return
+        except OSError:
+            if wait is None:
+                raise
+            gc.collect()  # packages nobody refers to any more close their files when freed
+            time.sleep(wait)
+
+
 def copy_project_files(name: str) -> str:
     """A test copy of any project: copied file by file without opening the original, then opened (and converted, if
     Brightway wants to) as the copy. Everything in a test copy may be changed; the original stays as it is."""
@@ -380,7 +434,7 @@ def copy_project_files(name: str) -> str:
         raise KeyError(_("Projekt «{name}» gibt es nicht.", name=name))
     src = ProjectDataset.get(ProjectDataset.name == name)
     n, new = 1, _("{base} (LCA Wrench)", base=name)
-    while new in bd.projects:
+    while new in bd.projects or _folder_taken(new, src.full_hash):
         n += 1
         new = _("{base} (LCA Wrench {n})", base=name, n=n)
     src_dir = bd.projects._project_dir(src)
@@ -399,10 +453,9 @@ def copy_project_files(name: str) -> str:
             # leave the copy first: deleting the current project would switch to "default" with its automatic updates
             bd.projects.set_current(before if before and before in bd.projects else "default", update=False)
         if new in bd.projects:
-            release_files()
-            bd.projects.delete_project(new, delete_dir=True)
-        elif dst_dir.exists():
-            shutil.rmtree(dst_dir)
+            remove_project(new)
+        else:
+            remove_folder(dst_dir)
         raise
     reg = registry.load()
     reg.setdefault("testcopies", {})[new] = {"original": name, "created": time.strftime("%Y-%m-%dT%H:%M:%S")}
@@ -881,10 +934,13 @@ def make_working_copy() -> str:
     cur = bd.projects.current
     base = reg["copies"].get(cur, {}).get("original", cur)
     n, name = 1, _("{base} – Arbeitskopie", base=base)
-    while name in bd.projects:
+    while name in bd.projects or _folder_taken(name, bd.projects.dataset.full_hash):
         n += 1
         name = _("{base} – Arbeitskopie {n}", base=base, n=n)
     bd.projects.copy_project(name, switch=True)
+    # a reused name must not get the cached results of a deleted copy (the cache is keyed by name and versions)
+    engine.bump_background(name)
+    engine.bump_foreground(name)
     reg = registry.load()
     reg["copies"][name] = {"original": cur, "created": time.strftime("%Y-%m-%dT%H:%M:%S"), "changes": []}
     reg.get("journal", {}).pop(name, None)  # a reused name must not inherit the undo steps of a deleted copy
@@ -892,6 +948,12 @@ def make_working_copy() -> str:
     models_of = reg.get("models", {}).get(cur)
     if models_of:
         reg.setdefault("models", {})[name] = list(models_of)
+    # the copy calculates on the same background as its original (a reused name must not keep a deleted copy's)
+    bg_of = reg.get("backgrounds", {}).get(cur)
+    if bg_of:
+        reg.setdefault("backgrounds", {})[name] = dict(bg_of)
+    else:
+        reg.get("backgrounds", {}).pop(name, None)
     registry.save(reg)
     return name
 
@@ -914,11 +976,16 @@ def edit_exchange(exchange_id: int, amount: float) -> dict:
     if old == amount:
         return {"changed": False}
     output, inp = exc.output, exc.input
-    models.rescale_uncertainty(exc, old, float(amount))
-    exc["amount"] = float(amount)
-    exc.save()
     changes = reg["copies"][cur]["changes"]
     prior = next((c for c in changes if c["exchange"] == exchange_id), None)
+    unc = ({k: models._plain(exc.get(k)) for k in models.UNC_FIELDS}
+           if int(exc.get("uncertainty type") or 0) > 1 else None)
+    if prior and prior.get("unc") and float(amount) == prior["old"]:
+        models._apply_fields(exc, prior["unc"])  # back to the original amount: the distribution exactly as before
+    else:
+        models.rescale_uncertainty(exc, old, float(amount))
+    exc["amount"] = float(amount)
+    exc.save()
     if prior:
         prior["new"] = float(amount)
         if prior["new"] == prior["old"]:
@@ -926,7 +993,8 @@ def edit_exchange(exchange_id: int, amount: float) -> dict:
     else:
         changes.append({"exchange": exchange_id, "activity_id": str(output.id), "activity": output["name"],
                         "location": output.get("location"), "input": inp["name"], "unit": short_unit(inp.get("unit")),
-                        "old": old, "new": float(amount), "time": time.strftime("%Y-%m-%dT%H:%M:%S")})
+                        "old": old, "new": float(amount), "time": time.strftime("%Y-%m-%dT%H:%M:%S"),
+                        **({"unc": unc} if unc else {})})
     registry.save(reg)
     engine.bump_background(cur)
     return {"changed": True}

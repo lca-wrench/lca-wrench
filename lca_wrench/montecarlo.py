@@ -10,7 +10,8 @@ no uncertainty, then all draws are identical).
 The work is split over worker processes (one chunk of iterations each, own
 seed = seed + worker index). The same seed with the same number of workers
 reproduces the result exactly. The reference test (tests/test_montecarlo.py)
-compares a single worker against a plain bw2calc loop with the same seed.
+compares a single worker against a plain bw2calc loop with the same seeds
+(`mc_lca`: one independent seed per resource group, derived from the run seed).
 """
 
 from __future__ import annotations
@@ -56,18 +57,52 @@ def _factorize(A):
     return solve
 
 
+def _reseed(lca, seed: int, labels=("technosphere_mm", "biosphere_mm", "characterization_mm")) -> None:
+    """Give every resource group its own reproducible RNG seed and redraw the matrices.
+
+    `seed_override` alone hands the same seed to every group, so the k-th uncertain value of every datapackage
+    (two alternatives in separate databases, A and B, the factors) got the same variate: perfectly correlated.
+    Values shared by several products (the background) stay common to all of them, as they sit once in the matrix.
+    """
+    from stats_arrays import MCRandomNumberGenerator
+
+    for m, label in enumerate(labels):
+        mm = getattr(lca, label, None)
+        if mm is None:
+            continue
+        for g, group in enumerate(mm.groups):
+            if isinstance(getattr(group, "rng", None), MCRandomNumberGenerator):
+                sub = int(np.random.SeedSequence([seed, m, g]).generate_state(1)[0])
+                group.rng = MCRandomNumberGenerator(params=group.data_original, seed=sub)
+        mm.rebuild_matrix()
+    lca.technosphere_matrix = lca.technosphere_mm.matrix
+    lca.biosphere_matrix = lca.biosphere_mm.matrix
+    if hasattr(lca, "characterization_mm"):
+        lca.characterization_matrix = lca.characterization_mm.matrix
+
+
+def mc_lca(demand: dict, method: tuple, seed: int):
+    """bw2calc LCA with distributions, independent seeds per resource group (see _reseed), first draw solved."""
+    lca = bc.LCA(demand, tuple(method), use_distributions=True, seed_override=seed)
+    lca.lci()
+    lca.lcia()
+    _reseed(lca, seed)
+    lca._delete_solver_state()
+    lca.lci_calculation()
+    lca.lcia_calculation()
+    return lca
+
+
 def run_chunk(project: str, fus: list[tuple[int, float]], methods: list[tuple], n: int, seed: int,
               progress=None, slot: int = 0) -> np.ndarray:
     """n coupled iterations for all fus and methods. Returns an array (n, len(fus), len(methods))."""
     bd.projects.set_current(project)
     nodes = {nid: bd.get_node(id=nid) for nid, _ in fus}
-    lca = bc.LCA({node: 1 for node in nodes.values()}, tuple(methods[0]), use_distributions=True, seed_override=seed)
-    lca.lci()
-    lca.lcia()
+    lca = mc_lca({node: 1 for node in nodes.values()}, methods[0], seed)
     cms = [lca.characterization_mm]
     for k, m in enumerate(methods[1:], start=1):
-        lca.seed_override = seed + 100_003 * k
         lca.switch_method(tuple(m))
+        _reseed(lca, seed + 100_003 * k, ("characterization_mm",))
         cms.append(lca.characterization_mm)
     demands = []
     for nid, amount in fus:
@@ -304,9 +339,7 @@ def _sens_pilot_chunk(project, fu, method, n, seed):
     """n pilot draws: running mean and spread of every data value of A and B; chunk 0 also the sensitivities."""
     bd.projects.set_current(project)
     nid, amount = fu
-    lca = bc.LCA({nid: amount}, tuple(method), use_distributions=True, seed_override=seed)
-    lca.lci()
-    lca.lcia()
+    lca = mc_lca({nid: amount}, method, seed)
     A, B = _matrices(lca)
     stats = {"n": 0, "mA": np.zeros(A.nnz), "m2A": np.zeros(A.nnz), "mB": np.zeros(B.nnz), "m2B": np.zeros(B.nnz)}
     meta = None
@@ -387,9 +420,7 @@ def _sens_main_chunk(project, fu, method, n, seed, a_idx, b_idx, sobol=()):
     too, as an array (pairs, len(sobol))."""
     bd.projects.set_current(project)
     nid, amount = fu
-    lca = bc.LCA({nid: amount}, tuple(method), use_distributions=True, seed_override=seed)
-    lca.lci()
-    lca.lcia()
+    lca = mc_lca({nid: amount}, method, seed)
     scores = np.empty(n)
     xa, xb = np.empty((n, len(a_idx))), np.empty((n, len(b_idx)))
     fab = np.empty((n // 2, len(sobol)))

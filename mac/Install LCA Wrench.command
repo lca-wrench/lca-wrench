@@ -22,6 +22,16 @@ pause() { if [ -t 0 ]; then echo; read -n 1 -s -r -p "Press any key to close"; e
 fail() { echo; echo "ERROR: $1"; echo "Log: $DIR/installation-log.txt"; pause; exit 1; }
 trap 'fail "Installation stopped (line $LINENO). Check the internet connection and run it again."' ERR
 
+# Runs only from the release package (pack_mac.sh puts this script next to lca_wrench and the requirements).
+# Started from a clone or from "Source code (zip)", nothing fits: stop before anything is written here.
+if [ ! -f requirements-lock.txt ]; then
+  echo "ERROR: this folder is not the LCA Wrench installation package (it looks like the source code)."
+  echo "Download LCA-Wrench-Mac.zip from the release page and open \"Install LCA Wrench\" there:"
+  echo "  https://github.com/lca-wrench/lca-wrench/releases/latest"
+  echo "\"Source code (zip)\" on that page is not the installer. To run from source, see \"From source\" in README.md."
+  pause; exit 1
+fi
+
 mkdir -p "$DIR/.tools" 2>/dev/null && touch "$DIR/.tools/.write-test" 2>/dev/null && rm -f "$DIR/.tools/.write-test" \
   || { echo "ERROR: no write access to $DIR"
        echo "Move the folder to Documents, or allow Terminal access (System Settings → Privacy & Security → Files and Folders)."
@@ -44,7 +54,7 @@ if [ -f FILES.txt ]; then
   if [ ${#MISSING[@]} -gt 0 ]; then
     echo "Missing in this folder (${#MISSING[@]} files), e.g.:"
     printf '  %s\n' "${MISSING[@]:0:5}"
-    fail "This folder is incomplete. Unpack the zip again into a new, empty folder (not over an older one) and run the installation there."
+    fail "This folder is incomplete. Run the installer of the package again into this folder (README.txt, \"Updating\"), or into a new, empty folder."
   fi
 fi
 
