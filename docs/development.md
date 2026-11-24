@@ -11,7 +11,9 @@ Setup and contribution rules: [../CONTRIBUTING.md](../CONTRIBUTING.md).
 ```
 
 Without the script: `python -m ruff check . && python -m pytest -q`. The GitHub workflow `.github/workflows/check.yml`
-runs the same on Linux for every pull request and push to main.
+runs the same on Linux and on Windows for every pull request and push to main. Windows matters because it cannot
+delete a file that is still open: a project or a background database whose files LCA Wrench (or a test) keeps open
+cannot be removed there, while on Linux and macOS it can.
 
 The browser tests (`tests/test_browser.py`, Playwright) drive the installed Google Chrome and start their own local
 process on port 8795 in the project `lca-wrench-test`. They go through the tour, create the example model, change an

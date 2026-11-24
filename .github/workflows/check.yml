@@ -1,5 +1,6 @@
-# Lint and tests, as ./check.sh runs them locally. The tests need the free BAFU 2025 project (setup_daten.py, 62 MB
-# from files.brightway.dev); the Brightway folder is cached so it is downloaded once per change of setup_daten.py.
+# Lint and tests, as ./check.sh runs them locally, on Linux and on Windows: Windows cannot delete open files, so some
+# faults show only there. The tests need the free BAFU 2025 project (setup_daten.py, 62 MB from files.brightway.dev);
+# the Brightway folder is cached so it is downloaded once per change of setup_daten.py.
 name: check
 on:
   pull_request:
@@ -12,8 +13,19 @@ permissions:
   contents: read
 jobs:
   check:
-    runs-on: ubuntu-latest
-    timeout-minutes: 40
+    strategy:
+      fail-fast: false  # a fault on one system does not stop the run on the other
+      matrix:
+        include:
+          - os: ubuntu-latest
+            minutes: 40
+          - os: windows-latest
+            minutes: 90  # slower; the whole suite took 41 minutes on a Windows laptop
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: ${{ matrix.minutes }}
+    defaults:
+      run:
+        shell: bash  # Git Bash on Windows: the same commands on both
     env:
       BRIGHTWAY2_DIR: ${{ github.workspace }}/.brightway
       PYTHON: python
@@ -28,10 +40,13 @@ jobs:
       - run: pip install -r requirements-lock.txt
       - run: pip install -r requirements-dev.txt
       - run: python -m ruff check .
+        if: runner.os == 'Linux'  # the same code on both; once is enough
       - uses: actions/cache@v4
         with:
           path: .brightway
-          key: brightway-${{ hashFiles('setup_daten.py', 'requirements-lock.txt') }}
+          key: brightway-${{ runner.os }}-${{ hashFiles('setup_daten.py', 'requirements-lock.txt') }}
       - run: mkdir -p .brightway && python setup_daten.py
+      # the browser tests use the installed Google Chrome: on Linux with its system libraries; Windows runners have it
       - run: python -m playwright install --with-deps chrome
+        if: runner.os == 'Linux'
       - run: python -m pytest -q
