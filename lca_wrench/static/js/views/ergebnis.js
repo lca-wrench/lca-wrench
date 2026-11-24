@@ -3,8 +3,9 @@
 import { S, esc, nf, pct, U, explain, bars, methodInfo, methodLabel, familyLabel, mKey, api, topicNames, t } from '../core.js';
 import { treeSvg, sankeySvg } from '../charts.js';
 import { loadCw, tCw } from './crosswalk.js';
+import { locale } from '../i18n.js';
 
-export const tabs = () => [['beitraege', t('Beiträge')], ['kategorien', t('Alle Kategorien')], ['sankey', t('Sankey')], ['lieferkette', t('Lieferkette')], ['inventar', t('Inventar')], ['profil', t('Umweltprofil')], ['warum', t('Warum anders?')], ['versionen', t('Versionen')], ['crosswalk', t('Andere Datenbank')]];
+export const tabs = () => [['beitraege', t('Beiträge')], ['kategorien', t('Alle Kategorien')], ['einzelwert', t('Einzelwert')], ['sankey', t('Sankey')], ['lieferkette', t('Lieferkette')], ['inventar', t('Inventar')], ['profil', t('Umweltprofil')], ['warum', t('Warum anders?')], ['versionen', t('Versionen')], ['crosswalk', t('Andere Datenbank')]];
 
 export async function loadErgebnis() {
   if (!S.fu) return;
@@ -18,6 +19,7 @@ export async function loadErgebnis() {
   }
   if (S.tab === 'warum' && (!S.why || S.why._key !== key())) { S.why = await api('/api/why', base); S.why._key = key(); }
   if (S.tab === 'kategorien') await loadCats();
+  if (S.tab === 'einzelwert') await loadSS();
   if (S.tab === 'versionen') await loadTargets();
   if (S.tab === 'crosswalk') await loadCw();
   if (S.tab === 'inventar' && (!S.inv || S.inv._key !== key())) {
@@ -48,14 +50,17 @@ export async function loadCats() {
   }
 }
 
-const key = () => JSON.stringify([S.fu.id, S.fu.amount, S.method, S.st.journal.length, S.st.changes.length, S.st.completion?.enabled, S.st.flowmap?.enabled]);
-export function resetErgebnis() { S.cats.res = null; S.calc = S.sankey = S.graph = S.inv = S.why = null; S.gsel = S.sksel = null; S.fuVerify = null; S.ver = { ...S.ver, res: null, detail: null, k: null, error: null }; S.cw = { ...S.cw, res: null, error: null, open: null, hits: null, trace: {} }; }
+const key = () => JSON.stringify([S.fu.id, S.fu.amount, S.method, S.st.journal.length, S.st.changes.length, S.st.completion?.enabled, S.st.flowmap?.enabled, S.st.regional?.enabled]);
+export function resetErgebnis() { S.cats.res = null; S.calc = S.sankey = S.graph = S.inv = S.why = null; S.gsel = S.sksel = null; S.fuVerify = null; S.ver = { ...S.ver, res: null, detail: null, k: null, error: null }; S.cw = { ...S.cw, res: null, error: null, open: null, hits: null, trace: {} }; S.ss = { ...S.ss, res: null, error: null }; }
 
 // what the method does not assess: inventory flows without a factor, and the switch for completed factors
 function factorNotice(r) {
   const f = r.factors;
   const sw = f.completable ? `<label class="row" style="gap:6px;font-size:13.5px" title="${t('Die Methode hat für manche Stoffe nur einen Faktor auf dem Fluss ohne Subkompartiment. Ein Fluss ohne Faktor bekommt dann den Faktor des gleichnamigen Flusses ohne Subkompartiment im selben Kompartiment. Eigene Faktoren der Methode (auch 0) bleiben, Langzeit-Emissionen werden nie ergänzt. Gilt für alle Rechnungen.')}"><input type="checkbox" id="complChk" ${f.completion ? 'checked' : ''}> ${t('Fehlende Faktoren für Subkompartimente ergänzen ({n} in dieser Methode)', { n: nf(f.completable) })}</label>` : '';
-  if (!f.uncharacterized && !sw) return '';
+  const g = r.regional || {};
+  let rsw = g.available ? `<label class="row" style="gap:6px;font-size:13.5px" title="${t('Die Methode hat Faktoren, die vom Ort abhängen (Zeilen mit Ort oder Länderkopien von Flüssen). Ein Prozess bekommt den Faktor seines Orts, ein Teil eines Landes den des Landes, eine Region das Mittel ihrer Länder (nach Produktionsmenge der gleichen Datensätze dort, sonst nach der Produktion ihrer Branche laut EXIOBASE, sonst gleich gewichtet). GLO, RoW und unbekannte Orte behalten den normalen Faktor. Gilt für alle Rechnungen.')}"><input type="checkbox" id="regChk" ${g.enabled ? 'checked' : ''}> ${t('Faktoren nach Ort anwenden ({k} Ort(e) in dieser Methode)', { k: nf(g.locations) })}</label>` : '';
+  rsw += regFiles(g);
+  if (!f.uncharacterized && !sw && !rsw) return '';
   // loud only where it matters: the namesakes would add more than 0.1 % of the result. Most flows of an inventory
   // have no factor in any one method (a climate method assesses a few dozen of some thousand), which is normal.
   const loud = f.namesakes > 0 && Math.abs(f.estimate) > 1e-3 * Math.abs(r.score || 0);
@@ -64,7 +69,43 @@ function factorNotice(r) {
     : loud ? `<b>${t('{k} von {n} Flüssen haben keinen Faktor; {s} tragen denselben Namen wie ein bewerteter Fluss.', { k: nf(f.uncharacterized), n: nf(f.flows), s: nf(f.namesakes) })}</b>${est}`
       : t('{k} von {n} Flüssen des Inventars haben in dieser Methode keinen Faktor.', { k: nf(f.uncharacterized), n: nf(f.flows) });
   const link = f.uncharacterized ? ` <button class="linkbtn" data-act="inv-filter" data-k="none">${t('Liste zeigen')}</button>` : '';
-  return `<div id="factorNotice" class="${loud ? 'warnbox' : 'row muted'}" style="${loud ? 'flex-direction:column;gap:6px' : 'font-size:13.5px;justify-content:space-between'}"><span>${txt}${link}</span>${sw}</div>`;
+  return `<div id="factorNotice" class="${loud ? 'warnbox' : 'row muted'}" style="${loud ? 'flex-direction:column;gap:6px' : 'font-size:13.5px;justify-content:space-between'}"><span>${txt}${link}</span>${sw}${rsw}</div>`;
+}
+
+// the JRC's EF 3.1 workbook with factors by country: which loaded file this method uses, else a button to load one
+function regFiles(g) {
+  const used = g.files || [], loaded = g.loaded_files || [];
+  if (used.length) {
+    return used.map(x => `<span class="row" style="gap:6px;font-size:13px">${t('Länderfaktoren aus «{file}», geladen am {date}', { file: esc(x.file), date: esc(x.loaded) })}<button class="linkbtn" data-act="reg-unload" data-k="${esc(x.id)}">${t('entfernen')}</button></span>`).join('');
+  }
+  if (!g.loadable) return '';
+  const tip = t('Die JRC veröffentlicht die Faktoren von EF 3.1 als Excel-Datei («EF-LCIAMethod_CF», im EF reference package 3.1). LCA Wrench liest daraus die Faktoren nach Land für Wassernutzung, Landnutzung, Versauerung und terrestrische Eutrophierung und behält sie auf diesem Computer. Sie gelten in allen Projekten für die EF-3.1-Methoden auf der EF-Flussliste und über die Flusszuordnung für die von ecoinvent. Lesen dauert etwa eine halbe Minute.');
+  if (loaded.length) {
+    return `<span class="muted" style="font-size:13px">${t('Die geladenen Länderfaktoren ({files}) passen nicht zu dieser Methode: Sie gelten für Methoden, deren Faktoren den Standardfaktoren der Datei entsprechen.', { files: esc(loaded.map(x => x.file).join(', ')) })} ${loaded.map(x => `<button class="linkbtn" data-act="reg-unload" data-k="${esc(x.id)}">${t('«{file}» entfernen', { file: esc(x.file) })}</button>`).join(' ')}</span>`;
+  }
+  return `<label class="btn small" style="cursor:pointer" title="${tip}">${t('Länderfaktoren aus der EF-3.1-Datei laden …')}<input type="file" id="regFile" accept=".xlsx" hidden></label>`;
+}
+
+// impact by the location of the processes that cause it; with factors by location, what they change and how found
+function locTable(r) {
+  const rows = r.by_location || [], g = r.regional || {}, u = esc(r.method_unit);
+  const withReg = g.available && g.enabled;
+  const max = Math.max(...rows.map(x => Math.abs(x.value)), 1e-300);
+  const sign = v => v > 0 ? '+' : v < 0 ? '−' : '';
+  const num = v => Math.abs(v) >= 1e-4 || !v ? nf(v) : v.toExponential(2).replace('e', ' e');  // tiny changes readable
+  const weighting = { volume: t('nach Produktionsmenge'), exiobase: t('nach Produktion der Branche laut EXIOBASE'), equal: t('gleich gewichtet'), mixed: t('je nach Datensatz anders gewichtet') };
+  const how = x => x.how === 'own' ? t('Faktor des Orts') : x.how === 'country' ? t('Faktor des Landes')
+    : x.how === 'region' ? t('Mittel der Länder, {w}', { w: weighting[x.weighting] || weighting.equal })
+      : x.kind === 'rest' || x.kind === 'global' ? t('normaler Faktor (Weltmittel)') : t('normaler Faktor');
+  if (!rows.length) return `<p class="empty">${t('Kein Prozess trägt direkt zum Ergebnis bei.')}</p>`;
+  return `<div class="tblwrap"><table class="tbl" id="locTbl"><thead><tr><th>${t('Ort')}</th><th style="text-align:right">${t('Wirkung')} (${u})</th><th>${t('Anteil')}</th>
+    ${withReg ? `<th style="text-align:right" title="${t('Was die Faktoren nach Ort an diesem Ort gegenüber den normalen Faktoren ändern.')}">${t('davon Faktoren nach Ort')}</th><th>${t('Faktor')}</th>` : ''}<th style="text-align:right">${t('Anzahl Prozesse')}</th></tr></thead><tbody>
+    ${rows.map(x => `<tr><td><b>${esc(x.location || '–')}</b>${x.name ? ` <span class="muted">${esc(x.name)}</span>` : ''}</td>
+      <td class="num nw" style="text-align:right">${nf(x.value)}</td>
+      <td style="width:22%"><div class="share"><div class="t"><i class="${x.value < 0 ? 'neg' : r.score && x.value / r.score >= 0.25 ? 'hot' : ''}" style="width:${Math.abs(x.value) / max * 100}%"></i></div><span>${pct(r.score ? x.value / r.score : 0)}</span></div></td>
+      ${withReg ? `<td class="num nw" style="text-align:right">${x.regional ? sign(x.regional) + num(Math.abs(x.regional)) : ''}</td><td class="muted" style="font-size:13px">${how(x)}</td>` : ''}
+      <td class="num" style="text-align:right">${nf(x.processes)}</td></tr>`).join('')}
+  </tbody></table></div>`;
 }
 
 const busy = () => `<p class="busy">${t('Rechne …')}</p>`;
@@ -87,7 +128,7 @@ export function vErgebnis() {
     </div>
     ${r ? `<div class="row" style="justify-content:space-between;align-items:flex-end">
       <div><span class="eyebrow">${esc(methodLabel(methodInfo()))}</span><div class="kpi"><span class="big">${nf(r.score)}</span><span class="u">${esc(r.method_unit)}</span></div></div>
-      <div class="row">${check}<span class="chip" title="${t('Zeit für Rechnung und Auswertung')}">${t('{ms} ms · {n} Produkte', { ms: nf(r.seconds * 1000), n: nf(r.matrix_size) })}</span>${r.factors.completed ? `<button class="chip acc" id="complChip" data-act="inv-filter" data-k="completed" title="${t('{n} Flüsse dieses Inventars haben keinen eigenen Faktor in der Methode und rechnen mit dem Faktor des gleichnamigen Flusses ohne Subkompartiment. Das sind {v} {u} des Ergebnisses. Klick zeigt die Liste.', { n: nf(r.factors.completed), v: nf(r.factors.completed_value), u: esc(r.method_unit) })}">${t('mit {n} ergänzten Faktoren', { n: nf(r.factors.completed) })}</button>` : ''}${r.model ? `<span class="chip acc">${t('eigenes Modell, live')}</span>` : ''}${r.counterpart ? `<span class="chip hot" title="${esc(r.counterpart.name)} · ${esc(r.counterpart.location || '')}">${t('gerechnet als {db}', { db: esc(r.counterpart.database) })}</span>` : ''}${S.st.background && S.st.background.options.length > 1 ? `<span class="chip" title="${t('Hintergrunddaten dieser Rechnung (unter Start wählen)')}">${esc(r.background.join(' + '))}</span>` : ''}</div>
+      <div class="row">${check}<span class="chip" title="${t('Zeit für Rechnung und Auswertung')}">${t('{ms} ms · {n} Produkte', { ms: nf(r.seconds * 1000), n: nf(r.matrix_size) })}</span>${r.factors.completed ? `<button class="chip acc" id="complChip" data-act="inv-filter" data-k="completed" title="${t('{n} Flüsse dieses Inventars haben keinen eigenen Faktor in der Methode und rechnen mit dem Faktor des gleichnamigen Flusses ohne Subkompartiment. Das sind {v} {u} des Ergebnisses. Klick zeigt die Liste.', { n: nf(r.factors.completed), v: nf(r.factors.completed_value), u: esc(r.method_unit) })}">${t('mit {n} ergänzten Faktoren', { n: nf(r.factors.completed) })}</button>` : ''}${r.regional?.enabled && r.regional.processes ? `<button class="chip acc" id="regChip" data-act="contrib-loc" title="${t('{n} Prozesse rechnen mit dem Faktor ihres Orts statt dem normalen Faktor. Das ändert das Ergebnis um {v} {u}. Klick zeigt das Ergebnis nach Ort.', { n: nf(r.regional.processes), v: (r.regional.effect > 0 ? '+' : '') + nf(r.regional.effect), u: esc(r.method_unit) })}">${t('mit Faktoren nach Ort')}</button>` : ''}${r.model ? `<span class="chip acc">${t('eigenes Modell, live')}</span>` : ''}${r.counterpart ? `<span class="chip hot" title="${esc(r.counterpart.name)} · ${esc(r.counterpart.location || '')}">${t('gerechnet als {db}', { db: esc(r.counterpart.database) })}</span>` : ''}${S.st.background && S.st.background.options.length > 1 ? `<span class="chip" title="${t('Hintergrunddaten dieser Rechnung (unter Start wählen)')}">${esc(r.background.join(' + '))}</span>` : ''}</div>
     </div>${factorNotice(r)}` : busy()}
     ${setupIndex() >= 0 && S.setupRes.fus.length > 1 ? `<label class="f">${t('Produkt aus der Rechnung «{name}»', { name: esc(S.setup?.name || '') })}<select id="fuSetup">${S.setupRes.fus.map((f, i) => `<option value="${i}" ${i === setupIndex() ? 'selected' : ''}>${esc(f.name)} ${esc(f.location || '')} · ${nf(f.amount)} ${esc(f.unit || '')}</option>`).join('')}</select></label>` : ''}
     <div class="row"><button class="btn small" data-act="add-setup" data-k="${S.fu.id}">${t('Zur Rechnung')}</button><button class="btn small" data-act="add-cmp-fu">${t('Zum Vergleich')}</button><button class="btn small" data-act="open" data-k="${S.fu.id}" data-db="${esc(S.fu.database || '')}">${t('Datenblatt')}</button>
@@ -95,16 +136,16 @@ export function vErgebnis() {
   </section>
   <nav class="tabs" role="tablist" aria-label="${t('Auswertungen')}">${tabs().filter(([k]) => (k !== 'profil' || S.st.profile_family) && (k !== 'warum' || (S.st.is_copy && S.st.changes.length)) && (k !== 'versionen' || !r?.model)).map(([k, l]) => `<button role="tab" aria-selected="${S.tab === k}" data-act="tab" data-k="${k}">${l}</button>`).join('')}</nav>`;
   if (!r) return head;
-  return head + ({ beitraege: tBeitraege, kategorien: tKategorien, sankey: tSankey, lieferkette: tTree, inventar: tInventar, profil: tProfil, warum: tWarum, versionen: tVersionen, crosswalk: tCw })[S.tab]();
+  return head + ({ beitraege: tBeitraege, kategorien: tKategorien, einzelwert: tEinzelwert, sankey: tSankey, lieferkette: tTree, inventar: tInventar, profil: tProfil, warum: tWarum, versionen: tVersionen, crosswalk: tCw })[S.tab]();
 }
 
 function tBeitraege() {
   const r = S.calc, mode = S.contrib;
-  return `${explain(t('<b>Wo</b> entsteht die Wirkung? Nach Prozess: direkte Emissionen jedes Prozesses in der ganzen Lieferkette. Nach Stoff: welche Emissionen oder Ressourcen dahinterstecken. Klick auf einen Prozess öffnet sein Datenblatt.'))}
+  return `${explain(t('<b>Wo</b> entsteht die Wirkung? Nach Prozess: direkte Emissionen jedes Prozesses in der ganzen Lieferkette. Nach Stoff: welche Emissionen oder Ressourcen dahinterstecken. Nach Ort: an welchen Orten die Prozesse liegen, die ausstossen oder Ressourcen nutzen. Klick auf einen Prozess öffnet sein Datenblatt.'))}
   <section class="card" style="display:flex;flex-direction:column;gap:12px">
     <div class="row" style="justify-content:space-between"><h3>${t('Wo entsteht die Wirkung?')}</h3>
-      <div class="seg" role="group" aria-label="${t('Beiträge nach')}"><button data-act="contrib" data-k="act" aria-pressed="${mode === 'act'}">${t('nach Prozess')}</button><button data-act="contrib" data-k="flow" aria-pressed="${mode === 'flow'}">${t('nach Stoff')}</button></div></div>
-    <div class="bars">${mode === 'act' ? bars(r.by_activity, r.by_activity_rest, r.score, 'open') : bars(r.by_flow, r.by_flow_rest, r.score, null)}</div>
+      <div class="seg" role="group" aria-label="${t('Beiträge nach')}"><button data-act="contrib" data-k="act" aria-pressed="${mode === 'act'}">${t('nach Prozess')}</button><button data-act="contrib" data-k="flow" aria-pressed="${mode === 'flow'}">${t('nach Stoff')}</button><button data-act="contrib" data-k="loc" aria-pressed="${mode === 'loc'}">${t('nach Ort')}</button></div></div>
+    ${mode === 'loc' ? locTable(r) : `<div class="bars">${mode === 'act' ? bars(r.by_activity, r.by_activity_rest, r.score, 'open') : bars(r.by_flow, r.by_flow_rest, r.score, null)}</div>`}
   </section>`;
 }
 
@@ -144,6 +185,59 @@ function tKategorien() {
       ${f.rows.length ? `<div class="tblwrap"><table class="tbl">${head(false, R.bars)}<tbody>${f.rows.map((r, i) => R.html(r, fi, i)).join('')}</tbody></table></div>` : `<p class="muted">${t('Keine Kategorie dieser Art.')}</p>`}</section>`;
   };
   return `${controls}<div class="catgrid ${c.res.families.length > 1 ? 'two' : ''}">${c.res.families.map(card).join('')}</div>`;
+}
+
+// ---------- single score: EF 3.1, ReCiPe 2016 endpoint, total UBP of ecological scarcity 2021 ----------
+
+// the sets the project's methods allow (by project and number of methods); the score of the chosen set
+const ssKey = () => JSON.stringify([S.fu.id, S.fu.amount, S.st.journal.length, S.st.changes.length, S.st.completion?.enabled, S.st.flowmap?.enabled, S.ss.set, S.ss.w]);
+export async function loadSS() {
+  const s = S.ss, k = S.st.project + '|' + S.st.methods.length + '|' + S.fu.id;
+  if (s.setsKey !== k) { s.sets = (await api(`/api/singlescore/sets?id=${encodeURIComponent(S.fu.id)}`)).sets; s.setsKey = k; s.res = null; }
+  if (!s.sets.length) return;
+  const ok = x => x && x.coverage !== 'missing';
+  if (!s.sets.some(x => x.id === s.set) || (!s.picked && !ok(s.sets.find(x => x.id === s.set)))) { s.set = (s.sets.find(ok) || s.sets[0]).id; s.w = null; }
+  if (s.res && s.res._key === ssKey()) return;
+  s.error = null;
+  try { s.res = await api('/api/singlescore', { id: S.fu.id, amount: S.fu.amount, set: s.set, weighting: s.w }); s.res._key = ssKey(); }
+  catch (e) { s.res = null; s.error = e.message; }
+}
+
+function tEinzelwert() {
+  const s = S.ss, r = s.res;
+  const intro = explain(t('Ein <b>Einzelwert</b> fasst die Wirkungskategorien einer Methode in einer Zahl zusammen. <b>EF 3.1</b>: jede der 16 Kategorien geteilt durch die Jahreswirkung einer Person (Normalisierung), mal ihr Gewicht, in Millipunkten (mPt). <b>ReCiPe 2016 Endpoint</b>: menschliche Gesundheit, Ökosysteme und Ressourcen, normalisiert und gewichtet, in Punkten (1000 Pt sind die Jahreswirkung einer Person). <b>Ökologische Knappheit 2021</b>: die Ökofaktoren gewichten schon, der Einzelwert ist das Total in UBP. Gewichten ist eine Wertung: wer vergleicht, schaut auch auf die Kategorien.'));
+  if (!s.sets) return intro + busy();
+  if (!s.sets.length) return intro + `<p class="empty">${t('In diesem Projekt fehlen die Methoden für einen Einzelwert: EF 3.1, ReCiPe 2016 Endpoint oder ökologische Knappheit 2021.')}</p>`;
+  const cur = s.sets.find(x => x.id === s.set) || s.sets[0];
+  const w = s.w || cur.weighting;
+  const found = cur.kind === 'ef31' ? t('{n} von 16 Kategorien', { n: cur.found }) : cur.kind === 'recipe2016' ? t('{n} von 3 Schutzgütern', { n: cur.found }) : t('{n} Kategorien', { n: cur.found });
+  const controls = `<section class="card row" style="justify-content:space-between">
+    <span class="muted" style="font-size:13.5px">${found}</span>
+    <div class="row"><label class="f">${t('Einzelwert')}<select id="ssSel">${s.sets.map(x => `<option value="${esc(x.id)}" ${x.id === cur.id ? 'selected' : ''}>${esc(x.label)}${x.coverage === 'missing' ? ' · ' + t('unvollständig für dieses Produkt') : ''}</option>`).join('')}</select></label>
+      ${cur.kind === 'recipe2016' ? `<label class="f" title="${t('Gewichte der Schutzgüter (Panel von Eco-indicator 99): I/I individualistisch, H/A hierarchistisch mit Durchschnittsgewichten, H/H hierarchistisch, E/E egalitär')}">${t('Gewichtung')}<select id="ssW">${cur.weightings.map(x => `<option value="${esc(x)}" ${x === w ? 'selected' : ''}>${esc(x)}${x === cur.weighting ? ' · ' + t('Standard für {p}', { p: cur.perspective }) : ''}</option>`).join('')}</select></label>` : ''}</div></section>`;
+  if (s.error) return intro + controls + `<div class="warnbox"><b>${t('Hinweis')}</b><span>${esc(s.error)}</span></div>`;
+  if (!r) return intro + controls + busy();
+  const weighted = r.kind !== 'es2021', recipe = r.kind === 'recipe2016';
+  const num = (v, digits) => v === null || v === undefined ? '–' : digits ? v.toLocaleString(locale(), { maximumFractionDigits: digits }) : nf(v);
+  // ReCiPe: the three areas of protection with their sums; the table by area, the largest first
+  const areas = recipe ? [...new Set(r.rows.map(x => x.group))].map(g => ({ g, v: r.rows.filter(x => x.group === g).reduce((a, x) => a + x.score, 0) })).sort((a, b) => Math.abs(b.v) - Math.abs(a.v)) : [];
+  const rows = recipe ? areas.flatMap(a => r.rows.filter(x => x.group === a.g)) : r.rows;
+  const td = v => `<td class="num nw" style="text-align:right">${v}</td>`;
+  const head = `<tr>${recipe ? `<th>${t('Schutzgut')}</th>` : ''}<th>${t('Kategorie')}</th><th style="text-align:right">${t('Ergebnis')}</th><th>${t('Einheit')}</th>${weighted ? `<th style="text-align:right" title="${t('Die Jahreswirkung einer Person (Welt)')}">${t('Normalisierung pro Person')}</th><th style="text-align:right" title="${t('Ergebnis geteilt durch die Normalisierung: Personenjahre')}">${t('Normalisiert')}</th><th style="text-align:right">${r.kind === 'ef31' ? t('Gewicht (%)') : t('Gewicht (Pt)')}</th><th style="text-align:right">${esc(r.unit)}</th>` : ''}<th style="text-align:right">${t('Anteil')}</th></tr>`;
+  const body = rows.map(x => `<tr>${recipe ? `<td class="muted">${esc(x.group || '')}</td>` : ''}<td><button class="linkbtn" data-act="ss-open" data-k="${r.rows.indexOf(x)}" title="${t('Beiträge zu dieser Kategorie zeigen')}">${esc(x.label)}</button>${x.coverage === 'missing' ? ` <span class="chip hot">${t('nicht bewertet')}</span>` : x.coverage === 'mapped' ? ` <span class="chip acc">${t('bewertet (Flusszuordnung)')}</span>` : ''}</td>${td(nf(x.result))}<td class="muted nw">${esc(x.unit)}</td>${weighted ? td(num(x.normalisation)) + td(num(x.normalised)) + td(num(x.weight, 2)) + td(nf(x.score)) : ''}${td(x.share === null ? '–' : pct(x.share))}</tr>`).join('');
+  const shown = r.rows.filter(x => Math.abs(x.score) > 0);
+  return intro + controls + `<section class="card" style="display:flex;flex-direction:column;gap:12px">
+    ${r.warning ? `<div class="warnbox"><b>${t('Unvollständig')}</b><span>${esc(r.warning)}</span></div>` : ''}
+    <div class="row" style="justify-content:space-between;align-items:flex-end">
+      <div><span class="eyebrow">${esc(r.label)}${recipe ? ' · ' + t('Gewichtung {w}', { w: esc(r.weighting) }) : ''}</span><div class="kpi"><span class="big">${nf(r.total)}</span><span class="u">${esc(r.unit)}</span></div></div>
+      ${areas.length ? `<div class="row">${areas.map(a => `<span class="chip">${esc(a.g)}: <span class="num">${nf(a.v)}</span> ${esc(r.unit)}</span>`).join('')}</div>` : ''}
+    </div>
+    <div class="bars">${bars(shown.map(x => ({ name: x.label, categories: recipe && x.group !== x.label ? x.group : '', value: x.score })), 0, r.total, null)}</div>
+  </section>
+  <section class="card" style="display:flex;flex-direction:column;gap:10px"><h3>${t('Rechenweg')}</h3>
+    <div class="tblwrap"><table class="tbl"><thead>${head}</thead><tbody>${body}</tbody></table></div>
+    ${r.notes.length ? `<ul class="muted" style="font-size:13px;margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px">${r.notes.map(n => `<li>${esc(n)}</li>`).join('')}</ul>` : ''}
+  </section>`;
 }
 
 function tSankey() {
@@ -212,7 +306,7 @@ function tInventar() {
   <section class="card" style="display:flex;flex-direction:column;gap:10px">
     <div class="row" style="justify-content:space-between"><h3>${t('Inventar · {n} Stoffflüsse', { n: nf(inv.length) })}</h3>
       <div class="row"><select id="invF" aria-label="${t('Nach Bewertung filtern')}"><option value="">${t('alle Flüsse')}</option><option value="none" ${f === 'none' ? 'selected' : ''}>${t('nur nicht bewertete ({n})', { n: nf(n('none')) })}</option>${n('completed') ? `<option value="completed" ${f === 'completed' ? 'selected' : ''}>${t('nur ergänzte ({n})', { n: nf(n('completed')) })}</option>` : ''}</select>
-        <input type="search" id="invQ" placeholder="${t('Filtern, z.B. carbon dioxide')}" value="${esc(S.invQ)}" aria-label="${t('Inventar filtern')}"><button class="btn small" data-act="csv-inv">${t('Als CSV')}</button>${S.calc.factors.completable ? `<button class="btn small" data-act="csv-completed" title="${t('Alle Faktoren, die die Ergänzung dieser Methode gibt: Fluss, Kompartiment, Faktor, Herkunft')}">${t('Ergänzte Faktoren als CSV')}</button>` : ''}</div></div>
+        <input type="search" id="invQ" placeholder="${t('Filtern, z.B. carbon dioxide')}" value="${esc(S.invQ)}" aria-label="${t('Inventar filtern')}"><button class="btn small" data-act="csv-inv">${t('Als CSV')}</button>${S.calc.factors.completable ? `<button class="btn small" data-act="csv-completed" title="${t('Alle Faktoren, die die Ergänzung dieser Methode gibt: Fluss, Kompartiment, Faktor, Herkunft')}">${t('Ergänzte Faktoren als CSV')}</button>` : ''}${S.calc.regional?.available ? `<button class="btn small" data-act="csv-regional" title="${t('Alle Faktoren nach Ort dieser Methode: Fluss, Ort, Faktor, normaler Faktor, Herkunft')}">${t('Faktoren nach Ort als CSV')}</button>` : ''}</div></div>
     ${f === 'none' ? `<p class="muted" style="font-size:13px">${t('Zuoberst die Flüsse, deren Name in einem anderen Subkompartiment desselben Kompartiments einen Faktor hat. Die Schätzung ist Menge mal dieser Faktor: ein Hinweis, wo die Methode eine Lücke haben könnte, kein Ergebnis.')}</p>` : ''}
     <div class="tblwrap"><table class="tbl" id="invTbl"><thead><tr><th>${t('Stoff')}</th><th>${t('Kompartiment')}</th><th style="text-align:right">${t('Menge')}</th><th>${t('Einheit')}</th><th>${t('Methode')}</th>${extraHead}</tr></thead><tbody>
       ${shown.map(r => `<tr data-status="${r.status}"><td>${esc(r.name)}</td><td class="muted">${esc(r.categories)}</td><td class="num nw" style="text-align:right">${sci(r.amount)}</td><td class="muted">${esc(r.unit)}</td><td><span class="chip ${r.status === 'none' ? ('estimate' in r ? 'hot' : '') : r.status === 'own' ? '' : 'acc'}">${lab[r.status]}</span></td>${extra(r)}</tr>`).join('')}

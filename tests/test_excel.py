@@ -239,7 +239,7 @@ def test_rejects_garbage_and_background_export(example):
 
 
 def test_api_download_and_upload(example):
-    with TestClient(app, base_url="http://127.0.0.1") as c:
+    with TestClient(app, base_url="http://127.0.0.1", headers={"X-LCA-Wrench": "1"}) as c:
         r = c.get("/api/models/export", params={"db": example})
         assert r.status_code == 200 and r.content[:2] == b"PK" and ".xlsx" in r.headers["content-disposition"]
         up = c.post("/api/models/import", params={"name": "API-Import"}, content=r.content,

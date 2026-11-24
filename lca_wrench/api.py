@@ -23,9 +23,10 @@ from bw2data.backends.schema import ExchangeDataset
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
+from starlette.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
 
-from . import beispiel, crosswalk, ecoinvent, excel, i18n, imports, overview, params, reproject, versions
+from . import beispiel, crosswalk, ecoinvent, excel, factor_files, i18n, imports, overview, params, reproject, versions
 from . import models as mdl
 from . import service as s
 from . import setups as cs
@@ -82,8 +83,15 @@ async def local_only(request: Request, call_next):
     if host not in ALLOWED_HOSTS:
         return JSONResponse({"detail": _("Nur lokal erreichbar.")}, status_code=403)
     origin = request.headers.get("origin")
-    if request.headers.get("sec-fetch-site") == "cross-site" or (
-            origin and origin != "null" and urlsplit(origin).hostname not in ALLOWED_HOSTS):
+    unsafe = request.method not in ("GET", "HEAD", "OPTIONS")
+    # Origin must be this server itself (scheme, host and port): another local port, e.g. a dev server or another
+    # tool on 127.0.0.1, is another site. "null" (sandboxed frames, file:// pages) may not change anything.
+    foreign = origin and (origin == "null" and unsafe or origin != "null" and (
+        urlsplit(origin).hostname not in ALLOWED_HOSTS or urlsplit(origin).netloc != request.headers.get("host")))
+    # Changes need the UI's own header: a page elsewhere cannot set it without a CORS preflight, which this server
+    # never answers. Covers browsers that send neither Origin nor Sec-Fetch-Site (e.g. Safari before 16.4).
+    if request.headers.get("sec-fetch-site") == "cross-site" or foreign or (
+            unsafe and request.headers.get("x-lca-wrench") != "1"):
         return JSONResponse({"detail": _("Nur lokal erreichbar.")}, status_code=403)
     return await call_next(request)
 
@@ -143,6 +151,13 @@ class ActIn(BaseModel):
 
 class CalcIn(ActIn):
     amount: float = Field(1.0, gt=0)
+
+
+class SingleScoreIn(BaseModel):
+    id: str
+    amount: float = Field(1.0, gt=0)
+    set: str  # an id from /api/singlescore/sets
+    weighting: str | None = None  # ReCiPe: another weighting set than the perspective's default
 
 
 class GraphIn(CalcIn):
@@ -208,6 +223,25 @@ class NameIn(BaseModel):
     name: str
 
 
+class DbIn(NameIn):
+    several_products: bool = False  # stored as in the Activity Browser 3
+
+
+class ProductIn(BaseModel):
+    id: str  # the process
+    name: str
+    unit: str = "unit"
+    amount: float = 1.0
+
+
+class PropertyIn(BaseModel):
+    id: str  # a product (set) or the process (add, delete)
+    label: str
+    amount: float = 1.0
+    unit: str = ""
+    normalize: bool = True
+
+
 class ProcessIn(BaseModel):
     database: str
     name: str
@@ -229,6 +263,12 @@ class ProcessUpdateIn(BaseModel):
 
 class IdIn(BaseModel):
     id: str
+
+
+class AllocationIn(BaseModel):
+    id: str
+    strategy: str
+    manual: dict[str, float] | None = None  # {product id: share}, for "manual"
 
 
 class ExchangeAddIn(BaseModel):
@@ -474,6 +514,16 @@ def post_activity(body: ActIn):
 
 # ---------- results ----------
 
+@app.get("/api/singlescore/sets")
+def get_singlescore_sets(id: str | None = None):  # noqa: A002 - with a product: does each set cover its flows?
+    return run(s.single_score_sets, id)
+
+
+@app.post("/api/singlescore")
+def post_singlescore(body: SingleScoreIn):
+    return run(s.single_score, body.id, body.amount, body.set, body.weighting)
+
+
 @app.post("/api/calc")
 def post_calc(body: CalcIn):
     return run(s.calculate, body.id, body.amount, _method(body.method))
@@ -639,6 +689,7 @@ class CrosswalkChoiceIn(BaseModel):
     target_database: str
     target_code: str | None = None
     reset: bool = False
+    price: float | None = None  # euro per unit of the product, for a sector of an input-output table
 
 
 class CrosswalkConfirmIn(BaseModel):
@@ -671,7 +722,8 @@ def post_crosswalk_search(body: CrosswalkSearchIn):
 
 @app.post("/api/crosswalk/choose")
 def post_crosswalk_choose(body: CrosswalkChoiceIn):
-    run(crosswalk.choose, body.source_database, body.source_code, body.target_database, body.target_code, body.reset)
+    run(crosswalk.choose, body.source_database, body.source_code, body.target_database, body.target_code, body.reset,
+        body.price)
     return {"ok": True}
 
 
@@ -721,6 +773,38 @@ def post_completion_factors(body: MethodIn):
     return run(s.completed_factors, tuple(body.method))
 
 
+@app.post("/api/regional")
+def post_regional(body: FlowmapIn):
+    """Factors that depend on the location of the activity (regional.py): on or off."""
+    return run(s.set_regional, body.enabled)
+
+
+@app.post("/api/regional/factors")
+def post_regional_factors(body: MethodIn):
+    """Every factor by location of a method: flow, location, factor, normal factor, source."""
+    return run(s.regional_factors, tuple(body.method))
+
+
+@app.post("/api/regional/load")
+async def post_regional_load(request: Request, name: str = ""):
+    """Load the JRC's EF 3.1 workbook (the user's own copy, sent as the body) and keep its factors by location."""
+    if int(request.headers.get("content-length") or 0) > factor_files.MAX_BYTES:
+        raise HTTPException(413, _("Die Datei ist zu gross (höchstens {n} MB).", n=factor_files.MAX_BYTES // (1024 * 1024)))
+    data = await request.body()
+    try:  # reading the workbook takes a minute and needs no project: outside the lock, so the app stays usable
+        table = await run_in_threadpool(factor_files.read_ef, data)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    entry = run(factor_files.store, table, name or "EF", hashlib.sha256(data).hexdigest())
+    return {**entry, "state": run(s.state)}
+
+
+@app.post("/api/regional/unload")
+def post_regional_unload(body: NameIn):
+    """Remove a loaded file with factors by location."""
+    return run(s.unload_factor_file, body.name)
+
+
 @app.post("/api/compare")
 def post_compare(body: CompareIn):
     return run(s.compare, [i.model_dump() for i in body.items], tuple(body.method))
@@ -740,8 +824,8 @@ def get_model_processes(db: str):
 
 
 @app.post("/api/models/db")
-def post_model_db(body: NameIn):
-    run(mdl.create_database, body.name)
+def post_model_db(body: DbIn):
+    run(mdl.create_database, body.name, body.several_products)
     return run(s.state)
 
 
@@ -781,6 +865,45 @@ def post_model_copy(body: CopyIn):
 def post_model_process_update(body: ProcessUpdateIn):
     run(mdl.update_process, body.id, body.fields)
     return {"ok": True}
+
+
+@app.post("/api/models/product/add")
+def post_product_add(body: ProductIn):
+    return {"id": run(mdl.add_product, body.id, body.name, body.unit, body.amount)}
+
+
+@app.post("/api/models/product/delete")
+def post_product_delete(body: IdIn):
+    run(mdl.delete_product, body.id)
+    return {"ok": True}
+
+
+@app.post("/api/models/property/set")
+def post_property_set(body: PropertyIn):
+    run(mdl.set_property, body.id, body.label, body.amount)
+    return {"ok": True}
+
+
+@app.post("/api/models/property/add")
+def post_property_add(body: PropertyIn):
+    run(mdl.add_property, body.id, body.label, body.unit, body.normalize)
+    return {"ok": True}
+
+
+@app.post("/api/models/property/delete")
+def post_property_delete(body: PropertyIn):
+    run(mdl.remove_property, body.id, body.label)
+    return {"ok": True}
+
+
+@app.post("/api/models/allocation")
+def post_model_allocation(body: AllocationIn):
+    return run(mdl.set_allocation, body.id, body.strategy, body.manual)
+
+
+@app.post("/api/allocation/compare")
+def post_allocation_compare(body: ActIn):
+    return run(s.allocation_compare, body.id, _method(body.method))
 
 
 @app.post("/api/models/process/delete")

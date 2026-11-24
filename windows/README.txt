@@ -17,6 +17,23 @@ LCA Wrench – installation on Windows
    PC (127.0.0.1).
 4. The interface is in English. "Deutsch" at the top right switches it to German.
 
+Updating to a newer version (e.g. from 0.1.0)
+Your projects, with your models, calculation setups and the settings of LCA Wrench, stay as they are: they are in
+the Brightway folder (%LOCALAPPDATA%\pylca\Brightway3), not in the folder "LCA-Wrench", and the update does not
+touch them. The Python and the packages in "LCA-Wrench" stay too; the installer only replaces what changed.
+1. Close LCA Wrench: close its black window. Let an import that is still running finish first.
+2. In the folder "LCA-Wrench", delete the folder "lca_wrench" (small letters, with an underscore). It holds only the
+   program code of the old version, none of your data.
+3. Unzip the new LCA-Wrench-Windows.zip over the old folder: right-click → "Extract All", and as the destination
+   enter the folder that contains "LCA-Wrench" (e.g. C:\Users\<name>) instead of the one suggested. When Windows
+   asks, choose "Replace the files in the destination".
+4. Double-click "Install LCA Wrench" in "LCA-Wrench" (allow it as the first time). It is quicker than the first
+   installation.
+5. Check: the file "VERSION" in "LCA-Wrench" begins with the new version number. Start LCA Wrench: your projects
+   are in the list at the top, and the file "lca-wrench.log" in the folder has a line "Start, version <new number>".
+If the installation says the folder is incomplete, do steps 2 to 4 again. Installing into a new, empty folder
+works as well: LCA Wrench finds the projects again, as they are not in its folder.
+
 Data: a new project with BAFU 2026 or ecoinvent
 On the start page "New project": empty, or right away with background data. Other projects stay untouched.
 - BAFU 2026: the life cycle inventories of the Swiss Federal Administration (BAFU:2026) with the 25 impact
@@ -71,6 +88,25 @@ LCA Wrench – Installation unter Windows (Deutsch)
    Schliessen beendet LCA Wrench. Fragt die Windows-Firewall nach, genügt «Abbrechen»: LCA Wrench
    ist nur auf diesem PC erreichbar (127.0.0.1).
 4. Die Oberfläche ist englisch. «Deutsch» oben rechts schaltet auf Deutsch um (der Browser merkt es sich).
+
+Auf eine neuere Version aktualisieren (z.B. von 0.1.0)
+Die Projekte, mit den eigenen Modellen, Rechnungen und den Einstellungen von LCA Wrench, bleiben wie sie sind: Sie
+liegen im Brightway-Ordner (%LOCALAPPDATA%\pylca\Brightway3), nicht im Ordner «LCA-Wrench», und das Update
+verändert sie nicht. Auch Python und die Pakete in «LCA-Wrench» bleiben; die Installation ersetzt nur, was sich
+geändert hat.
+1. LCA Wrench beenden: das schwarze Fenster schliessen. Einen laufenden Import vorher fertig laufen lassen.
+2. Im Ordner «LCA-Wrench» den Ordner «lca_wrench» löschen (klein geschrieben, mit Unterstrich). Darin ist nur der
+   Programmcode der alten Version, keine eigenen Daten.
+3. Das neue LCA-Wrench-Windows.zip über den alten Ordner entpacken: Rechtsklick → «Alle extrahieren», und als Ziel
+   den Ordner eintragen, in dem «LCA-Wrench» liegt (z.B. C:\Users\<Name>), statt des vorgeschlagenen. Fragt
+   Windows nach, «Die Dateien im Ziel ersetzen» wählen.
+4. Doppelklick auf «Install LCA Wrench» in «LCA-Wrench» (wie beim ersten Mal freigeben). Das geht schneller als die
+   erste Installation.
+5. Prüfen: Die Datei «VERSION» in «LCA-Wrench» beginnt mit der neuen Versionsnummer. LCA Wrench starten: Die
+   Projekte stehen oben in der Liste, und die Datei «lca-wrench.log» im Ordner hat eine Zeile
+   «Start, version <neue Nummer>».
+Meldet die Installation, der Ordner sei unvollständig, die Schritte 2 bis 4 nochmals machen. Auch eine Installation
+in einen neuen, leeren Ordner geht: LCA Wrench findet die Projekte wieder, denn sie liegen nicht in seinem Ordner.
 
 Daten: neues Projekt mit BAFU 2026 oder ecoinvent
 Auf der Startseite «Neues Projekt»: leer, oder gleich mit Hintergrunddaten. Andere Projekte bleiben unberührt.

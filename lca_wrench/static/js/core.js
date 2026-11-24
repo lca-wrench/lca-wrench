@@ -18,6 +18,7 @@ export const S = {
   fu: null, tab: 'beitraege', calc: null, cats: { a: null, b: '', topic: '', res: null }, contrib: 'act', graph: null, cutoff: 0.01, depth: 4, gsel: null,
   par: { data: null, adding: null }, formulaFor: null,
   why: null, cw: { project: null, database: null, targets: null, method: '', res: null, running: false, error: null, open: null, q: '', hits: null, view: 'datasets', trace: {} },
+  ss: { sets: null, setsKey: null, set: null, picked: false, w: null, res: null, error: null },
   ver: { project: null, database: null, targets: null, res: null, detail: null, k: null, running: false, error: null }, sankey: null, skCut: 0.02, skMax: 40, skMode: 'cum', sksel: null, inv: null, invQ: '', invF: '', fuVerify: null,
   // Vergleich
   cmp: [], cmpRes: null,
@@ -54,28 +55,41 @@ export const U = () => methodInfo().unit;
 export const isModelDb = name => S.st.databases.some(d => d.name === name && d.role === 'model');
 
 // the server answers in the language of the UI
-export const langHeader = () => ({ 'X-Lang': LANG });
+// X-LCA-Wrench: the server accepts changes only with it (protection against other websites, see api.local_only)
+export const langHeader = () => ({ 'X-Lang': LANG, 'X-LCA-Wrench': '1' });
+
+// fetch, with a message a person understands when the server does not answer at all (stopped, computer asleep)
+export async function request(path, init) {
+  try { return await fetch(path, init); }
+  catch (_) { throw new Error(t('LCA Wrench antwortet nicht. Läuft das Programm noch? Sonst neu starten und die Seite neu laden.')); }
+}
+// the error text of a failed answer: the server's own message, else the HTTP status
+export function failure(r, data) {
+  const d = data?.detail;
+  return new Error(typeof d === 'string' ? d : Array.isArray(d) ? t('Eingabe ungültig: {list}', { list: d.map(x => x.msg).join(', ') }) : t('Die Anfrage ist fehlgeschlagen (Fehler {status}).', { status: r.status }));
+}
 
 export async function api(path, body) {
   S.busy++; renderBusy();
   try {
-    const r = await fetch(path, body === undefined ? { headers: langHeader() } : { method: 'POST', headers: { 'Content-Type': 'application/json', ...langHeader() }, body: JSON.stringify(body) });
+    const r = await request(path, body === undefined ? { headers: langHeader() } : { method: 'POST', headers: { 'Content-Type': 'application/json', ...langHeader() }, body: JSON.stringify(body) });
     const data = await r.json().catch(() => ({}));
-    if (!r.ok) {
-      const d = data.detail;
-      throw new Error(typeof d === 'string' ? d : Array.isArray(d) ? t('Eingabe ungültig: {list}', { list: d.map(x => x.msg).join(', ') }) : t('Die Anfrage ist fehlgeschlagen.'));
-    }
+    if (!r.ok) throw failure(r, data);
     return data;
   } finally { S.busy--; renderBusy(); }
 }
 
+// a short note at the bottom; errors look different, are read out at once and stay until read (10 s or closed)
 let toastT;
-export function toast(msg, action) {
-  const t = $('toast');
-  t.innerHTML = esc(msg) + (action ? ` <button class="linkbtn tlink" data-act="${action.act}" ${action.k !== undefined ? `data-k="${esc(action.k)}"` : ''}>${esc(action.label)}</button>` : '');
-  t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, action ? 8000 : 5000);
+export function toast(msg, action, error = false) {
+  const el = $('toast');
+  el.classList.toggle('err', error);
+  el.setAttribute('role', error ? 'alert' : 'status');
+  el.innerHTML = `<span>${esc(msg)}</span>` + (action ? ` <button class="linkbtn tlink" data-act="${action.act}" ${action.k !== undefined ? `data-k="${esc(action.k)}"` : ''}>${esc(action.label)}</button>` : '')
+    + `<button class="tclose" data-act="toast-close" aria-label="${t('Schliessen')}" title="${t('Schliessen')}">×</button>`;
+  el.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => el.hidden = true, error ? 10000 : action ? 8000 : 5000);
 }
-export async function guard(fn) { try { await fn(); } catch (e) { toast(e.message); console.error(e); } }
+export async function guard(fn) { try { await fn(); } catch (e) { toast(e.message, null, true); console.error(e); } }
 // "Rechne …" only for requests that take noticeably long: on fast ones it would just flash for a few milliseconds
 let busyTimer = null;
 export function renderBusy() {
@@ -111,20 +125,18 @@ export function shareBar(v, total) {
 
 export function bars(items, rest, total, act) {
   const all = items.map(x => ({ ...x }));
-  if (Math.abs(rest) > 1e-15) all.push({ name: t('Übrige'), value: rest });
+  // the rest: many small items together, not a hotspot, so never in the warning colour
+  if (Math.abs(rest) > 1e-15) all.push({ name: t('Übrige'), value: rest, rest: true });
   const max = Math.max(...all.map(x => Math.abs(x.value)), 1e-15);
-  return all.map(x => `<button class="bar" ${act && x.id ? `data-act="${act}" data-k="${x.id}"` : 'tabindex="-1"'} title="${esc(x.name)}"><span>${esc(x.name)}${x.location ? ` <span class="muted">${esc(x.location)}</span>` : ''}${x.categories ? ` <span class="muted">${esc(x.categories)}</span>` : ''}${x.database && isModelDb(x.database) ? ` <span class="chip acc">${t('Modell')}</span>` : ''}</span><span class="t"><i class="${x.value < 0 ? 'neg' : total && x.value / total >= 0.25 ? 'hot' : ''}" style="width:${Math.abs(x.value) / max * 100}%"></i></span><span class="v"><span>${nf(x.value)}</span><span class="p">${pct(total ? x.value / total : 0)}</span></span></button>`).join('');
+  return all.map(x => `<button class="bar" ${act && x.id ? `data-act="${act}" data-k="${x.id}"` : 'tabindex="-1"'} title="${esc(x.name)}"><span>${esc(x.name)}${x.location ? ` <span class="muted">${esc(x.location)}</span>` : ''}${x.categories ? ` <span class="muted">${esc(x.categories)}</span>` : ''}${x.database && isModelDb(x.database) ? ` <span class="chip acc">${t('Modell')}</span>` : ''}</span><span class="t"><i class="${x.rest ? 'rest' : x.value < 0 ? 'neg' : total && x.value / total >= 0.25 ? 'hot' : ''}" style="width:${Math.abs(x.value) / max * 100}%"></i></span><span class="v"><span>${nf(x.value)}</span><span class="p">${pct(total ? x.value / total : 0)}</span></span></button>`).join('');
 }
 
 // a file the server makes (CSV, Excel): POST the request, save the answer under the name the server gives
 export async function download(path, body) {
   S.busy++; renderBusy();
   try {
-    const r = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json', ...langHeader() }, body: JSON.stringify(body) });
-    if (!r.ok) {
-      const d = (await r.json().catch(() => ({}))).detail;
-      throw new Error(typeof d === 'string' ? d : t('Die Anfrage ist fehlgeschlagen.'));
-    }
+    const r = await request(path, { method: 'POST', headers: { 'Content-Type': 'application/json', ...langHeader() }, body: JSON.stringify(body) });
+    if (!r.ok) throw failure(r, await r.json().catch(() => ({})));
     const m = /filename\*=UTF-8''([^;]+)/.exec(r.headers.get('Content-Disposition') || '');
     const a = document.createElement('a'); a.href = URL.createObjectURL(await r.blob());
     a.download = m ? decodeURIComponent(m[1]) : 'LCA Wrench'; a.click();

@@ -12,7 +12,7 @@ import numpy as np
 from bw2data.backends.schema import ActivityDataset as AD
 
 from .engine import System
-from . import completion, i18n
+from . import completion, i18n, regional, regions
 
 UNITS = {
     "kilogram": "kg",
@@ -48,7 +48,7 @@ def node_info(ids) -> dict[int, dict]:
         for nid, db, data in AD.select(AD.id, AD.database, AD.data).where(AD.id << ids[i:i + 500]).tuples():
             out[nid] = {"id": str(nid), "name": data.get("name", ""), "location": data.get("location"),
                         "unit": short_unit(data.get("unit")), "database": db,
-                        "product": data.get("reference product"),
+                        "product": data.get("reference product") or data.get("product"),
                         "categories": " / ".join(data.get("categories") or ())}
     return out
 
@@ -70,7 +70,7 @@ def score_table(S: System, fus: list[tuple[int, float]], methods: list[tuple]) -
 def contributions(S: System, node_id: int, amount: float, method: tuple, top: int = 12) -> dict:
     x = S.supply({node_id: amount})
     by_col = S.direct(method) * x
-    char = S.cvec(method) * S.inventory(x)
+    char = S.flow_impacts(method, x)  # c B x, plus the factors by location (regional.py)
     acts, acts_rest = _top(by_col, S.col_ids, top)
     flows, flows_rest = _top(char, S.bio_ids, top)
     info = node_info([a for a, _ in acts] + [f for f, _ in flows])
@@ -81,7 +81,51 @@ def contributions(S: System, node_id: int, amount: float, method: tuple, top: in
         "by_activity_rest": acts_rest,
         "by_flow": [{**_brief(info, f, flow=True), "value": v} for f, v in flows],
         "by_flow_rest": flows_rest,
+        **by_location(S, method, x, by_col),
     }
+
+
+PLACE_HOW = {regional.OWN: "own", regional.COUNTRY: "country", regional.REGION: "region", regional.NORMAL: "normal"}
+
+
+def by_location(S: System, method: tuple, x: np.ndarray, by_col: np.ndarray | None = None) -> dict:
+    """Impact by the location of the activities that cause it (their direct emissions and resource uses). Adds up to
+    the score. Per location also the part the factors by location change (regional.py) and how the factor was found:
+    "own" (the location's own factor), "country" (a part of a country: the country's), "region" (average over the
+    region's countries), "normal" (the method's normal factor)."""
+    if by_col is None:
+        by_col = S.direct(method) * x
+    R = S.regional(method)
+    reg = np.asarray(R.sum(axis=0)).ravel() * x if R is not None else np.zeros(len(by_col))
+    idx, places, how = S.column_places(method)
+    # one group per location code (columns at the same location can have places with other weights)
+    group: dict[str, int] = {}
+    gid = np.array([group.setdefault(p.location, len(group)) for p in places], dtype=np.int64)
+    nz = np.flatnonzero(by_col)
+    pl = idx[nz]
+    g = gid[pl]
+    n = len(group)
+    value = np.bincount(g, weights=by_col[nz], minlength=n)
+    part = np.bincount(g, weights=reg[nz], minlength=n)
+    count = np.bincount(g, minlength=n)
+    best = np.zeros(n, dtype=np.int8)
+    np.maximum.at(best, g, how[pl])
+    weightings: dict[int, set] = {}
+    for u in np.unique(pl):
+        if places[u].weighting:
+            weightings.setdefault(int(gid[u]), set()).add(places[u].weighting)
+    first = {}
+    for u, p in enumerate(places):
+        first.setdefault(int(gid[u]), p)
+    out = []
+    for k in np.flatnonzero(count):
+        p, w = first[int(k)], weightings.get(int(k), set())
+        out.append({"location": p.location, "name": regions.name(p.location), "kind": p.kind, "value": float(value[k]),
+                    "regional": float(part[k]), "processes": int(count[k]), "how": PLACE_HOW[int(best[k])],
+                    "weighting": "mixed" if len(w) > 1 else (next(iter(w)) if w else None)})
+    out.sort(key=lambda r: -abs(r["value"]))
+    return {"by_location": out, "regional": {**regional.summary(method), "effect": float(reg.sum()),
+                                             "processes": int(np.count_nonzero(reg))}}
 
 
 def _brief(info: dict, nid: int, flow: bool = False) -> dict:

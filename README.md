@@ -8,7 +8,7 @@ LCA Wrench is a local web interface for [Brightway](https://docs.brightway.dev) 
 (Python 3.12, FastAPI, plain JavaScript). It builds product models, calculates several products and methods at once,
 and shows results as contributions, Sankey diagram, supply chain tree and inventory. It runs in the browser on the
 local computer only (127.0.0.1) and works on ordinary Brightway projects, so models and calculation setups can be
-opened in the [Activity Browser](https://github.com/LCA-ActivityBrowser/activity-browser) as well. Version 0.1.0.
+opened in the [Activity Browser](https://github.com/LCA-ActivityBrowser/activity-browser) as well. Version 0.1.1.
 
 ![Result view: climate impact of a product with contributions](docs/screenshots/result.png)
 
@@ -21,13 +21,23 @@ opened in the [Activity Browser](https://github.com/LCA-ActivityBrowser/activity
   then start **LCA Wrench** from the Desktop.
 - **Windows:** download `LCA-Wrench-Windows.zip`, unpack, run **Install LCA Wrench**, then **Start LCA Wrench**.
   Windows warns the first time because the script is not signed ("More info" → "Run anyway").
+- **Linux:** download `LCA-Wrench-Linux.tar.gz`, unpack it (e.g. `tar -xzf LCA-Wrench-Linux.tar.gz -C ~`), run
+  `./install.sh` in the folder, then start **LCA Wrench** from the applications menu or with `./start.sh`.
 
-The installers run only from these packages. "Source code (zip)" on the releases page and the `mac/` and `windows/`
-folders of a clone are not installers; to run from a clone, see **From source** below.
+The installers run only from these packages. "Source code (zip)" on the releases page and the `mac/`, `windows/`
+and `linux/` folders of a clone are not installers; to run from a clone, see **From source** below.
 
 The installer sets up its own Python and the packages inside the LCA Wrench folder (no administrator rights, internet
-needed, 3 to 5 minutes). The Windows package is less tested than the macOS one. Details:
+needed, 3 to 5 minutes). The Windows and Linux packages are less tested than the macOS one. Details:
 [docs/install.md](docs/install.md).
+
+**Updating** (e.g. from 0.1.0). Close LCA Wrench, then install the new package over the old folder: on macOS open the
+new **Install LCA Wrench** and choose the same folder; on Windows and Linux delete the folder `lca_wrench` inside the
+LCA Wrench folder (the old program code), unpack the new package over the folder and run the installer again. Your
+projects, models, calculation setups and settings stay: they are in the Brightway folder, not in the LCA Wrench
+folder. The Python and the packages stay too. The file `VERSION` in the folder then shows the new version. Step by
+step: "Updating to a newer version" in the `README.txt` of each package. The automatic tests do the same update from
+the last release on all three systems ([docs/ci.md](docs/ci.md)).
 
 **Which data with which installation.** With the release package, a project with BAFU 2026 (EF 3.1 methods) is
 created in the app under "New project", and ecoinvent can be imported there with your own licence. BAFU 2025 with the
@@ -57,9 +67,11 @@ Options: `python -m lca_wrench --port 8790 --no-browser`. `./start.sh` still wor
 | Start | Project selection, databases by role (background, own models, biosphere flows), example model with one click, guided tour |
 | Data | Search across all databases (typo-tolerant; filters for unit group and location), data sheet with description, share of each input in the impact, uncertainty, copy of an activity into your own model |
 | Model | Own models (databases) and activities, inputs and emissions, amounts as numbers or formulas, credits, undo for every step, history, [moving a model to another region](docs/features.md#moving-a-model-to-another-region) |
+| Several products | Processes with several products as the Activity Browser 3 stores them: allocation in equal parts, by a product property (mass, price …) or by hand, every allocation compared side by side ([docs](docs/features.md#several-products-and-allocation)) |
 | Parameters | Project, model and activity parameters with formulas, stored as in the Activity Browser ([docs](docs/features.md#parameters-and-formulas)) |
 | Calculate | Calculation setups with several products × methods, stored in the Activity Browser format; cross-check with bw2calc; export as Excel or CSV |
 | Result | Contributions by activity or flow; all categories of one or two methods, or one kind of impact across methods; Sankey; supply chain tree; inventory with filter and CSV; environmental profile in UBP; Excel/CSV export |
+| Single scores | EF 3.1 normalized and weighted (mPt), ReCiPe 2016 endpoint points with the Eco-indicator 99 weighting sets (I/I, H/A, H/H, E/E), total UBP of Ecological Scarcity 2021; each category's weighted share ([docs](docs/features.md#single-scores)) |
 | Compare | Products across projects, for example original against working copy; calculation on every background database or scenario |
 | Excel exchange | Export and import of own models in the bw2io format, with parameters, exact linking of partners ([docs](docs/features.md#excel-exchanging-your-own-models)) |
 | Why different? | Difference between a working copy and its original, split exactly onto the changed exchanges |
@@ -69,13 +81,15 @@ Options: `python -m lca_wrench --port 8790 --no-browser`. `./start.sh` still wor
 | Background databases | BAFU 2025, BAFU 2026 with EF 3.1, ecoinvent, premise scenarios, EXIOBASE (hybrid models); one database, combined, or automatic ([docs](docs/data.md)) |
 | Flow mapping | Methods on one list of elementary flows are applied to products on the other where this holds ([docs](docs/flow-mapping.md)) |
 | Flows without a characterization factor | In Result, Inventory, each flow shows whether the method has a factor (characterized, characterized (flow mapping), characterized (completed), not characterized). A filter lists the not characterized flows, with a labelled estimate where the name has a factor in another sub-compartment; counts are shown above the result and the columns are in the export ([docs](docs/completed-factors.md)) |
-| Completed factors | Some methods (the Ecological Scarcity 2021 methods of the BAFU-2025-v2 template) carry most factors only on the flow without sub-compartment. LCA Wrench completes them at calculation time, marks this in the result, and the list of added factors can be exported. On by default, can be switched off; stored methods are not modified ([docs](docs/completed-factors.md)) |
+| Completed factors | Some methods (the Ecological Scarcity 2021 methods of the BAFU-2025-v2 template) carry most factors only on the flow without sub-compartment. LCA Wrench completes them at calculation time, marks this in the result, and the list of added factors can be exported. Only families that carry their factors on top-level flows are completed; families that characterize sub-compartments themselves (such as ecoinvent's) stay as they are. On by default, can be switched off; stored methods are not modified ([docs](docs/completed-factors.md)) |
+| Factors by location | Factors that depend on the location of the activity (EF 3.1 water use per country): read from the method's rows with a location (Brightway's convention), country copies of flows, or the JRC's EF 3.1 workbook loaded from your own copy; regions get the average of their countries, weighted by production volume or by their industry's output in EXIOBASE. Result by location, with what the factors change there. On by default, can be switched off ([docs](docs/regional-factors.md)) |
 | Real projects | Projects are never opened or converted without asking; test copies; Activity Browser 2 projects only as a copy; foreign databases are protected; changes from other programs are detected |
 | Language | English by default, German switchable in the interface |
 
 ## Data
 
-Nothing is bundled except the flow mapping (CC BY 4.0, see `lca_wrench/data/flowmaps/README.md`). All LCA data are
+Nothing is bundled except the flow mapping (CC BY 4.0, see `lca_wrench/data/flowmaps/README.md`) and the sector matching
+for EXIOBASE (Peng & Pfister 2023 and the EXIOBASE classification, see `lca_wrench/data/sectors/README.md`). All LCA data are
 downloaded or imported by the user: the BAFU 2025 template from files.brightway.dev, BAFU 2026 via sentier-brightway,
 ecoinvent with the user's own licence, premise scenarios and EXIOBASE. Background data stays unchanged; changes happen in
 your own models or in a working copy of the project. Details, licences and citation wording for data sources:
@@ -110,7 +124,9 @@ flows without sub-compartment, so emissions into sub-compartments count as zero 
   stand-in for premise.
 - Parameters: no uncertainty of parameters in Monte Carlo, no dependencies between activity groups.
 - Changing background data (only in a working copy) rebuilds the matrix.
-- Activities with several products (multifunctional) are not treated specially.
+- Processes with several products: Excel exchange and moving to another region do not work for such models yet;
+  substitution is modelled with LCA Wrench's credits, not with bw_functional's system expansion; no Circular
+  Footprint Formula.
 - The climate method derived from ecological scarcity (BAFU 2025) is not a standalone IPCC method; see
   [docs/data.md](docs/data.md).
 - The Activity Browser and LCA Wrench working on the same project at the same time can overwrite each other's entries;
@@ -120,15 +136,16 @@ flows without sub-compartment, so emissions into sub-compartments count as zero 
 
 - [Installation](docs/install.md), [Data and imports](docs/data.md), [Calculation](docs/calculation.md)
 - [Features](docs/features.md), [Uncertainty and sensitivity](docs/uncertainty.md), [Flow mapping](docs/flow-mapping.md)
-- [Completed factors](docs/completed-factors.md), [Validation](docs/validation.md), [Comparison with other tools](COMPARISON.md)
+- [Completed factors](docs/completed-factors.md), [Factors by location](docs/regional-factors.md), [Validation](docs/validation.md),
+  [Comparison with other tools](COMPARISON.md)
 - [Demo walkthrough](docs/demo.md), [Development](docs/development.md), [Contributing](CONTRIBUTING.md),
-  [Security](SECURITY.md)
+  [Security](SECURITY.md), [Changelog](CHANGELOG.md)
 
 ## Citation
 
 See [CITATION.cff](CITATION.cff). In plain text:
 
-Pfister, K. and Pfister, S. (2026). LCA Wrench (version 0.1.0). https://github.com/lca-wrench/lca-wrench
+Pfister, K. and Pfister, S. (2026). LCA Wrench (version 0.1.1). https://github.com/lca-wrench/lca-wrench
 
 ## Licence
 

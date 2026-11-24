@@ -10,8 +10,16 @@ Setup and contribution rules: [../CONTRIBUTING.md](../CONTRIBUTING.md).
 ./check.sh --no-browser    # without the browser tests
 ```
 
-Without the script: `python -m ruff check . && python -m pytest -q`. The GitHub workflow `.github/workflows/check.yml`
-runs the same on Linux for every pull request and push to main.
+Without the script: `python -m ruff check . && python -m pytest -q`. The GitHub workflow `.github/workflows/test.yml`
+runs the same on Linux, Windows and macOS for every pull request and push to main, on an installation from the release
+package, and checks a known result and the update from the last release ([ci.md](ci.md)).
+
+On Windows a file that is still open cannot be deleted (WinError 32). The engine closes the processed datapackages of
+a calculation once it has read them (`engine.close_files`), so its cache keeps no file open; a project is removed
+with `service.remove_project` (it calls `engine.forget` first, then retries the folder), and tests clean up with it
+too. Opening another project releases what the server's threads still hold of the project left
+(`service.release_files`) and, on Windows, drops the cached calculations of the projects opened before, so the
+Activity Browser can delete or change them.
 
 The browser tests (`tests/test_browser.py`, Playwright) drive the installed Google Chrome and start their own local
 process on port 8795 in the project `lca-wrench-test`. They go through the tour, create the example model, change an

@@ -17,11 +17,16 @@ exact, not an approximation:
     x_b = A_bb^-1 (f_b - A_bf x_f)
     h   = s_b . (f_b - A_bf x_f) + c . B_f x_f,   s_b = c B_b A_bb^-1 (cached)
 
-tests/test_engine.py checks every quantity against plain bw2calc.
+Factors that depend on where an activity is (regional.py) enter as a matrix R of the shape of B: (factor at the
+activity's place - normal factor) times B. The characterized biosphere matrix is diag(c) B + R, so the direct impacts
+are B^T c + 1^T R; without such factors R is None and nothing changes.
+
+tests/test_engine.py checks every quantity against plain bw2calc, tests/test_regional.py the factors by location.
 """
 
 from __future__ import annotations
 
+import gc
 import threading
 from collections import OrderedDict
 
@@ -31,11 +36,13 @@ import numpy as np
 from bw2data.backends.schema import ActivityDataset as AD
 from bw2data.backends.schema import ExchangeDataset as ED
 from bw2data.configuration import labels
+from fsspec.implementations.zip import ZipFileSystem
 from scipy import sparse
 from scipy.linalg import lu_factor, lu_solve
 from scipy.sparse.linalg import splu
 
-from . import completion, flowmap, i18n
+from . import completion, flowmap, i18n, regional
+from . import functional  # noqa: F401  (registers the backend: Activity Browser 3 databases open at all)
 from .i18n import msg, render
 
 BIOSPHERE_NODE_TYPES = ("emission", "natural resource", "economic", "inventory indicator", "social")
@@ -44,12 +51,29 @@ POSITIVE = set(labels.technosphere_positive_edge_types)
 BIOSPHERE = set(labels.biosphere_edge_types)
 PROCESS_TYPES = set(labels.process_node_types)
 IMPLICIT_PRODUCTION = set(labels.implicit_production_allowed_node_types)
+# Activity Browser 3 (bw_functional, backend "functional_sqlite"): the products of a process are nodes of their own
+FUNCTION_TYPES = ("product", "waste")
+# processes as listed for the user: also those with several products or none (their products are listed with them)
+LISTED_PROCESS_TYPES = PROCESS_TYPES | {"multifunctional", "nonfunctional"}
 
 _lock = threading.RLock()
 
 
 class ModelError(ValueError):
     """The user's model cannot be solved (missing production, singular, broken link)."""
+
+
+def close_files(lca: bc.LCA) -> None:
+    """Close the matrix files (processed/*.zip) a bw2calc LCA has opened. bw_processing reads every array when it opens
+    a file, so nothing reads them again, but bw2calc leaves them open as long as the LCA lives. Windows cannot delete
+    an open file: with the cached backgrounds holding them, removing a background database or deleting a project failed
+    there ("being used by another process")."""
+    for pkg in lca.packages:
+        fs = getattr(pkg, "fs", None)
+        if isinstance(fs, ZipFileSystem):
+            fs.close()  # the archive ...
+            if hasattr(getattr(fs, "of", None), "close"):
+                fs.of.close()  # ... and the file under it, which the archive leaves open
 
 
 # ---------- database roles ----------
@@ -110,6 +134,8 @@ class Background:
         self._cvec: dict = {}
         self._direct: dict = {}
         self._unit: dict = {}
+        self._reg: dict = {}
+        self._places: dict = {}
         demand = {}
         for name in self.dbs:
             node_id = AD.select(AD.id).where(AD.database == name, AD.type << list(PROCESS_TYPES)).limit(1).scalar()
@@ -124,6 +150,7 @@ class Background:
         else:
             lca = bc.LCA(demand)
             lca.load_lci_data()
+            close_files(lca)  # all read; kept open, the cache would lock them (Windows)
             self.lca = lca
             self.A = lca.technosphere_matrix.tocsc()
             self.B = lca.biosphere_matrix.tocsc()
@@ -142,10 +169,7 @@ class Background:
                 self.solver = None
                 self.solve = lambda b: refined(lu.solve, self.A, b)
                 self.solve_t = lambda b: refined(lambda v: lu.solve(v, trans="T"), AT, b)
-            diag = self.A.diagonal()
-            prod_row = dict(lca.dicts.product)
-            self.production = np.array([self.A[prod_row[a], c] if a in prod_row else diag[c]
-                                        for c, a in enumerate(self.act_ids)], dtype=float)
+            self.production = _production(self.A, self.act_ids, dict(lca.dicts.product), self.A.diagonal())
         self.act_col = {int(a): i for i, a in enumerate(self.act_ids)}
         self.prod_row = {int(p): i for i, p in enumerate(self.prod_ids)}
         self.bio_row = {int(f): i for i, f in enumerate(self.bio_ids)}
@@ -156,15 +180,32 @@ class Background:
                 self._cvec[method] = np.zeros(0)
             else:
                 self.lca.switch_method(method)
+                close_files(self.lca)  # the method's file, read now
                 c = np.asarray(self.lca.characterization_matrix.diagonal()).ravel().copy()
                 add = extra_vector(method, self.bio_ids)  # factors the method lacks: flow mapping, completion
                 self._cvec[method] = c + add if add is not None else c
         return self._cvec[method]
 
+    def places(self, volumes: bool = True) -> regional.Places:
+        """Where each activity column is, for factors that depend on the location (regional.py). volumes=False: the
+        locations only, regions weighted equally (enough to group a result by location, and much quicker)."""
+        if volumes not in self._places:
+            self._places[volumes] = regional.places_for(self.act_ids, volumes=volumes, databases=self.dbs)
+        return self._places[volumes]
+
+    def regional(self, method: tuple) -> regional.Part | None:
+        """The location-dependent part of the characterized biosphere matrix; None when the method has none."""
+        if method not in self._reg:
+            T = regional.active(method) if self.lca is not None else None
+            self._reg[method] = regional.matrix(T, self.bio_ids, self.places(), self.B, self.cvec(method)) if T else None
+        return self._reg[method]
+
     def direct(self, method: tuple) -> np.ndarray:
         """Characterized direct emissions per activity column (for its production amount)."""
         if method not in self._direct:
-            self._direct[method] = np.asarray(self.B.T @ self.cvec(method)).ravel()
+            d = np.asarray(self.B.T @ self.cvec(method)).ravel()
+            part = self.regional(method)
+            self._direct[method] = d + np.asarray(part.R.sum(axis=0)).ravel() if part is not None else d
         return self._direct[method]
 
     def unit_scores(self, method: tuple) -> np.ndarray:
@@ -277,6 +318,17 @@ def refined(solve, M, b: np.ndarray, steps: int = 2) -> np.ndarray:
     return x
 
 
+def _production(A, act_ids, prod_row: dict, fallback: np.ndarray) -> np.ndarray:
+    """Production amount per activity column: A[prod_row[a], c] for activity a in column c, `fallback[c]` where a has
+    no own product row. One vectorized lookup instead of a scalar sparse index per column."""
+    rows = np.array([prod_row.get(int(a), -1) for a in act_ids], dtype=np.int64)
+    out = np.array(fallback, dtype=float, copy=True)
+    has = np.flatnonzero(rows >= 0)
+    if len(has):
+        out[has] = np.asarray(A[rows[has], has]).ravel()
+    return out
+
+
 def _ids_by_index(mapping) -> np.ndarray:
     items = sorted(dict(mapping).items(), key=lambda kv: kv[1])
     return np.array([k for k, _ in items], dtype=np.int64)
@@ -287,11 +339,16 @@ def _ids_by_index(mapping) -> np.ndarray:
 class Foreground:
     """Matrices of the model databases, read directly from SQLite."""
 
-    def __init__(self, dbs: list[str], bg: Background, alias: dict | None = None):
+    def __init__(self, dbs: list[str], bg: Background, alias: dict | None = None, factors: dict | None = None):
         """alias: {(database, code): node id} for inputs from a background database that is not in the calculation,
-        taken from its counterpart in the chosen background (e.g. a premise scenario instead of ecoinvent)."""
+        taken from its counterpart in the chosen background (e.g. a premise scenario instead of ecoinvent).
+        factors: {product id: allocation factor} instead of the stored ones (comparing allocations, `with_factors`)."""
         self.dbs = list(dbs)
+        self.alias_keys = dict(alias or {})
+        self.factor_override = dict(factors or {})
         self.errors: list[tuple] = []  # i18n.msg, rendered in the reader's language
+        self.notes: list[tuple] = []  # the same, for what calculates but deserves a look (allocation factors)
+        self.functions: dict[int, list[tuple[int, float | None]]] = {}  # process id -> [(product id, factor)]
         self.nodes: dict[int, dict] = {}
         nb, nbio = bg.A.shape[0], len(bg.bio_ids)
         if not self.dbs:
@@ -321,8 +378,21 @@ class Foreground:
                     key_id[(idb, code)] = nid
                     kinds[nid] = typ
 
-        # columns: every process node of the model databases
-        cols = [nid for nid, t in kinds.items() if t in PROCESS_TYPES and self.nodes.get(nid, {}).get("database") in self.dbs]
+        # Processes with products of their own (Activity Browser 3): as in bw_functional's processing, the products
+        # are the columns. Every input, emission and credit of the process is split onto its products by their
+        # allocation factors (a factor that is not set counts as 1); each product's own production edge goes to its
+        # column unchanged.
+        self.functions = self._functions(key_id)
+        for pid, fs in self.functions.items():
+            total = sum(1.0 if a is None else a for _, a in fs)
+            if len(fs) > 1 and abs(total - 1.0) > 1e-6:
+                self.notes.append(msg("Die Allokationsfaktoren von «{name}» ergeben zusammen {total} statt 1.",
+                                      name=self.nodes.get(pid, {}).get("name", pid), total=f"{total:.4g}"))
+
+        # columns: every process node of the model databases, or its products
+        cols = [nid for nid, t in kinds.items() if t in PROCESS_TYPES and nid not in self.functions
+                and self.nodes.get(nid, {}).get("database") in self.dbs]
+        cols += [f for fs in self.functions.values() for f, _ in fs]
         cols.sort()
         col = {nid: i for i, nid in enumerate(cols)}
 
@@ -332,20 +402,32 @@ class Foreground:
         for _, data, idb, icode, odb, ocode, etype in rows:
             out_id = key_id.get((odb, ocode))
             in_id = key_id.get((idb, icode))
-            if out_id is None or out_id not in col:
+            if out_id is None:
+                continue
+            production = etype in POSITIVE and etype not in labels.substitution_edge_types
+            if out_id in self.functions:
+                fs = self.functions[out_id]
+                if production:  # only to the column of the product it produces
+                    targets = [(col[f], 1.0) for f, _ in fs if f == in_id]
+                else:
+                    targets = [(col[f], 1.0 if a is None else a) for f, a in fs]
+            elif out_id in col:
+                targets = [(col[out_id], 1.0)]
+            else:
                 continue
             if in_id is None:
                 broken += 1
                 continue
             amount = float(data.get("amount", 0) or 0)
-            if etype in BIOSPHERE:
-                bio.append((in_id, col[out_id], amount))
-            elif etype in NEGATIVE:
-                tech.append((in_id, col[out_id], -amount))
-            elif etype in POSITIVE:
-                tech.append((in_id, col[out_id], amount))
-                if etype not in labels.substitution_edge_types:
-                    has_production.add(out_id)
+            for c, share in targets:
+                if etype in BIOSPHERE:
+                    bio.append((in_id, c, amount * share))
+                elif etype in NEGATIVE:
+                    tech.append((in_id, c, -amount * share))
+                elif etype in POSITIVE:
+                    tech.append((in_id, c, amount * share))
+                    if production:
+                        has_production.add(cols[c])
         for nid in cols:
             if nid not in has_production:
                 if kinds[nid] in IMPLICIT_PRODUCTION:
@@ -393,12 +475,7 @@ class Foreground:
                 self.lu = splu(self.A_ff.tocsc())
             except RuntimeError:
                 self.errors.append(msg("Das Modell ist nicht lösbar: Die Produktionsmengen heben sich gegenseitig auf (singuläre Matrix)."))
-        diag = {}
-        A = self.A_ff.tocsc()
-        for c, nid in enumerate(cols):
-            r = row.get(nid)
-            diag[c] = A[r, c] if r is not None else 0.0
-        self.production = np.array([diag[c] for c in range(nf)], dtype=float)
+        self.production = _production(self.A_ff.tocsc(), cols, row, np.zeros(nf))
 
     def _empty(self, nb, nbio):
         self.act_ids = self.prod_ids = np.zeros(0, dtype=np.int64)
@@ -412,9 +489,54 @@ class Foreground:
     def error_texts(self) -> list[str]:
         return [render(e) for e in dict.fromkeys(self.errors)]
 
+    def note_texts(self) -> list[str]:
+        return [render(e) for e in dict.fromkeys(self.notes)]
+
+    def _functions(self, key_id: dict) -> dict[int, list[tuple[int, float | None]]]:
+        """Process id -> its products [(product id, allocation factor or None)], from the products' `processor`."""
+        out: dict[int, list[tuple[int, float | None]]] = {}
+        for nid, data in (AD.select(AD.id, AD.data)
+                          .where((AD.database << self.dbs) & (AD.type << list(FUNCTION_TYPES))).tuples()):
+            out_key = data.get("processor")
+            pid = key_id.get(tuple(out_key)) if isinstance(out_key, (list, tuple)) and len(out_key) == 2 else None
+            if pid is None:
+                continue
+            factor = self.factor_override.get(nid, data.get("allocation_factor"))
+            out.setdefault(pid, []).append((nid, float(factor) if _is_number(factor) else None))
+        for fs in out.values():
+            fs.sort()
+        return out
+
     def check(self) -> None:
         if self.errors:
             raise ModelError(" ".join(self.error_texts()))
+
+
+def with_factors(S: System, factors: dict[int, float]) -> System:
+    """The same calculation with other allocation factors for some products, nothing saved (comparing allocations).
+    Rebuilds only the models; the background and its factorization are shared. Not cached."""
+    fg = Foreground(S.fg.dbs, S.bg, S.fg.alias_keys, factors={**S.fg.factor_override, **factors})
+    out = System(S.bg, fg)
+    out.substituted, out.pulled, out.pulled_ids = S.substituted, S.pulled, S.pulled_ids
+    return out
+
+
+def _is_number(x) -> bool:
+    return isinstance(x, (int, float)) and not isinstance(x, bool) and np.isfinite(x)
+
+
+def products_of(node_id: int) -> list[tuple[int, float | None]]:
+    """The products of a process stored as in Activity Browser 3 [(product id, allocation factor)]; [] otherwise."""
+    node = AD.get_or_none(AD.id == int(node_id))
+    if node is None or node.type in FUNCTION_TYPES:
+        return []
+    out = []
+    for nid, data in (AD.select(AD.id, AD.data)
+                      .where((AD.database == node.database) & (AD.type << list(FUNCTION_TYPES))).tuples()):
+        if tuple(data.get("processor") or ()) == (node.database, node.code):
+            factor = data.get("allocation_factor")
+            out.append((nid, float(factor) if _is_number(factor) else None))
+    return sorted(out)
 
 
 def _coo(entries, shape) -> sparse.csc_matrix:
@@ -450,6 +572,9 @@ class System:
         self._unit: dict = {}
         self._cvec: dict = {}
         self._direct: dict = {}
+        self._reg: dict = {}
+        self._reg_f: dict = {}
+        self._fg_places = None
         self._A = None
         self._B = None
 
@@ -486,8 +611,70 @@ class System:
         if method not in self._direct:
             d_b = self.bg.direct(method)
             d_f = np.asarray(self.fg.B_f.T @ self.cvec(method)).ravel() if self.nf else np.zeros(0)
+            part = self._regional_fg(method)
+            if part is not None:
+                d_f = d_f + np.asarray(part.R.sum(axis=0)).ravel()
             self._direct[method] = np.concatenate([d_b, d_f])
         return self._direct[method]
+
+    # ---------- factors that depend on the location (regional.py) ----------
+
+    def fg_places(self) -> regional.Places:
+        if self._fg_places is None:
+            info = {int(i): (n["database"], n["name"], None, n["location"]) for i, n in self.fg.nodes.items()}
+            self._fg_places = regional.places_for(self.fg.act_ids, info, volumes=False)
+        return self._fg_places
+
+    def _regional_fg(self, method: tuple) -> regional.Part | None:
+        if method not in self._reg_f:
+            T = regional.active(method) if self.nf else None
+            self._reg_f[method] = regional.matrix(T, self.bio_ids, self.fg_places(), self.fg.B_f, self.cvec(method)) \
+                if T else None
+        return self._reg_f[method]
+
+    def regional(self, method: tuple) -> sparse.csc_matrix | None:
+        """R: the location-dependent part of the characterized biosphere matrix over all columns, so that the
+        characterized B is diag(c) B + R (None when the method has no factors by location or they are off)."""
+        if method not in self._reg:
+            pb, pf = self.bg.regional(method), self._regional_fg(method)
+            R = None
+            if pb is not None or pf is not None:
+                nbio = len(self.bio_ids)
+                Rb = pb.R if pb is not None else sparse.csc_matrix((len(self.bg.bio_ids), self.nb))
+                if Rb.shape[0] < nbio:
+                    Rb = sparse.vstack([Rb, sparse.csc_matrix((nbio - Rb.shape[0], Rb.shape[1]))]).tocsc()
+                Rf = pf.R if pf is not None else sparse.csc_matrix((nbio, self.nf))
+                R = sparse.hstack([Rb, Rf]).tocsc() if self.nf else Rb
+            self._reg[method] = R
+        return self._reg[method]
+
+    def flow_impacts(self, method: tuple, x: np.ndarray) -> np.ndarray:
+        """Impact per elementary flow for the supply x: c ∘ (B x), plus the part by location."""
+        out = self.cvec(method) * self.inventory(x)
+        R = self.regional(method)
+        return out + np.asarray(R @ x).ravel() if R is not None else out
+
+    def place(self, col: int) -> regional.Place:
+        return self.bg.places().column(col) if col < self.nb else self.fg_places().column(col - self.nb)
+
+    def column_places(self, method: tuple) -> tuple[np.ndarray, list, np.ndarray]:
+        """Per column the index of its place in `places`, the places (background ones first) and, per place, how a
+        flow of the method got its factor there (regional.OWN … NORMAL)."""
+        rb, rf = self.bg.regional(method), self._regional_fg(method)
+        pb, pf = self.bg.places(volumes=rb is not None), self.fg_places()  # the production volumes only when needed
+        idx = np.concatenate([pb.index, pf.index + len(pb.places)]) if self.nf else pb.index
+        how = np.zeros(len(pb.places) + len(pf.places), dtype=np.int8)
+        if rb is not None:
+            how[:len(pb.places)] = rb.how
+        if rf is not None:
+            how[len(pb.places):] = rf.how
+        return idx, pb.places + pf.places, how
+
+    def column_factors(self, method: tuple, col: int) -> np.ndarray:
+        """The factor of every flow for the activity in column `col`: the normal factors, with those of its place."""
+        c = self.cvec(method)
+        T = regional.active(method)
+        return regional.factors_at(T, self.bio_ids, c, self.place(col)) if T is not None else c
 
     def unit_scores(self, method: tuple) -> np.ndarray:
         """Cumulative score per unit of every product row, background and models."""
@@ -521,6 +708,13 @@ class System:
             pos = colv.indices[colv.data > 0]
             if len(pos):
                 return int(pos[0])
+        # a process stored as in Activity Browser 3: its product; with several products the user has to choose one
+        fs = self.fg.functions.get(node_id) or products_of(node_id)
+        if len(fs) == 1:
+            return self.ref_row(fs[0][0])
+        if fs:
+            name = AD.select(AD.name).where(AD.id == node_id).scalar()
+            raise KeyError(i18n._("«{name}» hat mehrere Produkte. Wähle eines davon.", name=name))
         other = self.counterpart(node_id)
         if other is not None and other != node_id:
             return self.ref_row(other)
@@ -556,8 +750,12 @@ class System:
 
 
 def method_cfs(method: tuple) -> dict[int, float]:
+    """The method's normal factors per flow id: its rows without location or with the global one, as bw2calc uses
+    them. Rows with another location are factors by location (regional.py)."""
     out: dict[int, float] = {}
     for entry in bd.Method(method).load():
+        if not regional.is_global(entry):
+            continue
         key, cf = entry[0], entry[1]
         if isinstance(key, (list, tuple)):
             key = bd.get_id(tuple(key))
@@ -600,6 +798,44 @@ def bump_all() -> None:
 def bump_foreground(project: str) -> None:
     with _lock:
         _fg_version[project] = _fg_version.get(project, 0) + 1
+
+
+def forget(project: str) -> None:
+    """Drop every cached calculation of `project` and close the processed datapackages they keep open.
+
+    A cached background holds its bw2calc LCA, whose datapackages keep the project's processed/*.zip files open.
+    Windows cannot delete an open file (WinError 32), so a project is forgotten before its folder is removed."""
+    with _lock:
+        gone = [_backgrounds.pop(k) for k in [k for k in _backgrounds if k[0] == project]]
+        for k in [k for k in _systems if k[0] == project]:
+            del _systems[k]
+        _bg_version[project] = _bg_version.get(project, 0) + 1
+        _fg_version[project] = _fg_version.get(project, 0) + 1
+    for bg in gone:
+        _close_packages(bg.lca)
+        bg.lca = None
+    gc.collect()  # what still refers to the packages elsewhere closes its files when it is freed
+
+
+def forget_others(project: str) -> None:
+    """forget() every other project with cached calculations. On Windows when another project is opened: its files
+    stay open otherwise, and another program (the Activity Browser) could not delete or rewrite that project."""
+    with _lock:
+        others = {k[0] for k in _backgrounds} | {k[0] for k in _systems}
+    for p in others - {project}:
+        forget(p)
+
+
+def _close_packages(lca) -> None:
+    for dp in getattr(lca, "packages", None) or []:
+        fs = getattr(dp, "fs", None)
+        try:
+            if hasattr(fs, "zip"):  # fsspec ZipFileSystem: the archive, then the file under it
+                fs.zip.close()
+            if hasattr(getattr(fs, "of", None), "__exit__"):
+                fs.of.__exit__(None, None, None)
+        except Exception:  # noqa: BLE001 - closing is best effort, the folder removal reports what stays open
+            pass
 
 
 def backgrounds_in_use(project: str) -> set[str]:

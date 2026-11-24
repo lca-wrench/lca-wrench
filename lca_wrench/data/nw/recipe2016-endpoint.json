@@ -1,0 +1,167 @@
+{
+ "source": "Normalization: RIVM, Normalization scores ReCiPe 2016 v1.1 (2019-05-14), world 2010, per person (sheet 'Final normalization scores', endpoint columns H, I, J); the normalization of an area of protection is the sum of its categories, land use (occupation) included. Weighting: the Eco-indicator 99 panel sets (Goedkoop & Spriensma, PRe), reused by ReCiPe 2008 and, for ReCiPe 2016, by SimaPro (method developers published only normalization factors).",
+ "single_score": "sum over the three areas of result / normalization x weight, in Pt (1000 Pt = the yearly impact of an average world citizen)",
+ "unit": "Pt",
+ "areas": {
+  "human health": {
+   "unit": "DALY",
+   "names": [
+    "human health"
+   ]
+  },
+  "ecosystem quality": {
+   "unit": "species.yr",
+   "names": [
+    "ecosystem quality",
+    "ecosystems"
+   ]
+  },
+  "natural resources": {
+   "unit": "USD2013",
+   "names": [
+    "natural resources",
+    "resources"
+   ]
+  }
+ },
+ "normalisation": {
+  "I": {
+   "human health": 0.011119073013405386,
+   "ecosystem quality": 0.0010026705957185138,
+   "natural resources": 31090.724442337174
+  },
+  "H": {
+   "human health": 0.024001948827984683,
+   "ecosystem quality": 0.0014792119404020572,
+   "natural resources": 28033.310461055058
+  },
+  "E": {
+   "human health": 0.10474984717590331,
+   "ecosystem quality": 0.0019232763808186228,
+   "natural resources": 28033.310461055058
+  }
+ },
+ "normalisation_categories": {
+  "human health": {
+   "I": {
+    "Global Warming - Human health": 0.0008734731859414427,
+    "Stratospheric ozone depletion - Human health": 1.5483066019524117e-05,
+    "Ionzing Radiation - Human health": 3.194070219083249e-06,
+    "Fine particulate matter formation - Human health": 0.010009245361730838,
+    "Photochemical ozone formation - Human health": 1.8022733742761528e-05,
+    "Toxicity - Human health (cancer)": 3.287912399257952e-06,
+    "Toxicity - Human health (non-cancer)": 3.388155189768623e-07,
+    "Water consumption - human health": 0.00019602786783350215
+   },
+   "H": {
+    "Global Warming - Human health": 0.007415098301940347,
+    "Stratospheric ozone depletion - Human health": 3.1865312634949464e-05,
+    "Ionzing Radiation - Human health": 4.079297475883296e-06,
+    "Fine particulate matter formation - Human health": 0.0160948401859121,
+    "Photochemical ozone formation - Human health": 1.8022733742761528e-05,
+    "Toxicity - Human health (cancer)": 3.4190377431228154e-05,
+    "Toxicity - Human health (non-cancer)": 0.0002078247510139118,
+    "Water consumption - human health": 0.00019602786783350215
+   },
+   "E": {
+    "Global Warming - Human health": 0.0724700513330015,
+    "Stratospheric ozone depletion - Human health": 9.438595588127012e-05,
+    "Ionzing Radiation - Human health": 9.780131527592423e-06,
+    "Fine particulate matter formation - Human health": 0.0160948401859121,
+    "Photochemical ozone formation - Human health": 1.8022733742761528e-05,
+    "Toxicity - Human health (cancer)": 0.0009801769190744827,
+    "Toxicity - Human health (non-cancer)": 0.01479192193042976,
+    "Water consumption - human health": 0.0002906679863338475
+   }
+  },
+  "ecosystem quality": {
+   "I": {
+    "Global Warming - Terrestrial ecosystems": 5.722755356168074e-06,
+    "Photochemical ozone formation - Terrestrial ecosystems": 2.238761786008037e-06,
+    "Acidification - Terrestrial ecosystems": 8.419891922192326e-06,
+    "Toxicity - Terrestrial ecosystems": 0.0003624201371404176,
+    "Water consumption - terrestrial ecosystems": 0.0,
+    "Global Warming - Freshwater ecosystems": 1.5597735463240051e-10,
+    "Land use - occupation": 0.0006233628589258681,
+    "Eutrophication - Freshwater ecosystems": 4.896352225784075e-07,
+    "Toxicity - Freshwater ecosystems": 8.73651574817297e-09,
+    "Water consumption -aquatic ecosystems": 6.157105995261624e-10,
+    "Toxicity - Marine ecosystems": 9.237265202140627e-10,
+    "Eutrophication - marine ecosystems": 6.123435058773402e-09
+   },
+   "H": {
+    "Global Warming - Terrestrial ecosystems": 2.237314142826829e-05,
+    "Photochemical ozone formation - Terrestrial ecosystems": 2.238761786008037e-06,
+    "Acidification - Terrestrial ecosystems": 8.419891922192326e-06,
+    "Toxicity - Terrestrial ecosystems": 0.0008188138758371857,
+    "Water consumption - terrestrial ecosystems": 3.484366950773775e-06,
+    "Global Warming - Freshwater ecosystems": 6.112661854509017e-10,
+    "Land use - occupation": 0.0006233628589258681,
+    "Eutrophication - Freshwater ecosystems": 4.896352225784075e-07,
+    "Toxicity - Freshwater ecosystems": 1.7496418926309127e-08,
+    "Water consumption -aquatic ecosystems": 6.157105995261624e-10,
+    "Toxicity - Marine ecosystems": 4.561498412664492e-09,
+    "Eutrophication - marine ecosystems": 6.123435058773402e-09
+   },
+   "E": {
+    "Global Warming - Terrestrial ecosystems": 0.000144940102666003,
+    "Photochemical ozone formation - Terrestrial ecosystems": 2.238761786008037e-06,
+    "Acidification - Terrestrial ecosystems": 8.419891922192326e-06,
+    "Toxicity - Terrestrial ecosystems": 0.0008815022653474452,
+    "Water consumption - terrestrial ecosystems": 3.484366950773775e-06,
+    "Global Warming - Freshwater ecosystems": 3.953966000728561e-09,
+    "Land use - occupation": 0.0006233628589258681,
+    "Eutrophication - Freshwater ecosystems": 4.896352225784075e-07,
+    "Toxicity - Freshwater ecosystems": 2.0179143020075452e-07,
+    "Water consumption -aquatic ecosystems": 6.157105995261624e-10,
+    "Toxicity - Marine ecosystems": 0.0002586260134558942,
+    "Eutrophication - marine ecosystems": 6.123435058773402e-09
+   }
+  },
+  "natural resources": {
+   "I": {
+    "Mineral resource scarcity": 30799.37230265946,
+    "Fossil resource scarcity": 291.35213967771415
+   },
+   "H": {
+    "Mineral resource scarcity": 27741.958321377344,
+    "Fossil resource scarcity": 291.35213967771415
+   },
+   "E": {
+    "Mineral resource scarcity": 27741.958321377344,
+    "Fossil resource scarcity": 291.35213967771415
+   }
+  }
+ },
+ "weighting": {
+  "I/I": {
+   "human health": 550,
+   "ecosystem quality": 250,
+   "natural resources": 200
+  },
+  "H/A": {
+   "human health": 400,
+   "ecosystem quality": 400,
+   "natural resources": 200
+  },
+  "H/H": {
+   "human health": 300,
+   "ecosystem quality": 400,
+   "natural resources": 300
+  },
+  "E/E": {
+   "human health": 300,
+   "ecosystem quality": 500,
+   "natural resources": 200
+  }
+ },
+ "default_weighting": {
+  "I": "I/I",
+  "H": "H/A",
+  "E": "E/E"
+ },
+ "notes": [
+  "Mineral resource scarcity makes up most of the resource normalization (27,742 of 28,033 USD2013 per person, H); its midpoint value in the same table, 120,051 kg Cu-eq per person, looks implausibly high.",
+  "Water consumption, terrestrial ecosystems is 0 for the Individualist perspective in RIVM's table."
+ ]
+}

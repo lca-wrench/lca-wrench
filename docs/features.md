@@ -110,12 +110,41 @@ background itself, d is just that product.
 
 - **Datasets:** every background dataset the product uses directly gets a counterpart, in this order: (1) a choice the
   user made or loaded from a mapping file; (2) the same code in the other database (the same database twice, or versions
-  that keep their codes); (3) a suggestion from name, reference product, location and unit. The user confirms
+  that keep their codes); (3) the same name, reference product, location and unit (a premise scenario gives its
+  datasets new codes), shown as "same name, location and unit" and counted as sure; (4) a suggestion from name,
+  reference product, location and unit. The user confirms
   suggestions ("Confirm suggestion", "Confirm good suggestions (n)") or changes them ("Change", search in the other
   database). "No counterpart" counts as zero on the other side; the share of the result here that such datasets carry is
   shown, as is the share of unsure suggestions.
 - **Units:** converted where both units measure the same thing (mass, energy, volume, freight, area, time …); otherwise
   the match is marked "Unit does not fit".
+- **Scenarios and EXIOBASE on the other side:** the datasets there are scored on their own database when the
+  calculation does not include it (a premise scenario or EXIOBASE is only part of it once chosen under Start).
+- **EXIOBASE (proxy sectors):** an input-output table has no dataset of the same name. Each dataset gets the industry
+  its activity belongs to, or that industry's product, in the region of its location (`lca_wrench/sectors.py`). Both
+  tables work: industry by industry (163 industries) and product by product (200 products), recognised by their
+  names. The industry, in this order:
+  1. **ISIC** (ecoinvent): the dataset's ISIC rev.4 class through the sector matching of Peng & Pfister (2023),
+     coarsened to 3 and 2 digits where a class is not listed;
+  2. **name rules**: words of the name and reference product, with BAFU 2025's EcoSpold01 category and BAFU 2026's
+     sector ("Electricity, hydropower, at power plant" → electricity by hydro, "Diesel, at regional storage" →
+     petroleum refinery, "Transport, freight, lorry …" → other land transport). With ISIC candidates a rule only
+     narrows them ("market for electricity, low voltage" → distribution and trade of electricity);
+  3. **category or sector alone** (BAFU "chemicals" → the chemical industries), marked unsure;
+  4. **words only**: the industries sharing most words with the name, marked unsure.
+
+  Several candidates are ranked by the words they share with the dataset; among equals the "nec" industry comes first
+  (ISIC 2011 → chemicals nec). In the product table each industry stands for its products, the one the name points to
+  first ("Heavy fuel oil" → Heavy Fuel Oil, "Petrol" → Motor Gasoline), else its main product. Region: the region
+  matching of Peng & Pfister (2023); a location covering several regions (GLO, RER, RoW) takes the one with the largest
+  production of the sector. Checked on all datasets of BAFU 2025 (90 % by name rules, the rest by category), BAFU 2026
+  (90 % by name rules) and ecoinvent 3.9.1 (by ISIC), and against the EXIOBASE 3.8.2 tables of 2022 (all 163
+  industry and 200 product names recognised).
+
+  The amount is converted into million euro with the price of the product: ecoinvent's property "price" (EUR 2005, not
+  deflated to the table's year) or a price typed in under "Change" ("Use with this price"); without one, the sector is
+  shown with "Price missing" and counts as zero. BAFU datasets have no price, so each needs one typed in. The tables are
+  in `lca_wrench/data/sectors`.
 - **Direct emissions** of the model's own activities: same code, otherwise the same name and compartment after
   normalizing the spelling ("Carbon dioxide, fossil" in "emissions to air" = "Carbon Dioxide (fossil)" in
   "Emissions / Emissions to air").
@@ -146,7 +175,79 @@ ecoinvent-shaped database in another project): side A equals the normal result; 
 the matched datasets, the unit conversion and the direct emissions; suggestions, the user's choice, "No counterpart"
 and going back; export in the format of sentier-mappings (ecoinvent by code only) and loading it again; the same
 database twice gives the same result; method and unit matching; API. The first calculation against another database
-prepares it, which takes some time.
+prepares it, which takes some time. `tests/test_backgrounds.py`: a premise-like scenario outside the calculation is
+scored on its own data (also one level down); EXIOBASE proxy sectors by ISIC class and region, the price from the
+dataset and typed in, and its export as a conversion factor; both tables (industries and products, with EXIOBASE's
+names) for datasets with ISIC class (ecoinvent), with a category (BAFU 2025) and with a sector only (BAFU 2026).
+
+## Several products and allocation
+
+A process with several products (milk and meat from one farm, boards and chips from one sawmill) is stored as the
+[Activity Browser 3](https://github.com/LCA-ActivityBrowser/activity-browser) stores it, with
+[bw_functional](https://github.com/LCA-ActivityBrowser/bw-functional) (database backend `functional_sqlite`): the
+process and each of its products are nodes of their own. A product names its process (`processor`), carries
+properties per unit of product (mass, price …; with `normalize`, multiplied by the amount produced) and the share of
+the process's inputs and emissions it bears (`allocation_factor`). The process says how the shares are found
+(`allocation`): in equal parts, by a property all its products have, or by hand. Code: `lca_wrench/functional.py`,
+the engine in `lca_wrench/engine.py` (`Foreground`).
+
+- **Calculation:** every input, emission and credit of the process is split onto its products by their shares; each
+  product's own production goes to its own column. This is what bw_functional does when it prepares the database for
+  bw2calc, and the tests check that both give the same result. A process with one product stands for that product; a
+  process with several asks which product to calculate. Shares that do not add up to 1 are calculated as given (as
+  bw_functional does) and noted at the process.
+- **Data sheet of the process:** the card "Products and allocation" lists the products with their amount (editable in
+  own models), share and impact per unit, and the allocation in use. Changing it (in equal parts, by a property, by
+  hand) recalculates at once and is a step in the history that can be undone. By hand, the shares typed in are scaled
+  to add up to 100 %. When the allocation uses a property per unit (price), changing a product's amount moves the
+  shares (revenue = price × amount).
+- **Data sheet of a product:** the process's inputs and emissions, scaled by the product's share, and its result.
+  The amounts are changed in the process ("Open activity").
+- **Compare allocations:** every way the process can be split, side by side: the impact per unit of each product, with
+  its share. Nothing is saved; only the models are recalculated with those shares, the background stays as it is.
+  Choosing an allocation is a modelling choice, so the spread belongs in the result.
+- **Own models only:** as everywhere, LCA Wrench changes only models made in it, or anything in a working copy.
+  Databases made in the Activity Browser 3 are calculated live and changed only in a copy of the project.
+- **bw_functional** is loaded without one part: when a project is opened, it brings the project's databases to its
+  current data structure and writes a version mark into the project. LCA Wrench does not change projects without being
+  asked, so this update runs only right before LCA Wrench itself writes into such a database.
+- **Building such models in LCA Wrench:** there is no format to choose when a model is made. Every process of an own
+  model has "+ Product" on its data sheet, with a note on what a co-product does. The first co-product in a classic
+  model stores the whole model as the Activity Browser 3 stores it, in place: each process gets its product as a node
+  of its own (name and unit of its reference product), and process ids, exchange ids, parameters and formulas,
+  uncertainties, inputs from other models and calculation setups stay (inputs and setups now name the product). The
+  allocation starts in equal parts. "Undo" stores the model in the classic format again. A model with a process that
+  has several production exchanges, or one naming another dataset, is refused with a message. Afterwards the model
+  needs bw_functional to be read, as in the Activity Browser 3.
+- **Allocation only from two products:** the card "Products and allocation" appears once a process has a second
+  product, with a note on ISO 14044: avoid allocation where possible, by splitting the process or by crediting the
+  co-product for what it replaces (system expansion, LCA Wrench's credits); otherwise split by a physical relationship
+  (mass, energy), only then by price; "Compare allocations" shows how much the choice moves the result.
+- **Products and properties:** "+ Product" adds more products, each with its amount and unit, and × removes one again
+  (not the last, and not while another process uses it). "+ Property" gives every product of the process a property
+  (price, mass …, per unit of product, 1 until set); its values are typed into the table, and the allocation can then
+  use it. A property the allocation uses cannot be removed. Every step can be undone; deleting a process deletes its
+  products with it, and undo brings both back. (The API can also make a model in this format from the start:
+  `several_products` in `POST /api/models/db`.)
+- **Inputs:** a process of this format is an input only through one of its products: choosing a process with several
+  products as input is refused, one with a single product stands for that product.
+- **Copying:** a dataset of BAFU or ecoinvent copied into such a model becomes a process with one product (with all
+  inputs and emissions); a process of such a model is copied with all its products, their properties and its
+  allocation. A product copied into a classic model becomes one dataset with its share of the process (every input
+  and emission times its allocation factor). LCA Wrench copies these itself: bw_functional 0.1.1's own copy of a
+  process deletes the original's products.
+- **Not yet:** storing a model back in the classic format other than by undo, Excel exchange and "Move to another
+  region" for such models (both refuse with a message), system expansion in bw_functional's terms (LCA Wrench's
+  credits remain the way to substitute), and the Circular Footprint Formula of PEF.
+
+Tested in `tests/test_multifunctional.py`: a dairy farm (8 kg milk, 1 kg meat, 9 kg CO2 per run) and cheese made from
+its milk, by hand calculation; the same farm written by bw_functional as the Activity Browser 3 writes it, with LCA
+Wrench's results equal to bw2calc's on bw_functional's processing for allocation by price, by mass, by hand and after
+a changed amount; the data sheets, undo and the comparison; the farm built step by step in LCA Wrench (new model,
+process, second product, price property, allocation, inputs, removing and restoring a product, copies both ways,
+deleting the process and undoing it), again equal to bw2calc; and a classic model with a parameter formula, an input
+from another model and a calculation setup, stored in this format by its first co-product and back by undo, with the
+same ids and formulas and results equal to bw2calc both ways.
 
 ## Search
 
@@ -216,3 +317,53 @@ takes the factor of the flow with the same name, the same top-level compartment,
 unit. Existing factors, including explicit zeros, are never overwritten; long-term sub-compartments are never completed;
 stored methods are not modified. The completion is on by default, visibly marked in the result, and can be switched off.
 The list of added factors is shown and can be exported. Details: [completed-factors.md](completed-factors.md).
+
+## Single scores
+
+Result, Single score sums up the impact categories of a method family in one number, with the weighted share of each
+category (bars and a table with result, normalization, weight and score; a click on a category shows its
+contributions). The sets the project's methods allow are listed; a set names the categories the project lacks.
+
+- **EF 3.1, normalized and weighted** (mPt): each of the 16 categories divided by its normalization factor (global, per
+  person and year) times its weight in %, × 1000. Works with sentier's EF 3.1 (BAFU 2026), ecoinvent's "EF v3.1" with
+  and without long-term emissions, and "EF v3.1 PEF".
+- **ReCiPe 2016 endpoint, points** (Pt; 1000 Pt = the yearly impact of one person): human health, ecosystem quality
+  and natural resources, each divided by RIVM's normalization (world 2010, per person) and weighted with a set of the
+  Eco-indicator 99 panel: by default I/I for the Individualist, H/A for the Hierarchist and E/E for the Egalitarian
+  perspective, as in SimaPro; H/H and the others can be chosen. Where a family has categories, the parts are the
+  categories, and a note appears if they do not add up to the area's total.
+- **Ecological Scarcity 2021, total UBP**: the eco-factors already weight, so the single score is the total: the
+  family's total method (ecoinvent's "total", LCA Wrench's derived total for the BAFU 2025 template), else the sum of
+  the categories.
+
+All numbers come from one inventory of the product, characterized with each method (including flow mapping and
+completed factors), so they are the same as calculating each method on its own. The factors, their sources and the
+points to check (mineral resources dominate RIVM's resource normalization) are in
+[../lca_wrench/data/nw/README.md](../lca_wrench/data/nw/README.md).
+
+A set whose methods are implemented on another list of elementary flows than the product's (sentier's EF 3.1 or the
+PEF methods on an ecoinvent product) gets 0 for the categories the flow mapping does not fill: particulate matter,
+toxicity, water use and resources (see [flow-mapping.md](flow-mapping.md)). Its single score would be too low, so the
+list marks such a set "incomplete for this product" and picks a complete one by default; chosen anyway, the result
+warns and marks the categories "not characterized".
+
+API: `GET /api/singlescore/sets` (with `?id=<product>`: a `coverage` per set: native, mapped or missing),
+`POST /api/singlescore` with `{"id", "amount", "set", "weighting"}`.
+
+## Factors by location (regionalized impact assessment)
+
+A characterization factor can depend on where the emitting activity is: EF 3.1 water use has a factor per country
+(Switzerland 1.34, Spain 77.7 m³ world eq. per m³). LCA Wrench reads such factors from the method itself, in Brightway's
+convention (rows `(flow, factor, location)`, which bw2calc leaves out) or as country copies of a flow (a flow with a
+location of its own, "Water, AT", whose generic flow is in the same method). Each activity gets the factor of its
+location; a part of a country (CA-QC) the country's; a region (RER, ENTSO-E …) the average of its countries, weighted
+by the production volumes of the same datasets there, else by the output of the dataset's industry in the project's
+EXIOBASE, else equally; GLO, RoW and unknown
+locations keep the normal factor. Nothing is bundled and the stored methods are not changed. On by default, can be
+switched off above the result; a method without such factors gives exactly the result it gave before. The country
+factors of the JRC's EF 3.1 workbook (water use, land use, acidification, terrestrial eutrophication) are loaded once
+from your own copy and apply to the matching EF 3.1 methods in all projects.
+
+**Result by location**: Result, Contributions, "by location" lists the impact by the location of the activities that
+cause it, with what the factors by location change there and how each factor was found; also in the export. Details:
+[regional-factors.md](regional-factors.md).

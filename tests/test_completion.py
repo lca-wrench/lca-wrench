@@ -119,7 +119,7 @@ def test_flows_without_a_factor(electricity, switch):
 
 def test_api_switch_list_and_export(electricity, switch):
     body = {"id": str(electricity.id), "amount": 1.0, "method": list(s.CLIMATE_METHOD)}
-    with TestClient(app, base_url="http://127.0.0.1") as c:
+    with TestClient(app, base_url="http://127.0.0.1", headers={"X-LCA-Wrench": "1"}) as c:
         assert c.post("/api/completion", json={"enabled": True}).json() == {"enabled": True}
         assert c.get("/api/state").json()["completion"] == {"enabled": True}
         on = c.post("/api/calc", json=body).json()
@@ -146,3 +146,29 @@ def test_api_switch_list_and_export(electricity, switch):
         done = wb["Ergänzte Faktoren"]
         assert done.max_row - 1 == on["factors"]["completed"]
         assert np.isclose(sum(r[4] for r in done.iter_rows(min_row=2, values_only=True)), on["factors"]["completed_value"])
+
+
+def test_a_family_that_specifies_its_sub_compartments_is_left_as_it_is():
+    """A family that gives most sub-compartments of its substances a factor of its own has chosen which ones count, so
+    a sub-compartment it leaves out stays out. The same factor on the flow without sub-compartment alone is completed."""
+    co2 = {i: cats for i, (name, cats, _u) in completion.flows(BIO).items() if name == "Carbon dioxide, fossil"}
+    top = next(i for i, c in co2.items() if c == ("emissions to air",))
+    subs = sorted(i for i, c in co2.items() if len(c) > 1 and c[0] == "emissions to air" and not completion.long_term(c))
+    assert len(subs) >= 3
+    key = {i: bd.get_node(id=i).key for i in [top, *subs]}
+    specified, sparse = ("test-specified", "Climate"), ("test-sparse", "Climate")  # one-method families
+    bd.Method(specified).register(unit="kg CO2-eq")
+    bd.Method(specified).write([(key[top], 1.0)] + [(key[i], 1.0) for i in subs[1:]])  # all but one sub-compartment
+    bd.Method(sparse).register(unit="kg CO2-eq")
+    bd.Method(sparse).write([(key[top], 1.0)])
+    try:
+        assert completion.sub_share(specified) == pytest.approx((len(subs) - 1) / len(subs))
+        assert completion.sub_share(sparse) == 0
+        assert not completion.needs_completion(specified) and completion.candidates(specified) == {}
+        assert completion.needs_completion(sparse) and set(completion.candidates(sparse)) == set(subs)
+        # the BAFU template's methods and the climate method derived from them keep their completed factors
+        assert completion.needs_completion(GW) and completion.candidates(GW)
+        assert completion.needs_completion(s.CLIMATE_METHOD) and completion.candidates(s.UBP_TOTAL_METHOD)
+    finally:
+        for m in (specified, sparse):
+            bd.Method(m).deregister()

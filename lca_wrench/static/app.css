@@ -169,19 +169,30 @@ details.haube[open] summary::before{content:"–"}
 
 @media (max-width:980px){.hero,.grid2{grid-template-columns:1fr}.flow{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:760px){
-  .app{grid-template-columns:1fr}
-  .rail{border-right:0;border-bottom:1px solid var(--line)}
-  .rail-in{flex-direction:row;overflow-x:auto;padding:6px 12px}
-  .nav{flex:1 0 64px}
+  /* minmax(0,…): the row of views scrolls by itself instead of widening the page */
+  .app{grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto 1fr}
+  .rail{border-right:0;border-bottom:1px solid var(--line);min-width:0;position:sticky;top:0;z-index:5}
+  .rail-in{flex-direction:row;overflow-x:auto;padding:6px 12px;scrollbar-width:thin}
+  .nav{flex:1 0 auto;min-width:56px;padding:6px 6px}
   .dataview{grid-template-columns:1fr}
-  .plist{position:static;max-height:240px}
+  .plist{position:static;max-height:min(60vh,440px)}
   .bar{grid-template-columns:minmax(0,1fr) auto;}
   .bar .t{grid-column:1/-1;grid-row:2}
   .srow{grid-template-columns:minmax(0,1fr) 70px}
   .srow .strack{grid-column:1/-1;grid-row:2}
   .truth{grid-template-columns:1fr}
   .flow{grid-template-columns:1fr}
-  .top{padding:10px 16px}
+  /* header in two columns: name and project, method and category, then the buttons */
+  .top{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 10px;padding:8px 12px}
+  .brand{margin-right:0;min-width:0}
+  .brand .chip{display:none}
+  .top label.f{min-width:0}
+  .top select{width:100%}
+  #bgBox,#copyChip,.topbtns{grid-column:1/-1}
+  #copyChip:empty,#busy:empty{display:none}
+  .topbtns{gap:6px}
+  .topbtns .btn{padding:4px 8px;font-size:12.5px}
+  .tblwrap .tbl td:first-child{min-width:150px}  /* only where the table can scroll sideways */
 }
 @media (prefers-reduced-motion:no-preference){.bar .t i,.share .t i,.strack i{transition:width .35s ease}}
 
@@ -333,3 +344,72 @@ span.formula{font-family:var(--font-num);font-size:13px;background:var(--surface
 @media (max-width:980px){.catgrid.two{grid-template-columns:minmax(0,1fr)}}
 .movelist{max-height:220px;overflow:auto;font-size:13px;margin:0;padding-left:18px}
 button.chip{border:0;cursor:pointer;font-family:inherit}
+
+/* ---------- UI polish ---------- */
+/* amounts like 0.0000660123 fit into the field */
+.fcell input[type=number]{width:136px}
+/* a checkbox or radio stays next to its text when the text wraps */
+label.row:has(> input[type=checkbox]),label.row:has(> input[type=radio]){flex-wrap:nowrap;align-items:flex-start}
+label.row > input[type=checkbox],label.row > input[type=radio]{flex:none;margin-top:4px}
+/* long dataset names on buttons wrap instead of widening a narrow page */
+@media (max-width:760px){.btn{white-space:normal;text-align:left;max-width:100%}}
+/* the working area next to a list (Data, Model, Parameters, Calculate) */
+.detail{display:flex;flex-direction:column;gap:18px;min-width:0}
+@media (max-width:760px){.detail{scroll-margin-top:72px}}
+/* notes at the bottom: errors in the warning colour, every note can be closed */
+.toast{display:flex;align-items:flex-start;gap:6px 10px;flex-wrap:wrap}
+.toast[hidden]{display:none}
+.toast > span{flex:1 1 auto;min-width:0}
+.toast.err{background:var(--hot);color:var(--on-accent)}
+.toast.err .tlink{color:inherit}
+.toast .tclose{border:0;background:transparent;color:inherit;opacity:.75;cursor:pointer;font-size:18px;line-height:1;padding:0 2px;margin-left:auto}
+.toast .tclose:hover{opacity:1}
+/* while the server works: a thin moving line along the top edge (it does not push the header around);
+   the text stays for screen readers */
+#busy{position:fixed;top:0;left:0;right:0;height:3px;z-index:30;pointer-events:none}
+#busy .busy{position:absolute;inset:0;overflow:hidden;font-size:0;color:transparent;background:linear-gradient(90deg,transparent,var(--accent),transparent) no-repeat;background-size:40% 100%;animation:busybar 1.1s linear infinite}
+#busy .busy::before{display:none}
+@keyframes busybar{from{background-position:-60% 0}to{background-position:160% 0}}
+@media (prefers-reduced-motion:reduce){#busy .busy{animation:none;background:var(--accent)}}
+/* a button whose action takes a while */
+[data-act][aria-busy="true"]{cursor:progress}
+.btn[aria-busy="true"]::after{content:"";display:inline-block;width:9px;height:9px;margin-left:7px;vertical-align:-1px;border-radius:50%;border:2px solid currentColor;border-right-color:transparent;animation:spin .8s linear infinite}
+@media (prefers-reduced-motion:reduce){.btn[aria-busy="true"]::after{animation:none}}
+.bar .t i.rest{background:var(--c6)}
+/* rows that open nothing (the rest, contributions by flow) do not look clickable */
+.bar:not([data-act]){cursor:default}
+.bar:not([data-act]):hover{background:transparent}
+/* the tabs of the result: one row that scrolls sideways on a phone, like the views */
+@media (max-width:760px){.tabs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:thin}.tabs button{flex:none;padding:8px 11px}}
+
+/* header on wider screens: name and selectors on the left, buttons on the right.
+   From 1200 px one row (the selectors give way before anything wraps); between phone and 1200 px two
+   deliberate rows: name and buttons, then the selectors in equal columns */
+@media (min-width:761px){
+  .brand{margin-right:0}
+  .topbtns{margin-left:auto;flex:none}
+  .top label.f{flex:1 1 150px;min-width:130px;max-width:260px}
+  .top select{width:100%;max-width:none}
+}
+@media (min-width:761px) and (max-width:1399px){.brand .chip{display:none}}
+@media (min-width:761px) and (max-width:1199px){
+  .top{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px 14px}
+  .top:has(#bgBox:not([hidden])){grid-template-columns:repeat(4,minmax(0,1fr))}
+  .brand{grid-column:1;grid-row:1}
+  .topbtns{grid-column:2/-1;grid-row:1;justify-self:end}
+  .top label.f{min-width:0;max-width:none}
+  #copyChip{grid-column:1/-1;justify-self:start}
+  #copyChip:empty{display:none}
+}
+
+/* touch screens: iPhone Safari zooms into any field with text below 16 px when it is tapped (and stays zoomed).
+   16 px there; zooming by hand stays possible (the viewport does not forbid it). :is/:where keep the specificity low,
+   so larger fields (the name in the editor, 18 px) stay as they are */
+@media (hover:none) and (pointer:coarse){
+  :root :is(input:where(:not([type=checkbox],[type=radio],[type=range],[type=file])),select,textarea){font-size:16px}
+}
+/* small phones (up to 400 px): the four header buttons stay in one row from 340 px, also in German (when it is
+   tight, the text of a button wraps inside it instead of a button moving to a second row; exact widths differ between
+   browser versions); the Start cards (inline padding, hence !important) and their table fit */
+@media (max-width:400px){.topbtns{gap:4px}.topbtns .btn{padding:4px 6px;flex:0 1 auto}.hero .card{padding:16px !important}.hero .tbl td.nw{white-space:normal}}
+@media (min-width:340px) and (max-width:400px){.topbtns{flex-wrap:nowrap}}

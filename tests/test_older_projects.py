@@ -25,7 +25,7 @@ def _files(d: Path) -> dict:
 def older():
     bd.projects.set_current(TEST_PROJECT)
     for name in [p.name for p in bd.projects if p.name.startswith(OLD)]:
-        bd.projects.delete_project(name, delete_dir=True)
+        s.remove_project(name)
     bd.projects.copy_project(OLD, switch=False)
     ds = ProjectDataset.get(ProjectDataset.name == OLD)
     data = dict(ds.data)
@@ -35,7 +35,7 @@ def older():
     yield OLD
     bd.projects.set_current(TEST_PROJECT)
     for name in [p.name for p in bd.projects if p.name.startswith(OLD)]:
-        bd.projects.delete_project(name, delete_dir=True)
+        s.remove_project(name)
 
 
 def test_older_project_is_marked_and_never_opened(older):

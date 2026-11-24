@@ -51,6 +51,15 @@ def _drop(*names):
             del bd.databases[n]
 
 
+def _bw2calc_score(node, method) -> float:
+    """Plain bw2calc. Its LCA keeps the matrix files open while it lives; here it is gone before a test removes the
+    database (Windows cannot delete an open file)."""
+    lca = bc.LCA({node: 1}, method)
+    lca.lci()
+    lca.lcia()
+    return lca.score
+
+
 @pytest.fixture(scope="module")
 def world():
     bd.projects.set_current(TEST_PROJECT)
@@ -125,6 +134,66 @@ def test_single_scenario_takes_the_counterparts(world):
         backgrounds.set_choice("auto", [], roles)
 
 
+def test_working_copy_keeps_the_background_choice(world):
+    """Regression: the copy reverted to "auto" and calculated on today's data instead of the chosen scenario."""
+    roles = models.roles()
+    backgrounds.set_choice("single", [SC], roles)
+    name = None
+    try:
+        name = s.make_working_copy()
+        assert bd.projects.current == name
+        assert backgrounds.choice(models.roles()) == {"mode": "single", "databases": [SC]}
+        assert models.system().score({world: 1}, GWP) == pytest.approx(Y2040, rel=1e-6)
+        # a lognormal background amount set to 0: no distribution left (it sampled around the old amount);
+        # undo brings the distribution back exactly
+        exc = next(iter(bd.get_node(database=EI, code="elec").technosphere()))
+        exc.update({"uncertainty type": 2, "loc": float(np.log(0.001)), "scale": 0.3})
+        exc.save()
+        eid = exc._document.id
+        s.edit_exchange(eid, 0.0)
+        e = next(iter(bd.get_node(database=EI, code="elec").technosphere()))
+        assert e["amount"] == 0 and int(e.get("uncertainty type") or 0) == 0 and e.get("loc") is None
+        s.undo_change(eid)
+        e = next(iter(bd.get_node(database=EI, code="elec").technosphere()))
+        assert e["amount"] == pytest.approx(0.001) and e["uncertainty type"] == 2 and e["scale"] == 0.3
+        assert e["loc"] == pytest.approx(np.log(0.001)) and s.state()["changes"] == []
+    finally:
+        bd.projects.set_current(TEST_PROJECT)
+        if name:
+            s.remove_project(name)
+            reg = models.registry.load()
+            for key in ("copies", "backgrounds", "models"):
+                reg.get(key, {}).pop(name, None)
+            models.registry.save(reg)
+        backgrounds.set_choice("auto", [], roles)
+
+
+def test_reused_working_copy_name_is_not_served_from_the_cache(world):
+    """Regression: a new copy with the name of a deleted, edited one returned the deleted copy's cached score."""
+    names = []
+
+    def drop(name):
+        bd.projects.set_current(TEST_PROJECT)
+        s.remove_project(name)
+        reg = models.registry.load()
+        for key in ("copies", "backgrounds", "models"):
+            reg.get(key, {}).pop(name, None)
+        models.registry.save(reg)
+
+    try:
+        names.append(s.make_working_copy())
+        co2 = next(iter(bd.get_node(database=EI, code="elec").biosphere()))
+        s.edit_exchange(co2._document.id, 10.0)
+        assert models.system().score({world: 1}, GWP) > 50
+        drop(names.pop())
+        names.append(s.make_working_copy())
+        assert models.system().score({world: 1}, GWP) == pytest.approx(TODAY, rel=1e-6)
+    finally:
+        for name in names:
+            drop(name)
+        bd.projects.set_current(TEST_PROJECT)
+
+
 def test_combined_and_compare_per_item(world):
     roles = models.roles()
     st = backgrounds.set_choice("combined", [EI, SC], roles)
@@ -143,7 +212,7 @@ def test_combined_and_compare_per_item(world):
     sc_elec = bd.get_node(database=SC, code="elec").id
     assert models.system_for(sc_elec).score({sc_elec: 1}, GWP) == pytest.approx(0.02 + 0.001 * 2.28, rel=1e-6)
     assert s.activity(sc_elec, GWP)["calculated_alone"] == SC
-    with TestClient(app, base_url="http://127.0.0.1") as c:
+    with TestClient(app, base_url="http://127.0.0.1", headers={"X-LCA-Wrench": "1"}) as c:
         items = [{"project": TEST_PROJECT, "id": str(world), "amount": 2},
                  {"project": TEST_PROJECT, "id": str(world), "amount": 2, "background": [SC]},
                  {"project": TEST_PROJECT, "id": str(sc_elec), "amount": 1}]
@@ -171,7 +240,7 @@ def test_premise_job_with_stand_in(world, monkeypatch):
     scenarios.forget_constants()
     names = [scenarios.scenario_name(EI, "remind", "TEST-50", y) for y in (2030, 2050)]
     try:
-        with TestClient(app, base_url="http://127.0.0.1") as c:
+        with TestClient(app, base_url="http://127.0.0.1", headers={"X-LCA-Wrench": "1"}) as c:
             o = c.get("/api/import/options").json()
             assert o["premise"]["ei_versions"] == ["3.10"] and [x["name"] for x in o["premise_sources"]] == [EI]
             body = {"name": TEST_PROJECT, "source": "premise", "source_db": EI, "model": "remind", "pathway": "TEST-50",
@@ -211,6 +280,47 @@ def test_premise_job_with_stand_in(world, monkeypatch):
 
 
 
+def test_premise_job_keeps_databases_made_meanwhile(world, monkeypatch, tmp_path):
+    """The user keeps working while premise runs (the dialog says so). A database made meanwhile stays in
+    databases.json when the job succeeds (the worker used to write back its stale copy) and is not deleted when the
+    job fails (the cleanup used to remove every database newer than the job)."""
+    monkeypatch.setenv("LCA_WRENCH_PREMISE_PYTHON", sys.executable)
+    monkeypatch.setenv("LCA_WRENCH_PREMISE_PATH", str(Path(__file__).parent / "fake_premise"))
+    monkeypatch.setenv("FAKE_PREMISE_GATE", str(tmp_path))
+    scenarios.forget_constants()
+    names = [scenarios.scenario_name(EI, "remind", "TEST-50", y) for y in (2030, 2050)]
+    mine = {"TEST-50": "Mein Modell waehrend premise", "TEST-FAIL": "Mein Modell waehrend premise (Fehler)"}
+    try:
+        with TestClient(app, base_url="http://127.0.0.1", headers={"X-LCA-Wrench": "1"}) as c:
+            body = {"name": TEST_PROJECT, "source": "premise", "source_db": EI, "model": "remind",
+                    "years": [2050, 2030], "key": "x" * 44}
+            for pathway, state in (("TEST-50", "fertig"), ("TEST-FAIL", "fehler")):
+                for f in tmp_path.iterdir():
+                    f.unlink()
+                job = c.post("/api/import/start", json={**body, "pathway": pathway}).json()
+                for _ in range(600):  # the worker has read the database list and is "running premise"
+                    if (tmp_path / "ready").exists():
+                        break
+                    time.sleep(0.1)
+                assert (tmp_path / "ready").exists()
+                db = mine[pathway]
+                with s.LOCK:
+                    bd.Database(db).register()
+                    bd.Database(db).write(_proc(db, "wp", "Waermepumpe", "heat", "CH", "megajoule"))
+                (tmp_path / "go").touch()
+                st = _wait(c, job)
+                assert st["state"] == state, st
+                listing = json.loads((Path(bd.projects.dir) / "databases.json").read_text())
+                assert db in listing and db in bd.databases, (pathway, sorted(listing))
+                assert len(bd.Database(db)) == 1
+                if state == "fertig":
+                    assert all(n in listing for n in names)
+            assert all(d in bd.databases for d in mine.values())
+    finally:
+        _drop(*names, *mine.values())
+        scenarios.forget_constants()
+
+
 def test_premise_offers_only_scenarios_in_its_archive(world, tmp_path, monkeypatch):
     """premise lists every pathway for every model, but its Zenodo archive has only some pairs (premise 2.5.2: no
     SSP2-Base at all, which failed with a 404). Offered are the pairs whose file is in the archive or on this computer."""
@@ -243,7 +353,7 @@ def test_premise_offers_only_scenarios_in_its_archive(world, tmp_path, monkeypat
         assert c["local"]["gcam"] == ["SSP2-Base"]
         assert scenarios.offered(c) == {"remind": ["SSP2-NPi", "SSP1-VLLO"], "image": ["SSP2-M", "SSP1-VLLO"],
                                         "gcam": ["SSP2-Base"]}
-        with TestClient(app, base_url="http://127.0.0.1") as cl:
+        with TestClient(app, base_url="http://127.0.0.1", headers={"X-LCA-Wrench": "1"}) as cl:
             o = cl.get("/api/import/options").json()
             assert o["premise_available"]["image"] == ["SSP2-M", "SSP1-VLLO"]
             body = {"name": TEST_PROJECT, "source": "premise", "source_db": EI, "model": "image", "pathway": "SSP2-Base",
@@ -288,7 +398,7 @@ def test_flow_mapping_fills_factors_across_flow_lists(world):
         assert models.system_for(ei).score({ei: 1}, GWP_EF) == pytest.approx(1.0)  # EF's factor on the ecoinvent flow
         assert models.system_for(ef).score({ef: 1}, WATER_EI) == 0.0  # water: never through the mapping
         assert models.system_for(ei).score({ei: 1}, GWP_EI) == pytest.approx(1.0)  # its own factors as they are
-        with TestClient(app, base_url="http://127.0.0.1") as c:
+        with TestClient(app, base_url="http://127.0.0.1", headers={"X-LCA-Wrench": "1"}) as c:
             items = [{"project": TEST_PROJECT, "id": str(ef), "amount": 1}, {"project": TEST_PROJECT, "id": str(ei), "amount": 1}]
             r = c.post("/api/compare", json={"items": items, "method": list(GWP_EI)}).json()
             assert [x["coverage"] for x in r] == ["mapped", "native"] and r[0]["score"] == pytest.approx(2.0)
@@ -427,10 +537,7 @@ def test_exiobase_import_dense_solver_and_hybrid(world, tmp_path):
         x = np.linalg.solve(np.eye(4) - A, np.eye(4)[1])
         want = float(c @ Sm @ x)
         assert Sy.score({serv.id: 1}, GWP) == pytest.approx(want, rel=1e-6)
-        lca = bc.LCA({serv: 1}, GWP)
-        lca.lci()
-        lca.lcia()
-        assert lca.score == pytest.approx(want, rel=1e-6)
+        assert _bw2calc_score(serv, GWP) == pytest.approx(want, rel=1e-6)
         # before any model uses the table: search finds its sectors (also by "money"), and a sector outside the chosen
         # background is calculated on its table alone (data sheet, result)
         backgrounds.set_choice("auto", [], roles)
@@ -467,7 +574,7 @@ def test_exiobase_import_dense_solver_and_hybrid(world, tmp_path):
         assert not any(o["removable"] for o in st["background"]["options"] if o["name"] != SC)
         backgrounds.set_choice("auto", [], models.roles())
         # the same as a job in its own process
-        with TestClient(app, base_url="http://127.0.0.1") as cl:
+        with TestClient(app, base_url="http://127.0.0.1", headers={"X-LCA-Wrench": "1"}) as cl:
             body = {"name": TEST_PROJECT, "source": "exiobase", "path": str(folder), "biosphere": BIO, "db_name": "EXIOBASE job"}
             assert cl.post("/api/import/start", json={**body, "biosphere": "nope"}).status_code == 400
             st = _wait(cl, cl.post("/api/import/start", json=body).json())
@@ -478,3 +585,198 @@ def test_exiobase_import_dense_solver_and_hybrid(world, tmp_path):
         backgrounds.set_choice("auto", [], models.roles())
         _drop(name, name + " biosphere", "EXIOBASE job", "EXIOBASE job biosphere")
         os.environ.pop("LCA_WRENCH_PREMISE_PYTHON", None)
+
+
+def test_other_database_scores_a_scenario_not_in_the_calculation(world):
+    """"Other database" with a premise scenario: the scenario is not part of the calculation (automatic background),
+    its datasets are scored on its own database, not as 0."""
+    from lca_wrench import crosswalk as cw
+
+    bd.projects.set_current(TEST_PROJECT)
+    backgrounds.set_choice("auto", [], models.roles())
+    assert SC not in models.system().bg.dbs
+    res = cw.compare(world, 1.0, GWP, TEST_PROJECT, SC)
+    rows = {r["code"]: r for r in res["rows"]}
+    elec_2040 = 0.02 + 0.001 * 2.28
+    assert rows["elec"]["origin"] == "code" and rows["elec"]["score_b"] == pytest.approx(10 * elec_2040, rel=1e-5)
+    assert rows["steel"]["origin"] == "exact"  # new code in the scenario, same name, product, location and unit
+    assert rows["steel"]["match"]["code"] == "steel-2040" and rows["steel"]["score_b"] == pytest.approx(2.28, rel=1e-5)
+    assert res["b"]["score"] == pytest.approx(10 * elec_2040 + 2.28, rel=1e-5)  # heat has no counterpart there
+    # one level down: the scenario's electricity, with its own inputs
+    tr = cw.trace(bd.get_node(database=EI, code="elec").id, "elec", 10.0, 10.0, GWP, TEST_PROJECT, SC, list(GWP))
+    assert tr["b"]["score"] == pytest.approx(10 * elec_2040, rel=1e-5)
+
+
+def test_other_database_exiobase_proxy_sectors(world, tmp_path):
+    """"Other database" with EXIOBASE: a dataset gets its proxy sector through its ISIC class (Peng & Pfister 2023)
+    in the region of its location, and its amount in money through its price; without a price it waits for one."""
+    from lca_wrench import crosswalk as cw
+    from lca_wrench import sectors
+
+    bd.projects.set_current(TEST_PROJECT)
+    folder, _, _ = _exio_files(tmp_path)
+    exio, src = "EXIOBASE proxy", "Test ISIC db"
+    gwp = bd.Method(GWP).load()
+    isic = [("ISIC rev.4 ecoinvent", "3510:Electric power generation, transmission and distribution")]
+    try:
+        exiobase.write(folder, exio, BIO)
+        _drop(src)
+        db = bd.Database(src)
+        db.register()
+        db.write({
+            (src, "coal-de"): {"name": "electricity production, hard coal", "reference product": "electricity, high voltage",
+                               "location": "DE", "unit": "kilowatt hour", "type": "process", "classifications": isic,
+                               "exchanges": [{"input": (src, "coal-de"), "amount": 1, "type": "production",
+                                              "properties": {"price": {"amount": 0.08, "unit": "EUR2005"}}},
+                                             {"input": CO2, "amount": 1.0, "type": "biosphere"}]},
+            (src, "coal-at"): {"name": "electricity production, hard coal", "reference product": "electricity, high voltage",
+                               "location": "AT", "unit": "kilowatt hour", "type": "process", "classifications": isic,
+                               "exchanges": [{"input": (src, "coal-at"), "amount": 1, "type": "production"},
+                                             {"input": CO2, "amount": 1.0, "type": "biosphere"}]},
+        })
+        engine.bump_background(TEST_PROJECT)
+        backgrounds.set_choice("auto", [], models.roles())
+        assert sectors.regions_for("DE") == ["DE"] and "DE" in sectors.regions_for("RER")
+        assert sectors.sectors_for_isic("35101") == sectors.sectors_for_isic("3510")  # coarsened
+        unit = engine.alone(exio)
+        coal = {a["location"]: a.id for a in bd.Database(exio) if a["name"] == "Coal power"}
+        s_coal_de = unit.score({coal["DE"]: 1}, GWP)
+        assert s_coal_de > 0
+
+        node = bd.get_node(database=src, code="coal-de").id
+        res = cw.compare(node, 1000.0, GWP, TEST_PROJECT, exio)
+        (row,) = res["rows"]
+        assert row["proxy"] == "isic" and row["origin"] == "auto" and row["quality"] == "good"
+        assert (row["match"]["name"], row["match"]["location"]) == ("Coal power", "DE")
+        assert row["match"]["factor"] == pytest.approx(0.08e-6) and row["price"] == pytest.approx(0.08)
+        assert row["score_b"] == pytest.approx(1000 * 0.08e-6 * s_coal_de, rel=1e-6)
+
+        # no price in the dataset: the sector is shown, the score waits for the user's price
+        node_at = bd.get_node(database=src, code="coal-at").id
+        (row,) = cw.compare(node_at, 1000.0, GWP, TEST_PROJECT, exio)["rows"]
+        assert row["match"] is None and row["problem"] == "price" and row["pending"]["location"] == "AT"
+        assert "score_b" not in row
+        with pytest.raises(ValueError):
+            cw.choose(src, "coal-at", exio, row["pending"]["code"], price=0)
+        cw.choose(src, "coal-at", exio, row["pending"]["code"], price=0.1)
+        (row,) = cw.compare(node_at, 1000.0, GWP, TEST_PROJECT, exio)["rows"]
+        s_coal_at = unit.score({coal["AT"]: 1}, GWP)
+        assert row["origin"] == "user" and row["score_b"] == pytest.approx(1000 * 0.1e-6 * s_coal_at, rel=1e-6)
+        exported = cw.export_mapping(src, exio)["replace"]
+        assert exported[0]["conversion_factor"] == pytest.approx(0.1e-6)
+        # search: the sectors in money can be picked for a dataset in kWh
+        hits = cw.search(TEST_PROJECT, exio, "coal power", unit="kilowatt hour")
+        assert hits and all(h["convertible"] for h in hits)
+    finally:
+        reg = models.registry.load()
+        reg.get("matches", {}).pop(cw._pair(src, exio), None)
+        models.registry.save(reg)
+        bd.projects.set_current(TEST_PROJECT)
+        _drop(src, exio, exio + " biosphere")
+        bd.Method(GWP).write(gwp)
+        engine.bump_background(TEST_PROJECT)
+
+
+def _exio_named(root: Path, system: str, names: list[str], volumes: dict | None = None) -> Path:
+    """An EXIOBASE table in its file format with real sector names (industries or products), regions CH and DE."""
+    d = root / f"IOT_2022_{system}"
+    (d / "satellite").mkdir(parents=True)
+    regions = [r for r in ("CH", "DE") for _ in names]
+    sectors = names * 2
+    n = len(sectors)
+    A = [[0.01 if i != j else 0.02 for j in range(n)] for i in range(n)]
+    lines = ["region\tsector\t" + "\t".join(regions), "region\tsector\t" + "\t".join(sectors)]
+    lines += [f"{regions[i]}\t{sectors[i]}\t" + "\t".join(str(v) for v in A[i]) for i in range(n)]
+    (d / "A.txt").write_text("\n".join(lines) + "\n")
+    (d / "unit.txt").write_text("region\tsector\tunit\n" + "".join(f"{r}\t{s}\tM.EUR\n" for r, s in zip(regions, sectors)))
+    vol = volumes or {}
+    (d / "x.txt").write_text("region\tsector\tindout\n" + "".join(
+        f"{r}\t{s}\t{vol.get((r, s), 1000)}\n" for r, s in zip(regions, sectors)))
+    co2 = [1e5 * (k + 1) for k in range(n)]
+    (d / "satellite" / "S.txt").write_text("stressor\t" + "\t".join(regions) + "\nstressor\t" + "\t".join(sectors)
+                                           + "\nCO2 - combustion - air\t" + "\t".join(str(v) for v in co2) + "\n")
+    (d / "satellite" / "unit.txt").write_text("stressor\tunit\nCO2 - combustion - air\tkg\n")
+    return d
+
+
+def test_exiobase_proxies_industries_and_products_for_ecoinvent_and_bafu(world, tmp_path):
+    """Both EXIOBASE tables: industries (ixi) and products (pxp), recognised by their names. Datasets with an ISIC
+    class (ecoinvent) and without, with a category (BAFU 2025) or a sector (BAFU 2026), get their proxy."""
+    from lca_wrench import crosswalk as cw
+    from lca_wrench import sectors
+
+    bd.projects.set_current(TEST_PROJECT)
+    gwp = bd.Method(GWP).load()
+    ixi = ["Production of electricity by coal", "Petroleum Refinery", "Manufacture of gas; distribution of gaseous fuels "
+           "through mains", "Other land transport", "Chemicals nec"]
+    pxp = ["Electricity by coal", "Gas/Diesel Oil", "Motor Gasoline", "Distribution services of gaseous fuels through mains",
+           "Other land transportation services", "Chemicals nec"]
+    src = "Test proxy sources"
+
+    def ds(code, name, loc, unit, **extra):
+        return {(src, code): {"name": name, "reference product": name, "location": loc, "unit": unit,
+                              "type": "process", **extra,
+                              "exchanges": [{"input": (src, code), "amount": 1, "type": "production"}]}}
+
+    sources = {}
+    # ecoinvent: ISIC class (refined petroleum products), narrowed by name
+    sources.update(ds("ei-diesel", "market for diesel, low-sulfur", "DE", "kilogram",
+                      classifications=[("ISIC rev.4 ecoinvent", "1920:Manufacture of refined petroleum products")]))
+    # BAFU 2025: EcoSpold01 category, no ISIC
+    sources.update(ds("bafu-coal", "Electricity, hard coal, at power plant", "CH", "kilowatt hour",
+                      categories=["electricity by fuel", "coal"]))
+    sources.update(ds("bafu-petrol", "Petrol, unleaded, at regional storage", "CH", "kilogram",
+                      categories=["oil", "fuels"]))
+    sources.update(ds("bafu-lorry", "Transport, freight, lorry 16-32 metric ton, EURO5", "RER", "ton kilometer",
+                      categories=["transport systems", "road"]))
+    # BAFU 2026: a sector only
+    sources.update(ds("b26-gas", "Natural gas, low pressure, at consumer", "CH", "megajoule", sector="energy"))
+    sources.update(ds("b26-edta", "EDTA, ethylenediaminetetraacetic acid, at plant", "CH", "kilogram", sector="chemicals"))
+    want = {  # code -> (industry table, product table)
+        "ei-diesel": ("Petroleum Refinery", "Gas/Diesel Oil"),
+        "bafu-coal": ("Production of electricity by coal", "Electricity by coal"),
+        "bafu-petrol": ("Petroleum Refinery", "Motor Gasoline"),
+        "bafu-lorry": ("Other land transport", "Other land transportation services"),
+        "b26-gas": ("Manufacture of gas; distribution of gaseous fuels through mains",
+                    "Distribution services of gaseous fuels through mains"),
+        "b26-edta": ("Chemicals nec", "Chemicals nec"),
+    }
+    how = {"ei-diesel": "isic", "bafu-coal": "rule", "bafu-petrol": "rule", "bafu-lorry": "rule", "b26-gas": "rule",
+           "b26-edta": "category"}
+    names = {"ixi": ixi, "pxp": pxp}
+    made = []
+    try:
+        _drop(src)
+        db = bd.Database(src)
+        db.register()
+        db.write(sources)
+        info = sectors.source_info([bd.get_node(database=src, code=c).id for c in want])
+        for k, system in enumerate(("ixi", "pxp")):
+            name = f"EXIOBASE {system} proxy"
+            # RER covers CH and DE: the region with the larger production of the sector is taken
+            big = {("DE", "Other land transport"): 5000, ("DE", "Other land transportation services"): 5000}
+            exiobase.write(_exio_named(tmp_path / system, system, names[system], big), name, BIO)
+            made.append(name)
+            engine.bump_background(TEST_PROJECT)
+            index = cw._index(TEST_PROJECT, name)
+            assert index.sectors.system == system
+            for code, (ind, prod) in want.items():
+                node = bd.get_node(database=src, code=code)
+                extra = info[node.id]
+                sugg, found = index.sectors.propose(node["name"], node["reference product"], node["location"],
+                                                    extra["isic"], extra["category"])
+                assert found == how[code], (system, code, found)
+                top = sugg[0][1]
+                assert top["name"] == (ind, prod)[k], (system, code, top["name"])
+                assert top["location"] == ("DE" if node["location"] in ("DE", "RER") else "CH"), (system, code)
+                assert (sugg[0][0] >= 0.6) == (found != "category"), (system, code, sugg[0][0])
+            # end to end: the comparison shows the proxy, waiting for a price (these datasets have none)
+            node = bd.get_node(database=src, code="ei-diesel")
+            (row,) = cw.compare(node.id, 1.0, GWP, TEST_PROJECT, name)["rows"]
+            assert row["proxy"] == "isic" and row["problem"] == "price"
+            assert row["pending"]["name"] == want["ei-diesel"][k] and row["pending"]["location"] == "DE"
+    finally:
+        bd.projects.set_current(TEST_PROJECT)
+        _drop(src, *made, *[m + " biosphere" for m in made])
+        bd.Method(GWP).write(gwp)
+        engine.bump_background(TEST_PROJECT)

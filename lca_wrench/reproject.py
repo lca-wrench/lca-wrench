@@ -48,6 +48,8 @@ def plan(db_name: str, location: str, scope: str = "electricity") -> dict:
     """What a move of model `db_name` to `location` would change, without changing anything."""
     if models.roles().get(db_name) != "model":  # any foreground database, also one from the Activity Browser
         raise ValueError(_("«{name}» ist kein Modell.", name=db_name))
+    if models.functional.is_functional(db_name):
+        raise ValueError(_("Für Modelle im Format des Activity Browser 3 (mehrere Produkte pro Prozess) geht das noch nicht."))
     target = regions.resolve(location)
     if not target:
         raise ValueError(_("Bitte einen Ort angeben, z.B. DE oder France."))
@@ -82,6 +84,8 @@ def reproject(db_name: str, location: str, scope: str = "electricity", new_name:
     Any foreground model can be moved, also one made elsewhere (Activity Browser): it is only read, the copy is a new
     model of LCA Wrench. relink: other models moved together, {old name: new name}; inputs from them then come from
     their copies."""
+    if models.functional.is_functional(db_name):
+        raise ValueError(_("Für Modelle im Format des Activity Browser 3 (mehrere Produkte pro Prozess) geht das noch nicht."))
     from bw2data.parameters import ActivityParameter, DatabaseParameter
 
     if DatabaseParameter.select().where(DatabaseParameter.database == db_name).exists() or \

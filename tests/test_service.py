@@ -32,6 +32,15 @@ def sample_activities(n=20, seed=42):
     return ids[:n]
 
 
+def bw2calc_score(aid, method) -> float:
+    """Plain bw2calc. Its LCA keeps the matrix files open while it lives; here it is gone before a test deletes the
+    project (Windows cannot delete an open file)."""
+    lca = bc.LCA({bd.get_node(id=int(aid)): 1}, method)
+    lca.lci()
+    lca.lcia()
+    return lca.score
+
+
 @pytest.mark.parametrize("method", METHODS)
 def test_unit_scores_match_bw2calc(method):
     for aid in sample_activities():
@@ -104,11 +113,8 @@ def test_working_copy_edit_undo_and_compare():
         top = a["technosphere"][0]
         s.edit_exchange(top["exchange"], top["amount"] * 0.5)
 
-        lca = bc.LCA({bd.get_node(id=int(aid)): 1}, s.CLIMATE_METHOD)
-        lca.lci()
-        lca.lcia()
         after = s.unit_score(aid, s.CLIMATE_METHOD)
-        assert after == pytest.approx(lca.score, rel=1e-6)
+        assert after == pytest.approx(bw2calc_score(aid, s.CLIMATE_METHOD), rel=1e-6)
         assert after < before
 
         cmp = s.compare([{"project": PROJECT, "id": aid, "amount": 1}, {"project": name, "id": aid, "amount": 1}],
@@ -121,7 +127,7 @@ def test_working_copy_edit_undo_and_compare():
         assert s.state()["changes"] == []
     finally:
         bd.projects.set_current(PROJECT)
-        bd.projects.delete_project(name, delete_dir=True)
+        s.remove_project(name)
         reg = registry.load()
         reg["copies"].pop(name, None)
         registry.save(reg)
@@ -137,3 +143,44 @@ def test_test_projects_hidden_and_source_protected():
     with pytest.raises(RuntimeError):
         bd.projects.set_current("bafu-2025")
     assert bd.projects.current == PROJECT
+
+
+def test_removing_a_copy_closes_its_files_and_frees_the_name():
+    """Windows cannot delete open files (WinError 32): the engine closes a calculation's processed datapackages once
+    it has read them (engine.close_files), and remove_project drops the cached calculations (engine.forget) and
+    leaves no folder; a folder left over by an earlier failed deletion does not block the next copy."""
+    from bw2data.project import ProjectDataset
+
+    from lca_wrench import engine
+
+    aid = s.examples()[0]["id"]
+    name = s.make_working_copy()
+    try:
+        s.unit_score(aid, s.CLIMATE_METHOD)  # builds and caches the copy's background
+        bgs = [bg for (p, _v, _d), bg in engine._backgrounds.items() if p == name]
+        assert bgs and bgs[0].lca.packages
+        zips = [dp.fs.zip for dp in bgs[0].lca.packages if hasattr(getattr(dp, "fs", None), "zip")]
+        assert zips and all(z.fp is None for z in zips)  # closed once read, though the calculation stays cached
+        folder = bd.projects._project_dir(ProjectDataset.get(ProjectDataset.name == name))
+        bd.projects.set_current(PROJECT)
+        s.remove_project(name)
+        assert all(z.fp is None for z in zips)  # closed
+        assert not any(p == name for (p, _v, _d) in engine._backgrounds)
+        assert name not in bd.projects and not folder.exists()
+
+        folder.mkdir(parents=True)  # what a failed deletion left behind
+        try:
+            again = s.make_working_copy()
+            assert again != name and bd.projects.current == again
+            bd.projects.set_current(PROJECT)
+            s.remove_project(again)
+        finally:
+            s.remove_folder(folder)
+    finally:
+        bd.projects.set_current(PROJECT)
+        if name in bd.projects:
+            s.remove_project(name)
+        reg = registry.load()
+        for n in [n for n in reg["copies"] if n.startswith(name)]:
+            reg["copies"].pop(n, None)
+        registry.save(reg)

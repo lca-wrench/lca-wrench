@@ -5,12 +5,12 @@ Two routes: the release packages (no terminal needed) and installation from sour
 
 ## Release packages
 
-`LCA-Wrench-Mac.zip` and `LCA-Wrench-Windows.zip` are attached to the
+`LCA-Wrench-Mac.zip`, `LCA-Wrench-Windows.zip` and `LCA-Wrench-Linux.tar.gz` are attached to the
 [GitHub release](https://github.com/lca-wrench/lca-wrench/releases). Each contains the app, `requirements-lock.txt`
-(the tested package versions), a `README.txt` (English first, German below) and two double-click scripts. On macOS
-these are packed inside an installer app (below).
+(the tested package versions), a `README.txt` (English first, German below) and two scripts: install and start. On
+macOS these are packed inside an installer app (below).
 
-The Windows package has been tested less than the macOS one.
+The Windows and Linux packages have been tested less than the macOS one.
 
 ### macOS
 
@@ -57,11 +57,48 @@ Files are in `windows/`.
 - It has been checked that all packages of the lock file resolve to prebuilt packages for Windows x64. The package has
   not been tested on as many real Windows PCs as the macOS one.
 
+### Linux
+
+Files are in `linux/`.
+
+- **install.sh** works like the macOS installer: it downloads `uv` 0.9.5 from GitHub (fixed checksum, x86_64 or
+  aarch64) and, with it, its own Python 3.12 and the packages of `requirements-lock.txt`, all only into the unpacked
+  folder (no root password, no system Python, no PATH, no shell profile). The fallback to `requirements-app.txt` works
+  as on macOS. It needs curl or wget and a glibc-based distribution (not Alpine).
+- **start.sh** starts the app on port 8787 and opens the browser (`xdg-open`). Closing the terminal stops it.
+- At the end the installer adds a menu entry **LCA Wrench** with the logo
+  (`~/.local/share/applications/lca-wrench.desktop`, read by GNOME, KDE, Xfce and others). It runs `start.sh` in a
+  terminal.
+- The package is a `.tar.gz`, which keeps the execute bits of the two scripts.
+- Brightway projects are in `~/.local/share/Brightway3`.
+- Tested with a fresh installation and an update on Ubuntu 26.04 (x86_64), and a fresh installation on Debian 12,
+  Ubuntu 22.04, Fedora 41 and Arch Linux (containers). aarch64 has not been tested.
+
+### Updating
+
+The same on all three systems: LCA Wrench is closed, the program code of the old version (the folder `lca_wrench`)
+is removed, the new package goes over the folder, and the installer runs again. It keeps `.venv` and `.tools` (uv
+venv `--allow-existing`) and brings the packages to the versions of the new `requirements-lock.txt`, so an update
+takes a fraction of the first installation. The Brightway projects, the settings file `lca-wrench.json` next to them
+and the log are outside `lca_wrench` and stay.
+
+- **macOS:** the new **Install LCA Wrench.app**, same folder: `bootstrap.sh` recognises an LCA Wrench folder (it has
+  `VERSION`), deletes `lca_wrench` and copies the package over it. Without a signature by hand, as in `README.txt`.
+- **Windows:** delete `lca_wrench`, "Extract All" with the folder that contains `LCA-Wrench` as the destination,
+  "Replace the files", then **Install LCA Wrench**.
+- **Linux:** `rm -rf ~/LCA-Wrench/lca_wrench`, `tar -xzf LCA-Wrench-Linux.tar.gz -C ~`, `./install.sh`.
+
+If a file of the package is missing afterwards (`FILES.txt`), the installer stops and says so. `VERSION` in the folder
+names the installed version, and `lca-wrench.log` writes it at every start ("Start, version …"). The `README.txt` of
+each package has the steps for users, in English and German. The CI's update job (`scripts/ci_package.py install`)
+does exactly these steps from the last release to the commit under test.
+
 ### Building the packages
 
 ```bash
 ./pack_mac.sh        # builds dist/LCA-Wrench-Mac.zip from the committed state
 ./pack_windows.sh    # builds dist/LCA-Wrench-Windows.zip from the committed state
+./pack_linux.sh      # builds dist/LCA-Wrench-Linux.tar.gz from the committed state
 ```
 
 Without further settings `pack_mac.sh` builds an unsigned package (the plain folder). For the signed and notarized
@@ -79,8 +116,8 @@ stored in the repository.
 
 ### Checksums
 
-`requirements-lock.txt` holds the SHA-256 checksum of every file of every package (macOS and Windows, including the
-sentier-brightway archive from GitHub). Both installers install with `uv pip install --require-hashes`: a file whose
+`requirements-lock.txt` holds the SHA-256 checksum of every file of every package (macOS, Windows and Linux,
+including the sentier-brightway archive from GitHub). All installers install with `uv pip install --require-hashes`: a file whose
 checksum does not match is not installed, and the installation stops with a message instead of falling back. Only
 versions that do not fit the computer at all fall back to `requirements-app.txt`, which has no checksums. The uv
 download itself is checked against a fixed checksum in the installers; the Python that uv loads is not covered by the

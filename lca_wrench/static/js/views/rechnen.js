@@ -14,7 +14,7 @@ export function vRechnen() {
       ${newForm}
       <div class="reslist">${list}</div>
     </aside>
-    <div style="display:flex;flex-direction:column;gap:18px;min-width:0">${S.setup ? editor(S.setup) + results() + mcSection() + (S.setup.fus.length && S.setup.methods.length ? sensSection() : '') : `<section class="card"><p class="empty">${t('Wähle links eine Rechnung oder lege eine neue an.')}</p></section>`}</div>
+    <div class="detail">${S.setup ? editor(S.setup) + results() + mcSection() + (S.setup.fus.length && S.setup.methods.length ? sensSection() : '') : `<section class="card"><p class="empty">${t('Wähle eine Rechnung aus der Liste oder lege eine neue an.')}</p></section>`}</div>
   </div>`;
 }
 
@@ -26,14 +26,14 @@ function editor(cs) {
   return `<section class="card" style="display:flex;flex-direction:column;gap:14px">
     <div class="row" style="justify-content:space-between;align-items:flex-end">
       <label class="f" style="flex:1 1 280px">${t('Name')}<input type="text" id="csName" value="${esc(cs.name)}" maxlength="120"></label>
-      <div class="row"><button class="btn danger" data-act="del-setup">${t('Löschen')}</button><button class="btn primary" data-act="run-setup" ${cs.fus.length && cs.methods.length ? '' : 'disabled'}>${t('Rechnen')}</button></div>
+      <button class="btn primary" data-act="run-setup" ${cs.fus.length && cs.methods.length ? '' : 'disabled'}>${t('Rechnen')}</button>
     </div>
     ${cs.missing ? `<div class="warnbox"><b>${t('Hinweis')}</b><span>${t('{n} Produkt(e) dieser Rechnung gibt es im Projekt nicht mehr.', { n: cs.missing })}</span></div>` : ''}
     <div><div class="row" style="justify-content:space-between;margin-bottom:4px"><h3>${t('Produkte (funktionelle Einheiten) · {n}', { n: cs.fus.length })}</h3><button class="btn small" data-act="pick-fu">${t('+ Produkt')}</button></div>
       ${cs.fus.length ? `<div class="tblwrap"><table class="tbl"><thead><tr><th>${t('Produkt')}</th><th>${t('Menge')}</th><th>${t('Einheit')}</th><th></th></tr></thead><tbody>${fus}</tbody></table></div>` : `<p class="empty">${t('Noch keine Produkte. Füge eines hinzu oder nimm es im Datenblatt mit «Zur Rechnung».')}</p>`}</div>
     <div><div class="row" style="justify-content:space-between;margin-bottom:6px"><h3>${t('Wirkungsmethoden · {n}', { n: cs.methods.length })}</h3><button class="btn small" data-act="pick-methods">${t('Methoden wählen')}</button></div>
       ${cs.methods.length ? `<div class="mchips">${ms}</div>` : `<p class="empty">${t('Noch keine Methode gewählt.')}</p>`}</div>
-    <p class="muted" style="font-size:12.5px">${t('Wird automatisch gespeichert und ist auch im Activity Browser unter «Calculation Setups» sichtbar.')}</p>
+    <div class="row" style="justify-content:space-between"><p class="muted" style="font-size:12.5px;flex:1 1 280px">${t('Wird automatisch gespeichert und ist auch im Activity Browser unter «Calculation Setups» sichtbar.')}</p><button class="btn small danger" data-act="del-setup">${t('Rechnung löschen')}</button></div>
   </section>`;
 }
 

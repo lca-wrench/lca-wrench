@@ -54,6 +54,45 @@ EN = {
     "Das Modell ist nicht lösbar: Die Produktionsmengen heben sich gegenseitig auf (singuläre Matrix).":
         "The model cannot be solved: the production amounts cancel each other out (singular matrix).",
     "Prozess {id} ist in diesem Projekt nicht berechenbar.": "Activity {id} cannot be calculated in this project.",
+    "«{name}» hat mehrere Produkte. Wähle eines davon.": "“{name}” has several products. Choose one of them.",
+    "«{name}» hat nur ein Produkt: eine Allokation ist nicht nötig.": "“{name}” has only one product: no allocation is needed.",
+    "Eine Allokation von «{name}» nach «{strategy}» geht nicht: nicht alle Produkte haben diese Eigenschaft.":
+        "“{name}” cannot be allocated by “{strategy}”: not all of its products have this property.",
+    "Eine Allokation von «{name}» nach «{strategy}» geht nicht: die Werte ergeben zusammen null.":
+        "“{name}” cannot be allocated by “{strategy}”: the values add up to zero.",
+    "Allokation von «{name}» geändert": "Allocation of “{name}” changed",
+    "Mehrere Produkte gibt es in Modellen im Format des Activity Browser 3. Lege dafür ein Modell mit mehreren Produkten "
+    "pro Prozess an und kopiere den Prozess hinein.":
+        "Several products exist in models in the format of the Activity Browser 3. Create a model with several products "
+        "per activity for this and copy the activity into it.",
+    "«{name}» hat mehrere Produkte: kopiere eines davon.": "“{name}” has several products: copy one of them.",
+    "Inputs gehören zum Prozess, nicht zum Produkt: öffne den Prozess.":
+        "Inputs belong to the activity, not to the product: open the activity.",
+    "«{name}» hat mehrere Produkte: wähle eines davon als Input.": "“{name}” has several products: choose one of them as input.",
+    "Die Menge eines Produkts kann nicht null sein.": "The amount of a product cannot be zero.",
+    "Produkt «{product}» zu «{name}» hinzugefügt": "Product “{product}” added to “{name}”",
+    "Das ist kein Produkt.": "This is not a product.",
+    "Ein Prozess braucht mindestens ein Produkt.": "An activity needs at least one product.",
+    "Dieses Produkt wird noch verwendet von {names}. Entferne dort zuerst den Input.":
+        "This product is still used by {names}. Remove the input there first.",
+    "Produkt «{product}» aus «{name}» entfernt": "Product “{product}” removed from “{name}”",
+    "«{label}» von «{product}» geändert": "“{label}” of “{product}” changed",
+    "Bitte einen Namen für die Eigenschaft eingeben (nicht «equal» oder «manual»).":
+        "Please enter a name for the property (not “equal” or “manual”).",
+    "Eigenschaft «{label}» für die Produkte von «{name}»": "Property “{label}” for the products of “{name}”",
+    "Nach «{label}» wird gerade alloziert. Wähle zuerst eine andere Allokation.":
+        "The allocation uses “{label}” now. Choose another allocation first.",
+    "Eigenschaft «{label}» der Produkte von «{name}» entfernt": "Property “{label}” removed from the products of “{name}”",
+    "«{name}» im Format des Activity Browser 3 gespeichert (mehrere Produkte pro Prozess)":
+        "“{name}” stored in the format of the Activity Browser 3 (several products per activity)",
+    "«{name}» hat mehrere oder fremde Referenzflüsse und lässt sich so nicht umstellen.":
+        "“{name}” has several or foreign reference flows and cannot be converted like this.",
+    "Für Modelle im Format des Activity Browser 3 (mehrere Produkte pro Prozess) geht das noch nicht.":
+        "This does not work yet for models in the format of the Activity Browser 3 (several products per activity).",
+    "Allokationen vergleichen geht für eigene Modelle; Hintergrunddaten sind schon alloziert.":
+        "Comparing allocations works for own models; background data are already allocated.",
+    "Die Allokationsfaktoren von «{name}» ergeben zusammen {total} statt 1.":
+        "The allocation factors of “{name}” add up to {total} instead of 1.",
     # excel
     "Die Datei ist leer.": "The file is empty.",
     "Die Datei ist zu gross (höchstens 25 MB).": "The file is too large (25 MB at most).",
@@ -198,6 +237,7 @@ EN = {
     "«{name}» ({location}) gibt es in «{database}» nicht eindeutig.": "“{name}” ({location}) does not exist exactly once in “{database}”.",
     "Wähle eine andere Datenbank oder ein anderes Projekt als Vergleich.": "Choose another database or another project to compare with.",
     "Die Datenbank «{name}» gibt es in diesem Projekt nicht.": "The database “{name}” does not exist in this project.",
+    "Der Preis muss grösser als 0 sein.": "The price must be greater than 0.",
     "Das Gegenstück gibt es in «{name}» nicht mehr. Rechne den Vergleich neu.": "The counterpart no longer exists in “{name}”. Run the comparison again.",
     "Diesen Vergleich gibt es nicht mehr. Bitte neu vergleichen.": "This comparison no longer exists. Please compare again.",
     # setups
@@ -303,4 +343,41 @@ EN = {
     "Schätzung, falls gleich bewertet": "Estimate if assessed alike",
     "Ergänzte Faktoren": "Completed factors",
     "Übernommen von": "Taken from",
+    # single scores (singlescore.py)
+    "EF 3.1, normalisiert und gewichtet": "EF 3.1, normalized and weighted",
+    "ReCiPe 2016 Endpoint ({p}), Punkte": "ReCiPe 2016 endpoint ({p}), points",
+    "Ökologische Knappheit 2021, UBP gesamt": "Ecological Scarcity 2021, total UBP",
+    "Diesen Einzelwert gibt es in diesem Projekt nicht.": "This single score does not exist in this project.",
+    "Ohne {n} Kategorie(n), die in diesem Projekt fehlen: {names}.":
+        "Without {n} category(ies) that this project lacks: {names}.",
+    "Die Kategorien von «{area}» ergeben {part} statt {total}.": "The categories of “{area}” add up to {part} instead of {total}.",
+    "Gewichtung {ws}: Menschliche Gesundheit {hh}, Ökosysteme {eq}, Ressourcen {res} (Panel von Eco-indicator 99, wie in SimaPro). Normalisierung: RIVM, ReCiPe 2016 v1.1, Welt 2010, pro Person.":
+        "Weighting {ws}: human health {hh}, ecosystems {eq}, resources {res} (Eco-indicator 99 panel, as in SimaPro). Normalization: RIVM, ReCiPe 2016 v1.1, world 2010, per person.",
+    "Die mineralischen Ressourcen machen fast die ganze Ressourcen-Normalisierung von RIVM aus (bitte prüfen).":
+        "Mineral resources make up almost all of RIVM's resource normalization (please check).",
+    "Die Kategorien ergeben {part} UBP, die Methode «gesamt» {total} UBP.": "The categories add up to {part} UBP, the “total” method to {total} UBP.",
+    "{n} Kategorie(n) ohne Faktoren für die Elementarflüsse dieses Produkts: {names}. Die Methode ist auf einer anderen Liste von Elementarflüssen umgesetzt, und die Flusszuordnung deckt diese Wirkungen nicht ab. Sie zählen als 0, der Einzelwert ist also zu tief: besser einen Einzelwert auf der Flussliste des Produkts wählen.":
+        "{n} category(ies) without factors for this product's elementary flows: {names}. The method is implemented on another list of elementary flows, and the flow mapping does not cover these impacts. They count as 0, so the single score is too low: better choose a single score on the product's flow list.",
+    "Über die Flusszuordnung (ecoinvent ↔ EF 3.1) bewertet: {names}.": "Assessed through the flow mapping (ecoinvent ↔ EF 3.1): {names}.",
+    "Menschliche Gesundheit": "Human health",
+    "Ökosystemqualität": "Ecosystem quality",
+    "Natürliche Ressourcen": "Natural resources",
+    # factors by location (regional.py)
+    "Beiträge nach Ort": "Contributions by location",
+    "Land": "Country",
+    "davon Faktoren nach Ort": "of which factors by location",
+    "Prozesse": "Activities",
+    "Faktor des Orts": "Factor of the location",
+    "Faktor des Landes": "Factor of the country",
+    "Mittel der Länder": "Average of the countries",
+    "normaler Faktor": "normal factor",
+    # loading the JRC's EF 3.1 workbook (factor_files.py)
+    "Das ist keine Excel-Datei, die sich lesen lässt ({error}).": "This is not an Excel file that can be read ({error}).",
+    "In der Datei fehlt das Blatt «{sheet}». Erwartet wird die Excel-Datei der EF-3.1-Faktoren der JRC (EF-LCIAMethod_CF).":
+        "The file has no sheet “{sheet}”. Expected is the JRC's Excel file of the EF 3.1 factors (EF-LCIAMethod_CF).",
+    "Im Blatt «{sheet}» fehlen Spalten (FLOW_uuid, LCIAMethod_name, CF, LCIAMethod_location).":
+        "Sheet “{sheet}” lacks columns (FLOW_uuid, LCIAMethod_name, CF, LCIAMethod_location).",
+    "In der Datei stehen keine Faktoren, die vom Ort abhängen.": "The file has no factors that depend on the location.",
+    "Die Datei ist zu gross (höchstens {n} MB).": "The file is too large (at most {n} MB).",
+    "Diese Datei mit Faktoren nach Ort ist nicht geladen.": "This file with factors by location is not loaded.",
 }

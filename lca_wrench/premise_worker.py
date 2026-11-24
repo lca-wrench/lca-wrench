@@ -65,11 +65,20 @@ def _restore_if_unreadable(listing: Path, saved: bytes) -> bool:
         return True
 
 
+def _reload(bd, names: list) -> None:
+    """Re-read databases.json before writing it: the app may have added databases (the user's models) while premise
+    ran, and bw2data writes its in-memory copy as it is. Only this run's own entries are kept from memory."""
+    own = {n: bd.databases.data[n] for n in names if n in bd.databases.data}
+    bd.databases.load()
+    bd.databases.data.update(own)
+
+
 def _clean_up(bd, listing: Path, saved: bytes, before: set, names: list) -> None:
-    """Remove what this run made (also databases whose metadata got lost), and leave a readable database list."""
-    if _restore_if_unreadable(listing, saved):
-        bd.databases.load()
-    for name in sorted((set(bd.databases) | set(names)) - before):
+    """Remove what this run made (also databases whose metadata got lost), and leave a readable database list.
+    Only this run's databases: others that appeared meanwhile are the user's."""
+    _restore_if_unreadable(listing, saved)
+    _reload(bd, names)
+    for name in sorted(set(names) - before):
         try:
             if name in bd.databases:
                 _make_writable(bd)
@@ -104,7 +113,9 @@ def main() -> int:
         say("phase", "update")
         ndb.update()
         say("phase", "write")
+        _reload(bd, cfg["names"])
         ndb.write_db_to_brightway(name=cfg["names"])
+        _reload(bd, cfg["names"])
         for name, sc in zip(cfg["names"], wanted):
             bd.databases.data[name]["lca_wrench"] = {"kind": "scenario", "scenario": {**sc, "source": cfg["source_db"]}}
         _make_writable(bd)

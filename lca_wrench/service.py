@@ -15,11 +15,13 @@ Rules:
 
 from __future__ import annotations
 
+import gc
 import json
 import logging
 import pickle
 import re
 import shutil
+import sys
 import threading
 import time
 from pathlib import Path
@@ -33,8 +35,8 @@ from bw2data.backends.schema import ExchangeDataset
 from bw2data.project import ProjectDataset
 from bw_processing import safe_filename
 
-from . import (analysis, backgrounds, bafu2026, beispiel, completion, engine, flowmap, models, montecarlo, overview, regions,
-               registry, repair, setups)
+from . import (analysis, backgrounds, bafu2026, beispiel, completion, engine, factor_files, flowmap, functional,
+               models, montecarlo, overview, regional, regions, registry, repair, setups)
 from .analysis import short_unit
 from .i18n import _
 from .models import ReadOnlyError
@@ -123,7 +125,9 @@ def _project_state(reg: dict, cur: str) -> dict:
     for n in sorted(bd.databases):
         try:
             count = len(bd.Database(n))
-        except Exception:  # e.g. a backend this Brightway does not know (multifunctional)
+            if functional.is_functional(n):  # Activity Browser 3 format: the processes, not also their product nodes
+                count = AD.select().where((AD.database == n) & (AD.type << list(engine.LISTED_PROCESS_TYPES))).count()
+        except Exception:  # e.g. a backend this Brightway does not know
             count = 0
         dbs.append({"name": n, "count": count, "role": roles.get(n, "empty"), "biosphere": roles.get(n) == "biosphere",
                     "writable": n in writable})
@@ -152,6 +156,7 @@ def _project_state(reg: dict, cur: str) -> dict:
         "background": background_state(roles),
         "flowmap": flowmap.info(),
         "completion": completion.info(),
+        "regional": regional.info(),
     }
 
 
@@ -191,6 +196,7 @@ def remove_background(name: str) -> dict:
     if users:
         raise ValueError(_("«{name}» wird noch von {n} Prozess(en) in anderen Datenbanken verwendet.", name=name, n=len(users)))
     project = bd.projects.current
+    engine.forget(project)  # the cached calculations keep its processed file open (Windows cannot delete it then)
     if own_bio:
         _strip_methods(bio)
     for db in ([name, bio] if own_bio else [name]):
@@ -202,7 +208,10 @@ def remove_background(name: str) -> dict:
         if db in bd.databases:
             raise ValueError(_("«{name}» liess sich nicht löschen. Einzelheiten in lca-wrench.log.", name=db))
         if processed:
-            Path(processed).unlink(missing_ok=True)  # Brightway leaves the matrix file (EXIOBASE: several hundred MB)
+            try:
+                remove_file(Path(processed))  # Brightway leaves the matrix file (EXIOBASE: several hundred MB)
+            except OSError as e:  # still open after the retries (another program): the database is gone all the same
+                log.warning("Matrix file of %s not deleted: %s", db, e)
     backgrounds.forget(name)
     engine.bump_background(project)
     return state()
@@ -264,12 +273,23 @@ def set_project(name: str, rebuild: bool = False) -> None:
         raise ValueError(_("Brightway baut «{name}» beim ersten Öffnen um (alle Rechendaten neu). Lege lieber eine "
                            "Testkopie an oder bestätige das Öffnen des Originals.", name=name))
     bd.projects.set_current(name)
+    release_files()  # of the project left
     OPEN["project"] = name
+    if sys.platform == "win32":
+        engine.forget_others(name)  # Windows: release the other projects' files (WinError 32 for other programs)
     reg = registry.load()
     if reg.get("last_project") != name:
         reg["last_project"] = name
         registry.save(reg)
     sync_external()  # the project may have been changed by another program while we were elsewhere
+
+
+def release_files() -> None:
+    """Close what other threads still have open of a project left. Brightway replaces its SQLite connections on a
+    switch, but the old parameters database sits in a reference cycle: until the cycle collector runs, the server's
+    request threads keep its file open, and on Windows the project cannot be deleted meanwhile (by LCA Wrench or by
+    another program). About 0.1 s."""
+    gc.collect()
 
 
 def pick_start_project(preferred: str | None = None) -> str | None:
@@ -357,6 +377,56 @@ def pending_updates(name: str) -> list[str]:
     return sorted(k for k, u in Updates.UPDATES.items() if u["automatic"] and not done.get(k))
 
 
+def remove_project(name: str) -> None:
+    """Delete a project with its folder, also on Windows.
+
+    The project's cached calculations keep its processed files open, and Windows cannot delete an open file
+    (WinError 32): they are dropped first (engine.forget). bw2data unregisters the project before it removes the
+    folder, so a folder that is still locked, e.g. by a virus scanner or the search indexer for a moment, is removed
+    afterwards with a few retries; a left-over folder would block a new project of the same name."""
+    if bd.projects.current == name:
+        # leave it first: deleting the current project would switch to "default" with its automatic updates
+        bd.projects.set_current("default", update=False)
+    engine.forget(name)
+    folder = bd.projects._project_dir(ProjectDataset.get(ProjectDataset.name == name)) if name in bd.projects else None
+    try:
+        if name in bd.projects:
+            bd.projects.delete_project(name, delete_dir=True)
+    except OSError:
+        log.warning("Project %s unregistered, its folder is removed again", name)
+    remove_folder(folder)
+
+
+def _folder_taken(name: str, full_hash: bool) -> bool:
+    """A folder of that name without a registered project: left over where a deletion failed (on Windows before
+    0.1.1). A new copy takes the next name instead of failing with "Project directory already exists"."""
+    return (Path(bd.projects._base_data_dir) / safe_filename(name, full=full_hash)).exists()
+
+
+def remove_folder(folder: Path | None) -> None:
+    """shutil.rmtree, retried while Windows still reports files of it as open."""
+    _retry(folder, shutil.rmtree)
+
+
+def remove_file(path: Path) -> None:
+    """Path.unlink, retried while Windows still reports the file as open."""
+    _retry(path, Path.unlink)
+
+
+def _retry(path: Path | None, remove) -> None:
+    for wait in (0.2, 0.5, 1.0, 2.0, None):
+        if path is None or not Path(path).exists():
+            return
+        try:
+            remove(Path(path))
+            return
+        except OSError:
+            if wait is None:
+                raise
+            gc.collect()  # packages nobody refers to any more close their files when freed
+            time.sleep(wait)
+
+
 def copy_project_files(name: str) -> str:
     """A test copy of any project: copied file by file without opening the original, then opened (and converted, if
     Brightway wants to) as the copy. Everything in a test copy may be changed; the original stays as it is."""
@@ -364,7 +434,7 @@ def copy_project_files(name: str) -> str:
         raise KeyError(_("Projekt «{name}» gibt es nicht.", name=name))
     src = ProjectDataset.get(ProjectDataset.name == name)
     n, new = 1, _("{base} (LCA Wrench)", base=name)
-    while new in bd.projects:
+    while new in bd.projects or _folder_taken(new, src.full_hash):
         n += 1
         new = _("{base} (LCA Wrench {n})", base=name, n=n)
     src_dir = bd.projects._project_dir(src)
@@ -383,9 +453,9 @@ def copy_project_files(name: str) -> str:
             # leave the copy first: deleting the current project would switch to "default" with its automatic updates
             bd.projects.set_current(before if before and before in bd.projects else "default", update=False)
         if new in bd.projects:
-            bd.projects.delete_project(new, delete_dir=True)
-        elif dst_dir.exists():
-            shutil.rmtree(dst_dir)
+            remove_project(new)
+        else:
+            remove_folder(dst_dir)
         raise
     reg = registry.load()
     reg.setdefault("testcopies", {})[new] = {"original": name, "created": time.strftime("%Y-%m-%dT%H:%M:%S")}
@@ -702,7 +772,63 @@ def activity(activity_id: int | str, method: tuple) -> dict:
     return d
 
 
+def allocation_compare(activity_id: int | str, method: tuple) -> dict:
+    """The products of a process (or of the process of a product) under every way the process can be split, per unit
+    of each product: equally, by each property all products have, as stored by hand. Nothing is saved: the models are
+    rebuilt with those shares (engine.with_factors), the rest of the calculation stays as it is."""
+    method = tuple(method)
+    act = bd.get_node(id=int(activity_id))
+    proc = functional.process_of(act)
+    if proc is None or not proc.multifunctional:
+        raise ValueError(_("«{name}» hat nur ein Produkt: eine Allokation ist nicht nötig.", name=act["name"]))
+    if models.roles().get(proc["database"]) != "model":
+        raise ValueError(_("Allokationen vergleichen geht für eigene Modelle; Hintergrunddaten sind schon alloziert."))
+    S = models.system()
+    products = proc.products()
+    current = functional.strategy(proc)
+    rows = []
+    for label in functional.strategies(proc):
+        try:
+            factors = functional.factors(proc, label)
+        except (KeyError, ValueError):
+            continue  # a property that is zero for all products, or manual shares that add up to nothing
+        S2 = engine.with_factors(S, factors)
+        rows.append({"strategy": label, "current": label == current,
+                     "factors": {str(k): v for k, v in factors.items()},
+                     "scores": {str(p.id): S2.score({p.id: 1.0}, method) for p in products}})
+    return {"process": str(proc.id), "name": proc["name"], "unit": short_unit(bd.methods[method].get("unit")),
+            "products": [{"id": str(p.id), "name": p.get("product") or p["name"], "unit": short_unit(p.get("unit"))}
+                         for p in products],
+            "rows": rows}
+
+
 # ---------- results ----------
+
+def single_score_sets(activity_id: int | str | None = None, amount: float = 1.0) -> dict:
+    """The single scores this project's methods allow (singlescore.py): EF 3.1, ReCiPe 2016 endpoint, UBP. With a
+    product, each says whether its methods cover the product's elementary flows ("coverage": native, mapped, missing)."""
+    from . import singlescore
+
+    sets = singlescore.sets()
+    out = [singlescore.summary(x) for x in sets]
+    if activity_id is not None and sets:
+        S = models.system_for(activity_id)
+        lists = singlescore.flow_lists(S, S.inventory(S.supply({int(activity_id): float(amount)})))
+        for o, x in zip(out, sets):
+            o["coverage"] = singlescore.coverage(x, lists)
+    return {"sets": out}
+
+
+def single_score(activity_id: int | str, amount: float, set_id: str, weighting: str | None = None) -> dict:
+    """One product's single score with its parts by category; weighting: another ReCiPe set (e.g. "H/H")."""
+    from . import singlescore
+
+    s = singlescore.find(set_id)
+    S = models.system_for(activity_id)
+    out = singlescore.compute(S, {int(activity_id): float(amount)}, s, weighting)
+    a = bd.get_node(id=int(activity_id))
+    return {**out, "id": str(a.id), "name": a["name"], "amount": float(amount), "unit_product": short_unit(a.get("unit"))}
+
 
 def calculate(activity_id: int | str, amount: float, method: tuple, top: int = 12) -> dict:
     """Score, contributions and environmental profile for one product, from the engine."""
@@ -760,7 +886,9 @@ def verify(fus: list[dict], methods: list[tuple]) -> dict:
         lca = bc.LCA({node: amount}, tuple(methods[0]))
         lca.lci()
         bio_ids = np.array([f for f, _ in sorted(lca.dicts.biosphere.items(), key=lambda kv: kv[1])], dtype=np.int64)
+        act_ids = np.array([a for a, _ in sorted(lca.dicts.activity.items(), key=lambda kv: kv[1])], dtype=np.int64)
         g = np.asarray(lca.inventory.sum(axis=1)).ravel()
+        places = None
         for m in methods:
             m = tuple(m)
             lca.switch_method(m)
@@ -772,6 +900,14 @@ def verify(fus: list[dict], methods: list[tuple]) -> dict:
             ref = float(lca.score) + (float(add @ g) if add is not None else 0.0)
             # measure against the gross impact, so results where credits and burdens cancel stay meaningful
             gross = float(abs(lca.characterized_inventory).sum()) + (float(abs(add * g).sum()) if add is not None else 0.0)
+            T = regional.active(m)  # factors by location: bw2calc uses only the global rows of a method
+            if T is not None:
+                places = places or regional.places_for(act_ids)
+                c = np.asarray(lca.characterization_matrix.diagonal()).ravel() + (add if add is not None else 0.0)
+                part = regional.matrix(T, bio_ids, places, lca.biosphere_matrix, c)
+                if part is not None:
+                    ref += float((part.R @ lca.supply_array).sum())
+                    gross += float(abs(part.R.multiply(lca.supply_array[None, :])).sum())
             worst = max(worst, abs(mine - ref) / gross if gross > 0 else abs(mine - ref))
             checked += 1
     return {"ok": bool(worst < 1e-6), "max_rel": worst, "checked": checked, "seconds": time.perf_counter() - t}
@@ -798,10 +934,13 @@ def make_working_copy() -> str:
     cur = bd.projects.current
     base = reg["copies"].get(cur, {}).get("original", cur)
     n, name = 1, _("{base} – Arbeitskopie", base=base)
-    while name in bd.projects:
+    while name in bd.projects or _folder_taken(name, bd.projects.dataset.full_hash):
         n += 1
         name = _("{base} – Arbeitskopie {n}", base=base, n=n)
     bd.projects.copy_project(name, switch=True)
+    # a reused name must not get the cached results of a deleted copy (the cache is keyed by name and versions)
+    engine.bump_background(name)
+    engine.bump_foreground(name)
     reg = registry.load()
     reg["copies"][name] = {"original": cur, "created": time.strftime("%Y-%m-%dT%H:%M:%S"), "changes": []}
     reg.get("journal", {}).pop(name, None)  # a reused name must not inherit the undo steps of a deleted copy
@@ -809,6 +948,12 @@ def make_working_copy() -> str:
     models_of = reg.get("models", {}).get(cur)
     if models_of:
         reg.setdefault("models", {})[name] = list(models_of)
+    # the copy calculates on the same background as its original (a reused name must not keep a deleted copy's)
+    bg_of = reg.get("backgrounds", {}).get(cur)
+    if bg_of:
+        reg.setdefault("backgrounds", {})[name] = dict(bg_of)
+    else:
+        reg.get("backgrounds", {}).pop(name, None)
     registry.save(reg)
     return name
 
@@ -831,11 +976,16 @@ def edit_exchange(exchange_id: int, amount: float) -> dict:
     if old == amount:
         return {"changed": False}
     output, inp = exc.output, exc.input
-    models.rescale_uncertainty(exc, old, float(amount))
-    exc["amount"] = float(amount)
-    exc.save()
     changes = reg["copies"][cur]["changes"]
     prior = next((c for c in changes if c["exchange"] == exchange_id), None)
+    unc = ({k: models._plain(exc.get(k)) for k in models.UNC_FIELDS}
+           if int(exc.get("uncertainty type") or 0) > 1 else None)
+    if prior and prior.get("unc") and float(amount) == prior["old"]:
+        models._apply_fields(exc, prior["unc"])  # back to the original amount: the distribution exactly as before
+    else:
+        models.rescale_uncertainty(exc, old, float(amount))
+    exc["amount"] = float(amount)
+    exc.save()
     if prior:
         prior["new"] = float(amount)
         if prior["new"] == prior["old"]:
@@ -843,7 +993,8 @@ def edit_exchange(exchange_id: int, amount: float) -> dict:
     else:
         changes.append({"exchange": exchange_id, "activity_id": str(output.id), "activity": output["name"],
                         "location": output.get("location"), "input": inp["name"], "unit": short_unit(inp.get("unit")),
-                        "old": old, "new": float(amount), "time": time.strftime("%Y-%m-%dT%H:%M:%S")})
+                        "old": old, "new": float(amount), "time": time.strftime("%Y-%m-%dT%H:%M:%S"),
+                        **({"unc": unc} if unc else {})})
     registry.save(reg)
     engine.bump_background(cur)
     return {"changed": True}
@@ -885,6 +1036,27 @@ def set_completion(on: bool) -> dict:
     """Completed factors for sub-compartments (completion.py): on or off, for all calculations."""
     completion.set_enabled(on)
     return completion.info()
+
+
+def set_regional(on: bool) -> dict:
+    """Factors that depend on the location of the activity (regional.py): on or off, for all calculations."""
+    regional.set_enabled(on)
+    return regional.info()
+
+
+def regional_factors(method: tuple) -> dict:
+    """Every factor by location the method has (whether switched on or not), for the list in the UI."""
+    method = tuple(method)
+    if method not in bd.methods:
+        raise KeyError(_("Methode fehlt in diesem Projekt"))
+    return {**regional.summary(method), "method": list(method), "unit": short_unit(bd.methods[method].get("unit")),
+            "rows": regional.table_rows(method)}
+
+
+def unload_factor_file(fid: str) -> dict:
+    """Remove a loaded file with factors by location (factor_files.py)."""
+    factor_files.unload(fid)
+    return regional.info()
 
 
 def completed_factors(method: tuple) -> dict:
@@ -990,7 +1162,9 @@ def explain_difference(activity_id: int | str, amount: float, method: tuple) -> 
                 k0, k1 = S0.bio_row.get(int(p["inp"])), S1.bio_row.get(int(p["inp"]))
                 if k0 is not None and k1 is not None:
                     d = float(S1.B[k1, j1] - S0.B[k0, j0])
-                    e["val"], e["used"] = c0[k0] * d * x1[S1.col[int(p["out"])]], float(x1[j1])
+                    # the factor at the emitting process's location (regional.py; the normal one without)
+                    cf = S0.column_factors(method, j0)[k0] if regional.active(method) is not None else c0[k0]
+                    e["val"], e["used"] = cf * d * x1[S1.col[int(p["out"])]], float(x1[j1])
             else:
                 i0, i1 = S0.row.get(int(p["inp"])), S1.row.get(int(p["inp"]))
                 if i0 is not None and i1 is not None:

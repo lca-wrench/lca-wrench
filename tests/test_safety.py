@@ -5,17 +5,21 @@
 - Databases not made in LCA Wrench are calculated, but changed only in a copy of the project.
 - Undo never overwrites a change another program made in the meantime.
 - Other websites in the browser cannot send requests; a project deleted from outside is not created again.
+- A project left keeps no file open (Windows cannot delete open files).
 """
 
+import os
 import pickle
 import shutil
+import sys
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import bw2data as bd
 import pytest
 from bw2data.backends.proxies import Exchange
 from bw2data.backends.schema import ExchangeDataset
-from bw2data.parameters import DatabaseParameter
+from bw2data.parameters import DatabaseParameter, ProjectParameter
 from bw2data.project import ProjectDataset
 from fastapi.testclient import TestClient
 
@@ -40,7 +44,7 @@ def _files(d: Path) -> dict:
 def _cleanup():
     bd.projects.set_current(TEST_PROJECT)
     for name in [p.name for p in bd.projects if p.name.startswith(PREFIX)]:
-        bd.projects.delete_project(name, delete_dir=True)
+        s.remove_project(name)
 
 
 def _electricity() -> int:
@@ -222,7 +226,7 @@ def test_undo_of_a_deleted_input_needs_its_process(model):
 @pytest.fixture()
 def client():
     bd.projects.set_current(TEST_PROJECT)
-    with TestClient(app, base_url="http://127.0.0.1") as c:
+    with TestClient(app, base_url="http://127.0.0.1", headers={"X-LCA-Wrench": "1"}) as c:
         yield c
     bd.projects.set_current(TEST_PROJECT)
 
@@ -272,11 +276,18 @@ def test_a_project_that_fails_to_load_is_reported_and_not_reopened(client, monke
 def test_requests_from_other_websites_are_rejected(client):
     assert client.post("/api/copy", json={}, headers={"Origin": "https://evil.example"}).status_code == 403
     assert client.post("/api/beispiel", headers={"Sec-Fetch-Site": "cross-site"}).status_code == 403
-    assert client.get("/api/state", headers={"Origin": "http://127.0.0.1:8787", "Sec-Fetch-Site": "same-origin"}).status_code == 200
+    assert client.get("/api/state", headers={"Origin": "http://127.0.0.1", "Sec-Fetch-Site": "same-origin"}).status_code == 200
+    # another local port is another website; "null" origins and requests without the UI header may change nothing
+    assert client.post("/api/copy", json={}, headers={"Origin": "http://127.0.0.1:3000"}).status_code == 403
+    assert client.post("/api/copy", json={}, headers={"Origin": "null"}).status_code == 403
+    assert client.post("/api/beispiel", headers={"X-LCA-Wrench": ""}).status_code == 403
+    assert client.post("/api/models/import", content=b"x", headers={"X-LCA-Wrench": "", "Content-Type": "text/plain"}).status_code == 403
+    assert client.get("/api/state", headers={"X-LCA-Wrench": ""}).status_code == 200  # reading needs no header
     big = client.post("/api/models/import", content=b"x", headers={"Content-Length": str(30 * 1024 * 1024)})
     assert big.status_code == 413
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows does not let another program delete the folder of an open project")
 def test_project_deleted_from_outside_is_not_created_again():
     _cleanup()
     name = f"{PREFIX}-weg"
@@ -285,7 +296,27 @@ def test_project_deleted_from_outside_is_not_created_again():
     s.acknowledge()
     d = _dir(name)
     ProjectDataset.delete().where(ProjectDataset.name == name).execute()  # what another program's delete does
+    # Windows deletes no open file: another program can delete the folder only once we have let go of its SQLite files
+    for _, sqlite_db in bd.config.sqlite3_databases:
+        sqlite_db.db.close()
     shutil.rmtree(d)
     assert s.sync_external() is True
     assert not s.project_open() and name not in bd.projects and not d.exists()
     _cleanup()
+
+
+def test_project_left_keeps_no_file_open():
+    """A request thread that read a project keeps its parameters database open after the switch until Python's cycle
+    collector runs (Brightway). Opening another project lets go at once: on Windows the project left can be deleted."""
+    psutil = pytest.importorskip("psutil")
+    _cleanup()
+    name = f"{PREFIX}-verlassen"
+    bd.projects.set_current(name)  # new and empty
+    d = os.path.normcase(str(bd.projects.dir))
+    try:
+        with ThreadPoolExecutor(max_workers=1) as ex:  # the thread stays alive, like the server's
+            ex.submit(lambda: ProjectParameter.select().count()).result()
+            s.set_project(TEST_PROJECT)
+            assert not [f.path for f in psutil.Process().open_files() if os.path.normcase(f.path).startswith(d)]
+    finally:
+        _cleanup()

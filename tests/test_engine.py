@@ -5,6 +5,8 @@ processes, an avoided product, a flow no background process emits) and
 deletes it afterwards. Needs the BAFU project from setup_daten.py.
 """
 
+import os
+
 import bw2calc as bc
 import bw2data as bd
 import numpy as np
@@ -305,6 +307,19 @@ def test_unit_scores_are_refined():
     assert models.system().score({aid: 1.0}, m) == pytest.approx(lca.score, rel=1e-10)
 
 
+def test_cached_background_keeps_no_file_open():
+    """bw2calc keeps its matrix files (processed/*.zip) open while the LCA lives, and the engine caches it: closed once
+    read, or the cache locks them on Windows, where an open file cannot be deleted (removing a background database,
+    deleting a project)."""
+    psutil = pytest.importorskip("psutil")
+    bd.projects.set_current(PROJECT)
+    S = models.system()
+    S.score({bafu("Packing, lime products", "CH"): 1.0}, s.CLIMATE_METHOD)  # the matrices and a method read
+    assert S.bg.lca is not None
+    processed = os.path.normcase(str(bd.projects.dir / "processed"))
+    assert not [f.path for f in psutil.Process().open_files() if os.path.normcase(f.path).startswith(processed)]
+
+
 def test_fast_lu_matches_default_and_falls_back():
     """fast_lu solves like SuperLU's default, and falls back where pivot-free elimination breaks down."""
     import numpy as np
@@ -330,3 +345,27 @@ def test_fast_lu_matches_default_and_falls_back():
     lu2 = engine.fast_lu(P)
     y = lu2.solve(np.array([1.0, 2.0, 3.0]))
     assert np.allclose(P @ y, [1.0, 2.0, 3.0], atol=1e-12)
+
+
+def test_production_amounts_match_matrix_entries(model):
+    """The vectorized production amounts equal the matrix entry of each column's own product row (diagonal where
+    there is none), for background and models alike, also after a production amount is edited."""
+    bd.projects.set_current(PROJECT)
+
+    def expected(A, act_ids, row, fallback):
+        return np.array([A[row[int(a)], c] if int(a) in row else fallback[c] for c, a in enumerate(act_ids)], dtype=float)
+
+    S = models.system()
+    bg = S.bg
+    assert np.array_equal(bg.production, expected(bg.A, bg.act_ids, dict(bg.lca.dicts.product), bg.A.diagonal()))
+    fg = S.fg
+    assert np.array_equal(fg.production, expected(fg.A_ff.tocsc(), fg.act_ids, fg.prod_row, np.zeros(S.nf)))
+    prod = next(iter(bd.get_node(id=model["p2"]).production()))
+    old = float(prod["amount"])
+    models.update_exchange(int(prod.id), amount=4.0)
+    try:
+        S2 = models.system()
+        assert S2.production[S2.col[model["p2"]]] == 4.0
+        assert np.array_equal(S2.fg.production, expected(S2.fg.A_ff.tocsc(), S2.fg.act_ids, S2.fg.prod_row, np.zeros(S2.nf)))
+    finally:
+        models.update_exchange(int(prod.id), amount=old)

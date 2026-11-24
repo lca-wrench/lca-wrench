@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "lca-wrench"
-version = "0.1.0"
+version = "0.1.1"
 description = "A local web UI for Brightway 2.5 with its own calculation engine: model, calculate and analyse life cycle assessments without waiting."
 readme = "README.md"
 requires-python = ">=3.12"
@@ -25,12 +25,13 @@ classifiers = [
 # Brightway itself is pinned to the tested versions (as in requirements-app.txt): a newer one could calculate
 # differently or convert projects when opening them. requirements-lock.txt pins everything, with checksums.
 dependencies = [
-  "bw2data==4.7",
+  "bw2data==4.8",
   "bw2calc==2.5.0",
   "bw2io==0.9.17",
   "bw2parameters==1.1.0",
   "bw-processing==1.6",
   "matrix-utils==0.9",
+  "bw-functional==0.1.1",
   "numpy",
   "scipy",
   "openpyxl",

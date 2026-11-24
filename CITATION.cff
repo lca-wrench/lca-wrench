@@ -8,8 +8,8 @@ authors:
   - family-names: "Pfister"
     given-names: "Stephan"
     affiliation: "ETH Zurich, Institute of Environmental Engineering"
-version: "0.1.0"
-date-released: "2026-11-18"
+version: "0.1.1"
+date-released: "2026-11-21"
 repository-code: "https://github.com/lca-wrench/lca-wrench"
 license: BSD-3-Clause
 abstract: "LCA Wrench is a local web interface for Brightway 2.5 with its own calculation engine for building product models and calculating life cycle assessment results."

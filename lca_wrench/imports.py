@@ -293,7 +293,6 @@ def _run_external(job: Job, cmds: list[list[str]], task: dict | None, env: dict 
 
     with s.LOCK:
         before = set(bd.databases) if s.project_open() else set()
-        methods0 = set(bd.methods) if s.project_open() else set()
     tail: deque = deque(maxlen=60)
     result, error = None, None
     try:
@@ -335,10 +334,11 @@ def _run_external(job: Job, cmds: list[list[str]], task: dict | None, env: dict 
             if task is not None:
                 s.sync_external()  # the worker wrote into the project: read it again
                 if error and s.project_open() and bd.projects.current == task["project"]:
-                    for n in set(bd.databases) - before:
-                        del bd.databases[n]
-                    for m in set(bd.methods) - methods0:
-                        bd.Method(m).deregister()
+                    # only the job's own databases: others made meanwhile are the user's (the job adds no methods)
+                    own = task.get("names") or [task["name"], task["name"] + " biosphere"]
+                    for n in set(own) - before:
+                        if n in bd.databases:
+                            del bd.databases[n]
                 s.acknowledge()
         except Exception:
             log.exception("Cleaning up after %s failed", job.source)
@@ -358,7 +358,7 @@ def _undo(name: str, created: bool, before: str | None, dbs0: set, methods0: set
                 # leave it first: deleting the current project would switch to "default" with its automatic updates
                 back = before if before and before in bd.projects and before != name else "default"
                 bd.projects.set_current(back, update=False)
-            bd.projects.delete_project(name, delete_dir=True)
+            s.remove_project(name)  # closes what keeps its files open (Windows)
         else:
             bd.projects.set_current(name)
             for db in set(bd.databases) - dbs0:

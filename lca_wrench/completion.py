@@ -14,7 +14,13 @@ compartment without sub-compartment:
   groundwater emissions of heavy metals to 0 on purpose) and special cases ("Carbon dioxide, fossil" in
   'stratosphere + troposphere');
 - never for long-term sub-compartments: whether long-term emissions count is a choice of the method, and methods
-  that count them list them. They stay without a factor and show up in the list of flows without a factor.
+  that count them list them. They stay without a factor and show up in the list of flows without a factor;
+- only in a method family that carries its factors on the flows without sub-compartment. For each method, take the
+  sub-compartment flows (not long-term) of the substances it has a top-level factor for, and the share of them with a
+  factor of its own. The BAFU template's methods give few of them one (median share 0.01); a family that gives most
+  of them a factor (median share 0.5 or more, as ecoinvent's LCIA methods) has chosen which sub-compartments count, and
+  a sub-compartment it leaves out (emissions to groundwater, for instance) stays out. Families as in
+  overview.method_family, with ecoinvent's version kept apart.
 
 Applied in the calculation (engine.cvec, the cross-check, Monte Carlo), not written into the project: the stored
 methods stay as they are. On by default, can be switched off (registry "completion"); the result names what was added.
@@ -26,9 +32,12 @@ import threading
 
 import numpy as np
 
+SPARSE = 0.5  # a family whose methods specify fewer of their sub-compartments (median share) gets completed factors
+
 _lock = threading.RLock()
 _flows_cache: dict = {}  # (project, stamp, database) -> {flow id: (name, categories, unit)}
 _added: dict = {}  # (project, stamp, method, num_cfs) -> {flow id: (factor, source flow id)}
+_needs: dict = {}  # (project, stamp, family, members with num_cfs) -> bool
 
 
 def enabled() -> bool:
@@ -89,6 +98,10 @@ def candidates(method: tuple) -> dict[int, tuple[float, int]]:
         with _lock:
             _added[k] = out
         return out
+    if not needs_completion(tuple(method)):  # a family that specifies its sub-compartments: left as it is
+        with _lock:
+            _added[k] = out
+        return out
     cf = engine.method_cfs(tuple(method))
     for db in sorted(flowmap.method_dbs(method)):
         fl = flows(db)
@@ -105,6 +118,48 @@ def candidates(method: tuple) -> dict[int, tuple[float, int]]:
                     out[i] = hit
     with _lock:
         _added[k] = out
+    return out
+
+
+def sub_share(method: tuple) -> float | None:
+    """Of the sub-compartment flows (not long-term) of the substances the method has a non-zero factor for on the flow
+    without sub-compartment, the share with a factor of their own (an explicit zero counts); None if there are none."""
+    from . import engine, flowmap
+
+    cf = engine.method_cfs(tuple(method))
+    covered = total = 0
+    for db in sorted(flowmap.method_dbs(method)):
+        fl = flows(db)
+        tops = {(name, cats[0], unit) for i, (name, cats, unit) in fl.items() if len(cats) == 1 and cf.get(i)}
+        if not tops:
+            continue
+        for i, (name, cats, unit) in fl.items():
+            if len(cats) > 1 and not long_term(cats) and (name, cats[0], unit) in tops:
+                total += 1
+                covered += i in cf
+    return covered / total if total else None
+
+
+def needs_completion(method: tuple) -> bool:
+    """Does the method's family carry its factors on the flows without sub-compartment? The median share (sub_share)
+    over the family's methods is below SPARSE. A derived total follows its parts (candidates)."""
+    import statistics
+
+    import bw2data as bd
+
+    from . import flowmap, overview
+
+    fam = overview.method_family(tuple(method), multi=True)
+    members = tuple(sorted((m, (bd.methods.get(m) or {}).get("num_cfs")) for m in bd.methods
+                           if overview.method_family(m, multi=True) == fam and not _summed(m)))
+    k = (bd.projects.current, flowmap._stamp(), fam, members)
+    with _lock:
+        if k in _needs:
+            return _needs[k]
+    shares = [x for m, _n in members if (x := sub_share(m)) is not None]
+    out = bool(shares) and statistics.median(shares) < SPARSE
+    with _lock:
+        _needs[k] = out
     return out
 
 

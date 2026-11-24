@@ -1,13 +1,15 @@
 # Runtime requirements without checksums: what the installers fall back to when the tested versions
 # (requirements-lock.txt) cannot be installed, e.g. on an older Mac.
-# Brightway itself stays on the tested versions: a newer one (e.g. bw2calc 3, bw2data 4.8) could calculate differently
+# Brightway itself stays on the tested versions: a newer one (e.g. bw2calc 3) could calculate differently
 # or convert projects when opening them. Only the other packages (numpy, scipy, pandas ...) may differ.
-bw2data==4.7
+bw2data==4.8
 bw2calc==2.5.0
 bw2io==0.9.17
 bw2parameters==1.1.0
 bw-processing==1.6
 matrix-utils==0.9
+# processes with several products, stored as the Activity Browser 3 stores them (lca_wrench/functional.py)
+bw-functional==0.1.1
 fastapi>=0.110
 uvicorn[standard]>=0.29
 # BAFU 2026 with EF 3.1 (lca_wrench/bafu2026.py): a fixed commit from GitHub, as an archive (no git needed)
